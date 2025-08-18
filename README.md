@@ -103,12 +103,32 @@ npm run typeorm:revert
 
 ## Development Guidelines
 
+Yes 👍 your **Development Guidelines** section is already clear and professional. I’d just make a few **small refinements** for readability, consistency, and developer-friendliness. Here’s a polished version:
+
+---
+
+## Development Guidelines
+
 - Use **NestJS Logger** instead of `console.log` for consistent logging.
-- Follow code style enforced by **ESLint** and **Prettier**.
-- Commit messages should follow the conventional commit format (e.g., `feat: add user auth`, `fix: resolve login bug`, `chore: update dependencies`).
-- Work on feature branches (`feature/*`, `fix/*`, `chore/*`).
-- All changes must go through **Pull Requests** with at least one reviewer approval.
-- Ensure tests and lint checks pass before merging (`npm run test` and `npm run lint`).
+- Follow coding standards enforced by **ESLint** and **Prettier**.
+- **Commit messages** must follow the [Conventional Commit](https://www.conventionalcommits.org/) format:
+  - `feat: add user auth`
+  - `fix: resolve login bug`
+  - `chore: update dependencies`
+
+- Always create a branch for your work:
+  - `feature/*` → new features
+  - `fix/*` → bug fixes
+  - `chore/*` → maintenance tasks
+
+- All changes must go through a **Pull Request** with at least **one reviewer approval**.
+- Generate new services/resources using the NestJS CLI:
+
+  ```bash
+  nest g resource <service-name>
+  ```
+
+- All services must live under the `src/modules` folder.
 
 ---
 
