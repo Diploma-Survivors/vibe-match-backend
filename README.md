@@ -98,13 +98,6 @@ npm run typeorm:run
 # Revert the last migration
 npm run typeorm:revert
 ```
-
----
-
-## Development Guidelines
-
-Yes 👍 your **Development Guidelines** section is already clear and professional. I’d just make a few **small refinements** for readability, consistency, and developer-friendliness. Here’s a polished version:
-
 ---
 
 ## Development Guidelines
