@@ -1,206 +1,148 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
 # Vibe Match Backend
 
-A NestJS backend application for the Vibe Match platform.
+Backend service for the **Vibe Match** platform
 
-## Features
+---
 
-- **PostgreSQL Database**: TypeORM integration with PostgreSQL
-- **Redis Cache**: Redis integration for caching and session management
-- **Swagger Documentation**: Auto-generated API documentation
-- **JWT Authentication**: Secure authentication system
-- **Environment Configuration**: Comprehensive environment variable management
-- **Docker Support**: Docker Compose setup for development
+## Getting Started
 
-## Prerequisites
+### Option 1: Docker Compose (Recommended)
 
-- Node.js (v18 or higher)
-- PostgreSQL 16
-- Redis 7.2
-- Docker & Docker Compose (optional)
+#### 1. Clone the repo
 
-## Quick Start
+```bash
+git clone https://github.com/Diploma-Survivors/vibe-match-backend
+cd vibe-match-backend
+```
 
-### Using Docker Compose (Recommended)
+#### 2. Copy env file
 
-1. Clone the repository
-2. Copy the environment file:
+```bash
+cp env.example .env
+```
+
+#### 3. Update .env with your values
+
+Edit `.env` to configure database, Redis, and other environment-specific settings.
+
+#### 4. Start infrastructure
+
+```bash
+docker compose up -d
+```
+
+#### 5. Install dependencies
+
+```bash
+npm install
+```
+
+#### 6. Start the application
+
+```bash
+npm run start:dev
+```
+
+### Option 2: Manual Setup
+
+1. Install **PostgreSQL** and **Redis** locally.
+2. Create a database named `vibe-match`:
    ```bash
-   cp env.example .env
+   createdb vibe-match
    ```
-3. Update the `.env` file with your configuration
-4. Start the services:
-   ```bash
-   docker-compose up -d
-   ```
-5. Install dependencies:
+3. Copy `.env` from `env.example` and update credentials.
+4. Install dependencies:
    ```bash
    npm install
    ```
-6. Start the application:
+5. Run the application:
    ```bash
    npm run start:dev
    ```
 
-### Manual Setup
-
-1. Install PostgreSQL and Redis
-2. Create a database named `vibe-match`
-3. Copy the environment file:
-   ```bash
-   cp env.example .env
-   ```
-4. Update the `.env` file with your database credentials
-5. Install dependencies:
-   ```bash
-   npm install
-   ```
-6. Start the application:
-   ```bash
-   npm run start:dev
-   ```
-
-## Environment Variables
-
-Copy `env.example` to `.env` and configure:
-
-- **Database**: PostgreSQL connection settings
-- **Redis**: Redis connection settings
-- **JWT**: Authentication secrets and TTLs
-- **Mail**: SMTP configuration
-- **Swagger**: API documentation settings
+---
 
 ## API Documentation
 
-Once running, access Swagger documentation at:
+Available at:
+👉 [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
 
-```
-http://localhost:3000/api/docs
-```
+---
 
-## Available Scripts
+## Scripts
 
-- `npm run start:dev` - Start in development mode
-- `npm run build` - Build the application
-- `npm run start:prod` - Start in production mode
-- `npm run test` - Run tests
-- `npm run test:e2e` - Run end-to-end tests
+- `npm run start:dev` → Run in development with hot-reload
+- `npm run start:prod` → Run in production
+- `npm run build` → Compile the application to `/dist`
+- `npm run test` → Run unit tests with Jest
+- `npm run test:e2e` → Run end-to-end tests
+- `npm run lint` → Run ESLint to check code style
+- `npm run format` → Run Prettier to format code
 
-## Project Structure
+---
 
-```
-src/
-├── config/          # Configuration files
-├── common/          # Shared utilities
-├── modules/         # Feature modules
-│   ├── auth/        # Authentication module
-│   └── user/        # User management module
-└── main.ts          # Application entry point
-```
+## 🗄 Database & Migrations
 
-## Database Migrations
+- **Development**: Auto-sync enabled via TypeORM for schema updates.
+- **Production**: Use migrations for controlled schema changes.
 
-The application uses TypeORM with auto-synchronization enabled in development. For production, consider using migrations:
+### Migration Commands
 
 ```bash
+# Generate a new migration
 npm run typeorm:generate -- -n MigrationName
+
+# Run migrations
 npm run typeorm:run
+
+# Revert the last migration
+npm run typeorm:revert
 ```
+
+---
+
+## Development Guidelines
+
+- Use **NestJS Logger** instead of `console.log` for consistent logging.
+- Follow code style enforced by **ESLint** and **Prettier**.
+- Commit messages should follow the conventional commit format (e.g., `feat: add user auth`, `fix: resolve login bug`, `chore: update dependencies`).
+- Work on feature branches (`feature/*`, `fix/*`, `chore/*`).
+- All changes must go through **Pull Requests** with at least one reviewer approval.
+- Ensure tests and lint checks pass before merging (`npm run test` and `npm run lint`).
+
+---
+
+## Workflow: Trunk-Based Development
+
+1. Create a feature branch:
+   ```bash
+   git checkout -b feature/awesome-feature
+   ```
+2. Commit changes and push:
+   ```bash
+   git commit -m "feat: implement awesome feature"
+   git push origin feature/awesome-feature
+   ```
+3. Open a Pull Request on GitHub.
+4. Request review and ensure CI checks (tests, linting) pass.
+5. Merge into the `main` branch after approval.
+
+---
+
+## Notes for Team
+
+- **Dependency Management**: Keep dependencies up to date using `npm outdated` and update as needed.
+- **API Documentation**: Update Swagger annotations for any API changes to keep [http://localhost:3000/api/docs](http://localhost:3000/api/docs) current.
+- **Environment Variables**: Add new variables to `env.example` when updating `.env` requirements.
+- **Logging**: Use structured logging (e.g., JSON format) for better observability in production.
+- **Testing**: Write unit and end-to-end tests for all new features and bug fixes.
+- **Security**: Ensure sensitive data (e.g., API keys, credentials) is stored in `.env` and never committed.
+
+---
+
+## Troubleshooting
+
+- **Database Connection Issues**: Verify PostgreSQL is running and `.env` credentials match.
+- **Redis Connection Errors**: Ensure Redis is accessible and the port in `.env` is correct.
+- **Dependency Issues**: Run `npm ci` for a clean install if `npm install` fails.
+- **Migration Conflicts**: Check migration history with `npm run typeorm:log` and resolve conflicts manually.
