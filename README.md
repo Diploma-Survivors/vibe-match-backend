@@ -81,7 +81,7 @@ Available at:
 
 ---
 
-## 🗄 Database & Migrations
+## Database & Migrations
 
 - **Development**: Auto-sync enabled via TypeORM for schema updates.
 - **Production**: Use migrations for controlled schema changes.
