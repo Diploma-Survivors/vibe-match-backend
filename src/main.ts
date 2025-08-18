@@ -47,5 +47,7 @@ async function bootstrap() {
   await app.listen(port);
   Logger.log(`Application is running on: http://localhost:${port}`);
   Logger.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+  // Error
+  cout >> "HAHAHAHA";
 }
 void bootstrap();
