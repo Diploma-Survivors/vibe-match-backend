@@ -15,6 +15,7 @@ import { Language } from './language/language.entity';
 import { User } from '../user/entities/user.entity';
 import { StoragesService } from '../storages/storages.service';
 import { Module } from '@nestjs/common';
+import { SubmissionQueue } from './enums/submission-event.enum';
 
 @Module({
   imports: [
@@ -42,7 +43,7 @@ import { Module } from '@nestjs/common';
       },
     }),
     BullModule.registerQueue({
-      name: 'submission-finalize',
+      name: SubmissionQueue.FINALIZE,
     }),
   ],
   controllers: [SubmissionController],

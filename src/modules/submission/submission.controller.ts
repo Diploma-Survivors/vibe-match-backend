@@ -86,7 +86,6 @@ export class SubmissionController {
       .catch(() => {});
   }
 
-  @Sse(':id/stream')
   @SkipTransformResponse()
   @Sse(':id/stream')
   streamResults(@Param('id') submissionId: string): Observable<MessageEvent> {
