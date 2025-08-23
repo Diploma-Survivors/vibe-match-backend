@@ -10,6 +10,9 @@ import environmentValidation from './config/environment.validation';
 import redisConfig from './config/redis.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
+import { SubmissionModule } from './modules/submission/submission.module';
+import { TestcaseModule } from './modules/testcase/testcase.module';
+import { ProblemModule } from './modules/problem/problem.module';
 
 @Module({
   imports: [
@@ -37,6 +40,9 @@ import { UserModule } from './modules/user/user.module';
     }),
     AuthModule,
     UserModule,
+    SubmissionModule,
+    TestcaseModule,
+    ProblemModule,
   ],
   controllers: [AppController],
   providers: [AppService],

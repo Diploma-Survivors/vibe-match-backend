@@ -1,4 +1,4 @@
-# compiled output
+gi# compiled output
 /dist
 /node_modules
 /build
@@ -54,3 +54,8 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+/src/modules/judge0/examples-master/nodejs-node_modules/
+/src/modules/judge0/examples-master/javascript-multi-file-client-side/
+/src/modules/judge0/examples-master/typescript-user-input-01/
+/src/modules/judge0/examples-master/web-post_execution_filesystem/
+/src/modules/judge0/examples-master/

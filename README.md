@@ -18,7 +18,7 @@ cd vibe-match-backend
 #### 2. Copy env file
 
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 #### 3. Update .env with your values
@@ -98,6 +98,7 @@ npm run typeorm:run
 # Revert the last migration
 npm run typeorm:revert
 ```
+
 ---
 
 ## Development Guidelines

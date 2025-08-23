@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Submission } from '../../submission/entities/submission.entity';
+import { Problem } from '../../problem/entities/problem.entity';
 
 @Entity()
 export class User {
@@ -55,4 +57,12 @@ export class User {
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
+
+  // TODO: CONSIDER ABOUT PERFORMANCE
+  @OneToMany(() => Submission, (submission) => submission.user)
+  submissions: Submission[];
+
+  // TODO: CONSIDER ABOUT PERFORMANCE
+  @OneToMany(() => Problem, (problem) => problem.user)
+  problems: Problem[];
 }
