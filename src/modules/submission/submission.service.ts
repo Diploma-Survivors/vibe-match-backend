@@ -34,28 +34,28 @@ export class SubmissionService {
       throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
     }
 
-    const results: TestResultDto[] = [];
     let passedCount = 0;
 
-    // Run code against each test case
-    for (const testCase of dto.testCases) {
-      const judge0Response = await this.executeTestCase(
-        dto,
-        testCase,
-        problem,
-        file,
-      );
+    const results: TestResultDto[] = await Promise.all(
+      dto.testCases.map(async (testCase) => {
+        const judge0Response = await this.executeTestCase(
+          dto,
+          testCase,
+          problem,
+          file,
+        );
 
-      const actualOutput =
-        this.judge0Service.decodeBase64(judge0Response.stdout) || '';
-      const expectedOutput = testCase.expectedOutput || '';
+        const actualOutput =
+          this.judge0Service.decodeBase64(judge0Response.stdout) || '';
+        const expectedOutput = testCase.expectedOutput || '';
 
-      if (actualOutput === expectedOutput) {
-        passedCount++;
-      }
+        if (actualOutput === expectedOutput) {
+          passedCount++;
+        }
 
-      results.push(this.buildTestResult(testCase, judge0Response));
-    }
+        return this.buildTestResult(testCase, judge0Response);
+      }),
+    );
 
     return this.buildSubmissionResult(
       problem.testCases.length,
