@@ -10,12 +10,14 @@ import environmentValidation from './config/environment.validation';
 import redisConfig from './config/redis.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
+import { LtiModule } from './modules/lti/lti.module';
+import { ltiConfig } from './config/lti.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig],
+      load: [appConfig, databaseConfig, redisConfig, ltiConfig],
       validationSchema: environmentValidation,
       validationOptions: {
         allowUnknown: true,
@@ -37,6 +39,7 @@ import { UserModule } from './modules/user/user.module';
     }),
     AuthModule,
     UserModule,
+    LtiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
