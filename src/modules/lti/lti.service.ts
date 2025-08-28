@@ -10,20 +10,20 @@ import {
   LTI_VERSIONS,
 } from './constants/lti.constants';
 import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
+import { RedisService } from '../../shared/redis/redis.service';
 
-// TODO: Use Redis to store state, nonce, and target_link_uri
-const stateStore = new Map<
-  string,
-  { nonce: string; targetLinkUri: string; lti_message_hint?: string }
->();
+const LTI_STATE_TTL_SECONDS = 300;
 
 @Injectable()
 export class LtiService {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
+  ) {}
 
-  public handleLoginInitiation(
+  public async handleLoginInitiation(
     ltiLoginInitiationDto: LtiLoginInitiationDto,
-  ): string {
+  ): Promise<string> {
     const { iss, login_hint, target_link_uri, lti_message_hint } =
       ltiLoginInitiationDto;
 
@@ -37,11 +37,13 @@ export class LtiService {
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
 
-    stateStore.set(state, {
-      nonce,
-      targetLinkUri: target_link_uri,
-      lti_message_hint,
-    });
+    const stateData = { nonce, target_link_uri, lti_message_hint };
+    await this.redisService.set(
+      `lti:state:${state}`,
+      JSON.stringify(stateData),
+      LTI_STATE_TTL_SECONDS,
+    );
+    console.log(`LtiService: Stored state '${state}' in Redis:`, stateData);
 
     const authenticationRequestUrl = this.configService.get<string>(
       'lti.authenticationRequestUrl',
@@ -63,6 +65,7 @@ export class LtiService {
     redirectUrl.searchParams.append('prompt', 'none');
     redirectUrl.searchParams.append('login_hint', login_hint);
 
+    console.log('Redirecting to Moodle with URL:', redirectUrl.toString());
     return redirectUrl.toString();
   }
 
@@ -71,15 +74,24 @@ export class LtiService {
   ): Promise<string> {
     const { id_token, state } = ltiLaunchRequestDto;
 
-    const storedState = stateStore.get(state);
-    if (!storedState) {
+    const storedStateString = await this.redisService.get(`lti:state:${state}`);
+    if (!storedStateString) {
       throw new Error(
         'Invalid or expired state parameter (CSRF protection failed)',
       );
     }
-    stateStore.delete(state);
+    const parsedState = JSON.parse(storedStateString) as {
+      nonce: string;
+      target_link_uri: string;
+      lti_message_hint?: string;
+    };
+    await this.redisService.del(`lti:state:${state}`);
+    console.log(
+      `LtiService: Retrieved state '${state}' from Redis:`,
+      parsedState,
+    );
 
-    const { nonce } = storedState;
+    const { nonce } = parsedState;
 
     const platformPublicKeysetUrl = this.configService.get<string>(
       'lti.publicKeysetUrl',
@@ -118,6 +130,7 @@ export class LtiService {
       throw new Error('Invalid nonce');
     }
 
+    // TODO: Implement user session creation and redirect to the appropriate content
     console.log('LTI Launch successful! Claims:', claims);
 
     const context = claims[LTI_CLAIMS.CONTEXT] as LtiContextClaim;

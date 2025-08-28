@@ -6,23 +6,24 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
-import environmentValidation from './config/environment.validation';
-import redisConfig from './config/redis.config';
+import { redisConfig } from './config/redis.config';
+import { ltiConfig } from './config/lti.config';
+import environmentValidationSchema from './config/environment.validation';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { DataResponseInterceptor } from './common/interceptors/data-response.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { LtiModule } from './modules/lti/lti.module';
-import { ltiConfig } from './config/lti.config';
+import { RedisModule } from './shared/redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true,
+      envFilePath: '.env',
       load: [appConfig, databaseConfig, redisConfig, ltiConfig],
-      validationSchema: environmentValidation,
-      validationOptions: {
-        allowUnknown: true,
-        abortEarly: true,
-      },
+      validationSchema: environmentValidationSchema,
+      isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
@@ -40,8 +41,13 @@ import { ltiConfig } from './config/lti.config';
     AuthModule,
     UserModule,
     LtiModule,
+    RedisModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: DataResponseInterceptor },
+  ],
 })
 export class AppModule {}

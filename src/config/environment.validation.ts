@@ -11,10 +11,10 @@ export default Joi.object({
   DATABASE_NAME: Joi.string().required(),
   DATABASE_USERNAME: Joi.string().required(),
   // Redis Configuration
-  REDIS_HOST: Joi.string().default('localhost'),
-  REDIS_PORT: Joi.number().port().default(6379),
-  REDIS_PASSWORD: Joi.string().optional(),
-  REDIS_DB: Joi.number().default(0),
+  REDIS_HOST: Joi.string().required(),
+  REDIS_PORT: Joi.number().required(),
+  REDIS_PASSWORD: Joi.string().allow('', null).optional(),
+  REDIS_DB: Joi.number().required(),
   // JWT Configuration
   JWT_SECRET: Joi.string().required(),
   JWT_TOKEN_AUDIENCE: Joi.required(),

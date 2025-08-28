@@ -1,9 +1,9 @@
-import { Controller, Get, Redirect, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Res } from '@nestjs/common';
 import { LtiService } from './lti.service';
 import { KeysService } from './keys.service';
 import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
 import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
-
+import type { Response } from 'express';
 @Controller()
 export class LtiController {
   constructor(
@@ -17,21 +17,20 @@ export class LtiController {
   }
 
   @Post('lti/login')
-  @Redirect()
-  public handleLoginInitiation(
+  public async handleLoginInitiation(
     @Body() ltiLoginInitiationDto: LtiLoginInitiationDto,
-  ): { url: string } {
-    const redirectUrl = this.ltiService.handleLoginInitiation(
+    @Res() res: Response,
+  ): Promise<void> {
+    const redirectUrl = await this.ltiService.handleLoginInitiation(
       ltiLoginInitiationDto,
     );
-    return { url: redirectUrl };
+    res.redirect(302, redirectUrl);
   }
 
   @Post('lti/launch')
   public async handleLtiLaunch(
     @Body() ltiLaunchRequestDto: LtiLaunchRequestDto,
   ): Promise<string> {
-    // TODO: Handle LTI launch
     const launchResult =
       await this.ltiService.handleLtiLaunch(ltiLaunchRequestDto);
     return launchResult;
