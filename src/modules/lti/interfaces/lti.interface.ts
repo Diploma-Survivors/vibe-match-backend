@@ -1,4 +1,4 @@
-import { JWTPayload } from 'jose';
+import * as jose from 'jose';
 
 export interface LtiContextClaim {
   id: string;
@@ -35,7 +35,7 @@ export interface LtiDeepLinkingSettingsClaim {
   text?: string;
 }
 
-export interface LtiClaims extends JWTPayload {
+export interface LtiClaims extends jose.JWTPayload {
   iss: string;
   sub: string;
   aud: string;
@@ -59,4 +59,10 @@ export interface LtiClaims extends JWTPayload {
   'https://purl.imsglobal.org/spec/lti-ags/claim/endpoint'?: LtiAgsEndpointClaim;
   'https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice'?: LtiNrpsNamesRoleServiceClaim;
   'https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings'?: LtiDeepLinkingSettingsClaim;
+}
+
+export interface LtiLaunchResponse {
+  cl;
+  jwt: string;
+  redirectPath: string;
 }

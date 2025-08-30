@@ -16,5 +16,6 @@ export default registerAs('appConfig', function () {
     mailPort: process.env.MAIL_PORT,
     smtpUsername: process.env.SMTP_USERNAME,
     smtpPassword: process.env.SMTP_PASSWORD,
+    url: process.env.APP_URL,
   };
 });

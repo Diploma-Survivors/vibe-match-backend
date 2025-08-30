@@ -9,16 +9,21 @@ import {
   LTI_MESSAGE_TYPES,
   LTI_VERSIONS,
 } from './constants/lti.constants';
-import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
+import { LtiClaims } from './interfaces/lti.interface';
 import { RedisService } from '../../shared/redis/redis.service';
+import { UserService } from '../../modules/user/user.service';
+import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
 
 const LTI_STATE_TTL_SECONDS = 300;
+const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems';
 
 @Injectable()
 export class LtiService {
   constructor(
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly userService: UserService,
+    private readonly jwtAuthService: JwtAuthService,
   ) {}
 
   public async handleLoginInitiation(
@@ -130,10 +135,21 @@ export class LtiService {
       throw new Error('Invalid nonce');
     }
 
-    // TODO: Implement user session creation and redirect to the appropriate content
-    console.log('LTI Launch successful! Claims:', claims);
+    const user = await this.userService.findOrCreateByLtiClaims(claims);
+    console.log('LTI Launch: User processed in DB:', user.id, user.email);
 
-    const context = claims[LTI_CLAIMS.CONTEXT] as LtiContextClaim;
-    return `LTI Launch Successful for user: ${claims.sub} in course: ${context?.title || context?.label}`;
+    const internalJwtPayload = {
+      userId: user.id,
+      roles: (claims[LTI_CLAIMS.ROLES] || []) as string[],
+      sub: claims.sub,
+      iss: claims.iss,
+    };
+    const internalJwt = this.jwtAuthService.generateJwt(internalJwtPayload);
+    console.log('LTI Launch: Generated Internal JWT.');
+
+    return JSON.stringify({
+      jwt: internalJwt,
+      redirectPath: FRONTEND_AUTH_CALLBACK_URL,
+    });
   }
 }
