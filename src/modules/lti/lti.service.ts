@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
 import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
@@ -19,6 +24,8 @@ const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems';
 
 @Injectable()
 export class LtiService {
+  private readonly logger = new Logger(LtiService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
@@ -29,26 +36,33 @@ export class LtiService {
   public async handleLoginInitiation(
     ltiLoginInitiationDto: LtiLoginInitiationDto,
   ): Promise<string> {
-    const { iss, login_hint, target_link_uri, lti_message_hint } =
+    const { iss, loginHint, targetLinkUri, ltiMessageHint } =
       ltiLoginInitiationDto;
 
     const platformId = this.configService.get<string>(
       'lti.platformId',
     ) as string;
     if (iss !== platformId) {
-      throw new Error('Invalid issuer');
+      throw new BadRequestException('Invalid issuer');
     }
 
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
 
-    const stateData = { nonce, target_link_uri, lti_message_hint };
+    // Store stateData with snake_case keys to match LTI spec when reconstructing URL
+    const stateData = {
+      nonce,
+      target_link_uri: targetLinkUri,
+      lti_message_hint: ltiMessageHint,
+    };
     await this.redisService.set(
       `lti:state:${state}`,
       JSON.stringify(stateData),
       LTI_STATE_TTL_SECONDS,
     );
-    console.log(`LtiService: Stored state '${state}' in Redis:`, stateData);
+    this.logger.log(
+      `Stored state '${state}' in Redis: ${JSON.stringify(stateData)}`,
+    );
 
     const authenticationRequestUrl = this.configService.get<string>(
       'lti.authenticationRequestUrl',
@@ -63,25 +77,27 @@ export class LtiService {
     redirectUrl.searchParams.append('response_type', 'id_token');
     redirectUrl.searchParams.append('client_id', clientId);
     redirectUrl.searchParams.append('redirect_uri', toolRedirectionUri);
-    redirectUrl.searchParams.append('lti_message_hint', lti_message_hint || '');
+    redirectUrl.searchParams.append('lti_message_hint', ltiMessageHint || '');
     redirectUrl.searchParams.append('state', state);
     redirectUrl.searchParams.append('response_mode', 'form_post');
     redirectUrl.searchParams.append('nonce', nonce);
     redirectUrl.searchParams.append('prompt', 'none');
-    redirectUrl.searchParams.append('login_hint', login_hint);
+    redirectUrl.searchParams.append('login_hint', loginHint);
 
-    console.log('Redirecting to Moodle with URL:', redirectUrl.toString());
+    this.logger.log(
+      `Redirecting to Moodle with URL: ${redirectUrl.toString()}`,
+    );
     return redirectUrl.toString();
   }
 
   public async handleLtiLaunch(
     ltiLaunchRequestDto: LtiLaunchRequestDto,
   ): Promise<string> {
-    const { id_token, state } = ltiLaunchRequestDto;
+    const { idToken, state } = ltiLaunchRequestDto;
 
     const storedStateString = await this.redisService.get(`lti:state:${state}`);
     if (!storedStateString) {
-      throw new Error(
+      throw new UnauthorizedException(
         'Invalid or expired state parameter (CSRF protection failed)',
       );
     }
@@ -91,9 +107,8 @@ export class LtiService {
       lti_message_hint?: string;
     };
     await this.redisService.del(`lti:state:${state}`);
-    console.log(
-      `LtiService: Retrieved state '${state}' from Redis:`,
-      parsedState,
+    this.logger.log(
+      `Retrieved state '${state}' from Redis: ${JSON.stringify(parsedState)}`,
     );
 
     const { nonce } = parsedState;
@@ -109,34 +124,39 @@ export class LtiService {
     let decodedJwt: jose.JWTVerifyResult;
     try {
       const JWKS = jose.createRemoteJWKSet(new URL(platformPublicKeysetUrl));
-      decodedJwt = await jose.jwtVerify(id_token, JWKS, {
+      decodedJwt = await jose.jwtVerify(idToken, JWKS, {
         audience: clientId,
         issuer: platformId,
         clockTolerance: 5,
       });
     } catch (error) {
-      throw new Error(`JWT verification failed: ${(error as Error).message}`);
+      this.logger.error(`JWT verification failed: ${(error as Error).message}`);
+      throw new UnauthorizedException(
+        `JWT verification failed: ${(error as Error).message}`,
+      );
     }
 
     const claims = decodedJwt.payload as LtiClaims;
 
     if (claims[LTI_CLAIMS.VERSION] !== LTI_VERSIONS.V1_3) {
-      throw new Error('Unsupported LTI version');
+      throw new BadRequestException('Unsupported LTI version');
     }
 
     if (
       claims[LTI_CLAIMS.MESSAGE_TYPE] !==
       LTI_MESSAGE_TYPES.LTI_RESOURCE_LINK_REQUEST
     ) {
-      throw new Error('Unsupported LTI message type');
+      throw new BadRequestException('Unsupported LTI message type');
     }
 
     if (claims.nonce !== nonce) {
-      throw new Error('Invalid nonce');
+      throw new UnauthorizedException('Invalid nonce');
     }
 
     const user = await this.userService.findOrCreateByLtiClaims(claims);
-    console.log('LTI Launch: User processed in DB:', user.id, user.email);
+    this.logger.log(
+      `LTI Launch: User processed in DB: ID ${user.id}, Email ${user.email}`,
+    );
 
     const internalJwtPayload = {
       userId: user.id,
@@ -145,7 +165,7 @@ export class LtiService {
       iss: claims.iss,
     };
     const internalJwt = this.jwtAuthService.generateJwt(internalJwtPayload);
-    console.log('LTI Launch: Generated Internal JWT.');
+    this.logger.log('LTI Launch: Generated Internal JWT.');
 
     return JSON.stringify({
       jwt: internalJwt,
