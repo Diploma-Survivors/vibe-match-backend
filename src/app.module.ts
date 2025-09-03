@@ -16,6 +16,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { LtiModule } from './modules/lti/lti.module';
 import { RedisModule } from './shared/redis/redis.module';
+import { ProblemsModule } from './modules/problems/problems.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { RedisModule } from './shared/redis/redis.module';
     UserModule,
     LtiModule,
     RedisModule,
+    ProblemsModule,
   ],
   controllers: [AppController],
   providers: [
