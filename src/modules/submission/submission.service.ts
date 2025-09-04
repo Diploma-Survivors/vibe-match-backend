@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
-import { TestResultDto } from '../testcase/dto/run-testcase-result.response.dto';
+import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { CreateTestCaseDto } from '../testcase/dto/create-testcase.dto';
 import { judge0StatusMap, SubmissionStatus } from './enums/submission.enum';
 import { SubmissionResultDto } from './dto/submission.response.dto';
@@ -18,8 +18,8 @@ export class SubmissionService {
   private readonly logger = new Logger(SubmissionService.name);
 
   constructor(
-    private readonly problemRepository: Repository<Problem>,
-    private readonly submissionRepository: Repository<Submission>,
+    @InjectRepository(SubmissionRepository)
+    private readonly submissionRepository: SubmissionRepository,
     private readonly judge0Service: Judge0Service,
   ) {}
 

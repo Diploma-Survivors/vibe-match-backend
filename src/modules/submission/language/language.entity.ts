@@ -6,6 +6,6 @@ export class Language {
   @PrimaryColumn()
   id: number; // matches Judge0 language ID
 
-  @OneToOne(() => JudgeLanguage, (judgeLanguage) => judgeLanguage.id)
-  judgeLanguage: JudgeLanguage;
+  @Column()
+  name: string
 }

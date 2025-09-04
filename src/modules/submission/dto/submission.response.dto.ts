@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SubmissionStatus } from '../enums/submission.enum';
-import { TestResultDto } from '../../testcase/dto/run-testcase-result.response.dto';
+import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 
 export class SubmissionResultDto {
   @ApiProperty({

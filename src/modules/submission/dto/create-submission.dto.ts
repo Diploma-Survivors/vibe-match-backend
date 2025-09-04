@@ -7,7 +7,6 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { CreateTestCaseDto } from '../../testcase/dto/create-testcase.dto';
 
 export class CreateSubmissionDto {
   @ApiProperty({
@@ -58,6 +57,6 @@ export class CreateSubmissionDto {
       : parsed;
   })
   @ValidateNested({ each: true })
-  @Type(() => CreateTestCaseDto)
-  readonly testCases: CreateTestCaseDto[];
+  @Type(() => CreateTestcaseSampleDto)
+  readonly testCases: CreateTestcaseSampleDto[];
 }

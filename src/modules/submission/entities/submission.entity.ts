@@ -6,9 +6,9 @@ import {
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Problem } from '../../problem/entities/problem.entity';
+import { Problem } from '../../problems/entities/problem.entity';
 import { SubmissionStatus } from '../enums/submission.enum';
-import { Language } from './language.entity';
+import { Language } from '../language/language.entity';
 import { User } from '../../user/entities/user.entity';
 
 // TODO: missing contest participant id
@@ -18,7 +18,7 @@ export class Submission {
   id: number;
 
   @Column('text')
-  code: string;
+  sourceCode: string;
 
   @ManyToOne(() => User, (user) => user.submissions)
   user: User;
@@ -33,13 +33,10 @@ export class Submission {
   })
   status: SubmissionStatus;
 
-  @Column()
-  score: number;
-
-  @Column()
+  @Column({ type: 'float', nullable: true })
   runtime: number;
 
-  @Column()
+  @Column({ nullable: true })
   memoryUsed: number;
 
   @CreateDateColumn()
@@ -50,4 +47,7 @@ export class Submission {
 
   @Column('text')
   sourceCode: string;
+
+  @Column()
+  fileUrl: string;
 }
