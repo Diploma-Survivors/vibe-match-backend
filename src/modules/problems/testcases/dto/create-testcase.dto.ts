@@ -1,1 +1,3 @@
-export class CreateTestcaseDto {}
+export class CreateTestcaseDto {
+  fileUrl: string;
+}

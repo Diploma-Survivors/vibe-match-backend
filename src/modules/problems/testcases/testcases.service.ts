@@ -1,11 +1,39 @@
 import { Injectable } from '@nestjs/common';
-import { CreateTestcaseDto } from './dto/create-testcase.dto';
 import { UpdateTestcaseDto } from './dto/update-testcase.dto';
+import { StoragesService } from 'src/modules/storages/storages.service';
+import {
+  TESTCASE_BUCKET,
+  TESTCASE_FILE_EXTENSION,
+} from './constants/testcases.constant';
+import type { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
+import { v4 as uuidV4 } from 'uuid';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Testcase } from './entities/testcase.entity';
 
 @Injectable()
 export class TestcasesService {
-  create(createTestcaseDto: CreateTestcaseDto) {
-    return 'This action adds a new testcase';
+  constructor(
+    private readonly storagesService: StoragesService,
+    @InjectRepository(Testcase)
+    private readonly testcaseRepository: Repository<Testcase>,
+  ) {}
+
+  async create(file: Express.Multer.File, user: JwtPayload) {
+    const seed = uuidV4();
+    const key = `${user.userId}_${user.iss}_${seed}.${TESTCASE_FILE_EXTENSION}`;
+
+    await this.storagesService.upload({
+      bucket: TESTCASE_BUCKET,
+      key,
+      file: file.buffer,
+    });
+
+    const url = this.storagesService.getObjectUrl(TESTCASE_BUCKET, key);
+
+    await this.testcaseRepository.save({
+      fileUrl: url,
+    });
   }
 
   findAll() {
