@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { LtiClaims } from '../../modules/lti/interfaces/lti.interface';
+import { AuthTypeEnum } from './enums/auth-type.enum';
 
 @Injectable()
 export class UserService {
@@ -31,5 +33,35 @@ export class UserService {
 
   remove(id: number) {
     return this.userRepository.delete(id);
+  }
+
+  public async findOrCreateByLtiClaims(claims: LtiClaims): Promise<User> {
+    const ltiSubjectId = claims.sub;
+    const ltiPlatformId = claims.iss;
+
+    let user = await this.userRepository.findOne({
+      where: {
+        ltiSubjectId: ltiSubjectId,
+        ltiPlatformId: ltiPlatformId,
+      },
+    });
+
+    if (!user) {
+      user = this.userRepository.create({
+        ltiSubjectId: ltiSubjectId,
+        ltiPlatformId: ltiPlatformId,
+        email: claims.email || null,
+        firstName: claims.given_name || null,
+        lastName: claims.family_name || null,
+        authType: AuthTypeEnum.LTI,
+      });
+      await this.userRepository.save(user);
+    } else {
+      user.firstName = claims.given_name || user.firstName;
+      user.lastName = claims.family_name || user.lastName;
+      await this.userRepository.save(user);
+    }
+
+    return user;
   }
 }

@@ -6,24 +6,25 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
-import environmentValidation from './config/environment.validation';
-import redisConfig from './config/redis.config';
+import { redisConfig } from './config/redis.config';
+import { ltiConfig } from './config/lti.config';
+import environmentValidationSchema from './config/environment.validation';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { DataResponseInterceptor } from './common/interceptors/data-response.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
-import { SubmissionModule } from './modules/submission/submission.module';
-import { TestcaseModule } from './modules/testcase/testcase.module';
-import { ProblemModule } from './modules/problem/problem.module';
+import { LtiModule } from './modules/lti/lti.module';
+import { RedisModule } from './shared/redis/redis.module';
+import { ProblemsModule } from './modules/problems/problems.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
+      envFilePath: '.env',
+      load: [appConfig, databaseConfig, redisConfig, ltiConfig],
+      validationSchema: environmentValidationSchema,
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig],
-      validationSchema: environmentValidation,
-      validationOptions: {
-        allowUnknown: true,
-        abortEarly: true,
-      },
     }),
     TypeOrmModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
@@ -40,11 +41,15 @@ import { ProblemModule } from './modules/problem/problem.module';
     }),
     AuthModule,
     UserModule,
-    SubmissionModule,
-    TestcaseModule,
-    ProblemModule,
+    LtiModule,
+    RedisModule,
+    ProblemsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: DataResponseInterceptor },
+  ],
 })
 export class AppModule {}
