@@ -4,6 +4,7 @@ import { UpdateProblemDto } from './dto/update-problem.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Problem } from './entities/problem.entity';
 import { Repository } from 'typeorm';
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @Injectable()
 export class ProblemsService {
@@ -14,9 +15,12 @@ export class ProblemsService {
     private readonly problemsRepository: Repository<Problem>,
   ) {}
 
-  async create(createProblemDto: CreateProblemDto) {
+  async create(createProblemDto: CreateProblemDto, user: JwtPayload) {
     try {
-      const problem = this.problemsRepository.create(createProblemDto);
+      const problem = this.problemsRepository.create({
+        ...createProblemDto,
+        author: { id: user.userId },
+      });
       return await this.problemsRepository.save(problem);
     } catch (err) {
       this.logger.error(err);

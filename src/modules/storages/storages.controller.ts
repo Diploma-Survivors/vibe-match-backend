@@ -1,16 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Delete } from '@nestjs/common';
 import { StoragesService } from './storages.service';
-import { CreateStorageDto } from './dto/create-storage.dto';
 import { UpdateStorageDto } from './dto/update-storage.dto';
 
 @Controller('storages')
 export class StoragesController {
   constructor(private readonly storagesService: StoragesService) {}
-
-  @Post()
-  create(@Body() createStorageDto: CreateStorageDto) {
-    return this.storagesService.create(createStorageDto);
-  }
 
   @Get()
   findAll() {

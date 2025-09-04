@@ -17,12 +17,21 @@ import { UserModule } from './modules/user/user.module';
 import { LtiModule } from './modules/lti/lti.module';
 import { RedisModule } from './shared/redis/redis.module';
 import { ProblemsModule } from './modules/problems/problems.module';
+import { awss3Config } from './config/aws-s3.config';
+import { jwtConfig } from './config/jwt.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: '.env',
-      load: [appConfig, databaseConfig, redisConfig, ltiConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        ltiConfig,
+        awss3Config,
+        jwtConfig,
+      ],
       validationSchema: environmentValidationSchema,
       isGlobal: true,
     }),
