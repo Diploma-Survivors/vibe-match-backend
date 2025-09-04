@@ -1,11 +1,43 @@
 import { Injectable } from '@nestjs/common';
-import { CreateStorageDto } from './dto/create-storage.dto';
 import { UpdateStorageDto } from './dto/update-storage.dto';
+import { PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { ConfigService } from '@nestjs/config';
+import { FileUploadOptions } from './interfaces/file-update-options.interface';
 
 @Injectable()
 export class StoragesService {
-  create(createStorageDto: CreateStorageDto) {
-    return 'This action adds a new storage';
+  private readonly client: S3Client;
+
+  constructor(private readonly configService: ConfigService) {
+    const accessKeyId = this.configService.get<string>('awss3.accessKeyId');
+    const secretAccessKey = this.configService.get<string>(
+      'awss3.secretAccessKey',
+    );
+
+    const clientConfig: S3ClientConfig = {};
+
+    if (accessKeyId && secretAccessKey) {
+      clientConfig.credentials = {
+        accessKeyId,
+        secretAccessKey,
+      };
+    }
+
+    this.client = new S3Client(clientConfig);
+  }
+
+  async upload({ bucket, key, file }: FileUploadOptions) {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: file,
+      }),
+    );
+  }
+
+  getObjectUrl(bucket: string, key: string) {
+    return `https://${bucket}.s3.amazonaws.com/${key}`;
   }
 
   findAll() {

@@ -17,10 +17,7 @@ export class Testcase {
   id: string;
 
   @Column('text', { nullable: false })
-  input_url: string;
-
-  @Column('text', { nullable: false })
-  output_url: string;
+  fileUrl: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
