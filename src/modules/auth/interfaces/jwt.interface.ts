@@ -1,6 +1,12 @@
-export interface JwtPayload {
+import { JWTPayload as JoseJwtPayload } from 'jose';
+import { RoleEnum } from '../../user/enums/role.enum';
+
+export interface JwtPayload extends JoseJwtPayload {
   userId: number;
-  roles: string[];
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  roles: RoleEnum[];
   sub: string;
   iss: string;
 }

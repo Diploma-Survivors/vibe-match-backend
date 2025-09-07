@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 import { AuthTypeEnum } from '../enums/auth-type.enum';
+import { RoleEnum } from '../enums/role.enum';
 
 @Entity()
 @Unique(['ltiSubjectId', 'ltiPlatformId'])
@@ -43,6 +44,15 @@ export class User {
   })
   @Column({ type: 'varchar', nullable: true })
   lastName: string | null;
+
+  @ApiProperty({
+    description: 'User roles',
+    example: [RoleEnum.STUDENT],
+    enum: RoleEnum,
+    isArray: true,
+  })
+  @Column('simple-array', { nullable: true })
+  roles: RoleEnum[];
 
   @ApiProperty({
     description: 'Authentication type (local or lti)',

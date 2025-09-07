@@ -16,6 +16,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { LtiModule } from './modules/lti/lti.module';
 import { RedisModule } from './shared/redis/redis.module';
+import { CourseModule } from './modules/course/course.module';
+import { UserCourseModule } from './modules/user-course/user-course.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { RedisModule } from './shared/redis/redis.module';
     UserModule,
     LtiModule,
     RedisModule,
+    CourseModule,
+    UserCourseModule,
   ],
   controllers: [AppController],
   providers: [
