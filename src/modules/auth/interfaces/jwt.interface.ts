@@ -7,6 +7,6 @@ export interface JwtPayload extends JoseJwtPayload {
   firstName?: string;
   lastName?: string;
   roles: RoleEnum[];
-  sub: string;
-  iss: string;
+  sub?: string;
+  iss?: string;
 }

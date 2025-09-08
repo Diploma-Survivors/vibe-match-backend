@@ -8,6 +8,7 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { redisConfig } from './config/redis.config';
 import { ltiConfig } from './config/lti.config';
+import authConfig from './config/auth.config';
 import environmentValidationSchema from './config/environment.validation';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
@@ -23,7 +24,7 @@ import { UserCourseModule } from './modules/user-course/user-course.module';
   imports: [
     ConfigModule.forRoot({
       envFilePath: '.env',
-      load: [appConfig, databaseConfig, redisConfig, ltiConfig],
+      load: [appConfig, databaseConfig, redisConfig, ltiConfig, authConfig],
       validationSchema: environmentValidationSchema,
       isGlobal: true,
     }),

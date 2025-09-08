@@ -62,7 +62,7 @@ export interface LtiClaims extends jose.JWTPayload {
 }
 
 export interface LtiLaunchResponse {
-  cl;
-  jwt: string;
+  accessToken: string;
+  refreshToken: string;
   redirectPath: string;
 }

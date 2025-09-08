@@ -18,6 +18,7 @@ import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
 import { RedisService } from '../../shared/redis/redis.service';
 import { UserService } from '../../modules/user/user.service';
 import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
+import { RefreshTokenService } from '../../modules/auth/services/refresh-token.service'; // Import RefreshTokenService
 import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
 
@@ -35,6 +36,7 @@ export class LtiService {
     private readonly redisService: RedisService,
     private readonly userService: UserService,
     private readonly jwtAuthService: JwtAuthService,
+    private readonly refreshTokenService: RefreshTokenService,
     private readonly courseService: CourseService,
     private readonly userCourseService: UserCourseService,
   ) {}
@@ -202,11 +204,17 @@ export class LtiService {
       sub: claims.sub,
       iss: claims.iss,
     };
-    const internalJwt = this.jwtAuthService.generateJwt(internalJwtPayload);
-    this.logger.log('LTI Launch: Generated Internal JWT.');
+    const accessToken =
+      this.jwtAuthService.generateAccessToken(internalJwtPayload);
+    this.logger.log('LTI Launch: Generated Access Token.');
+
+    const refreshToken =
+      await this.refreshTokenService.createRefreshToken(user);
+    this.logger.log('LTI Launch: Generated Refresh Token and stored in DB.');
 
     return JSON.stringify({
-      jwt: internalJwt,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
       redirectPath: FRONTEND_AUTH_CALLBACK_URL,
     });
   }

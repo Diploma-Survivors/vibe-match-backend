@@ -7,6 +7,7 @@ import { AuthModule } from '../../modules/auth/auth.module';
 import { RedisModule } from '../../shared/redis/redis.module';
 import { UserCourseModule } from '../user-course/user-course.module';
 import { CourseModule } from '../course/course.module';
+import { RefreshTokenModule } from '../../modules/auth/refresh-token.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CourseModule } from '../course/course.module';
     RedisModule,
     CourseModule,
     UserCourseModule,
+    RefreshTokenModule,
   ],
   controllers: [LtiController],
   providers: [LtiService, KeysService],
