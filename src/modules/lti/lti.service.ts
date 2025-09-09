@@ -14,10 +14,15 @@ import {
   LTI_MESSAGE_TYPES,
   LTI_VERSIONS,
 } from './constants/lti.constants';
-import { LtiClaims } from './interfaces/lti.interface';
+import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
 import { RedisService } from '../../shared/redis/redis.service';
 import { UserService } from '../../modules/user/user.service';
 import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
+import { RefreshTokenService } from '../../modules/auth/services/refresh-token.service'; // Import RefreshTokenService
+import { CourseService } from '../../modules/course/services/course.service';
+import { UserCourseService } from '../../modules/user-course/services/user-course.service';
+
+import { Course } from '../course/entities/course.entity';
 
 const LTI_STATE_TTL_SECONDS = 300;
 const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems';
@@ -31,6 +36,9 @@ export class LtiService {
     private readonly redisService: RedisService,
     private readonly userService: UserService,
     private readonly jwtAuthService: JwtAuthService,
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly courseService: CourseService,
+    private readonly userCourseService: UserCourseService,
   ) {}
 
   public async handleLoginInitiation(
@@ -49,7 +57,6 @@ export class LtiService {
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
 
-    // Store stateData with snake_case keys to match LTI spec when reconstructing URL
     const stateData = {
       nonce,
       target_link_uri: targetLinkUri,
@@ -95,6 +102,7 @@ export class LtiService {
   ): Promise<string> {
     const { idToken, state } = ltiLaunchRequestDto;
 
+    // Verify state
     const storedStateString = await this.redisService.get(`lti:state:${state}`);
     if (!storedStateString) {
       throw new UnauthorizedException(
@@ -113,6 +121,7 @@ export class LtiService {
 
     const { nonce } = parsedState;
 
+    // Verify JWT from platform
     const platformPublicKeysetUrl = this.configService.get<string>(
       'lti.publicKeysetUrl',
     ) as string;
@@ -153,22 +162,59 @@ export class LtiService {
       throw new UnauthorizedException('Invalid nonce');
     }
 
+    // Upsert user
     const user = await this.userService.findOrCreateByLtiClaims(claims);
     this.logger.log(
       `LTI Launch: User processed in DB: ID ${user.id}, Email ${user.email}`,
     );
 
+    // Process course
+    const ltiContextClaim = claims[LTI_CLAIMS.CONTEXT] as LtiContextClaim;
+    let course: Course | null = null;
+
+    if (ltiContextClaim) {
+      try {
+        course =
+          await this.courseService.findOrCreateByLtiContextClaims(claims);
+        this.logger.log(
+          `LTI Launch: Course processed in DB: ID ${course.id}, Title ${course.title}`,
+        );
+
+        await this.userCourseService.enrollUserInCourse(
+          user,
+          course,
+          user.roles,
+        );
+        this.logger.log(
+          `LTI Launch: User ${user.id} enrolled in course ${course.id} with roles: ${user.roles.join(', ')}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to process LTI course or enroll user: ${(error as Error).message}`,
+        );
+      }
+    }
+
     const internalJwtPayload = {
       userId: user.id,
-      roles: (claims[LTI_CLAIMS.ROLES] || []) as string[],
+      email: user.email || undefined,
+      firstName: user.firstName || undefined,
+      lastName: user.lastName || undefined,
+      roles: user.roles,
       sub: claims.sub,
       iss: claims.iss,
     };
-    const internalJwt = this.jwtAuthService.generateJwt(internalJwtPayload);
-    this.logger.log('LTI Launch: Generated Internal JWT.');
+    const accessToken =
+      this.jwtAuthService.generateAccessToken(internalJwtPayload);
+    this.logger.log('LTI Launch: Generated Access Token.');
+
+    const refreshToken =
+      await this.refreshTokenService.createRefreshToken(user);
+    this.logger.log('LTI Launch: Generated Refresh Token and stored in DB.');
 
     return JSON.stringify({
-      jwt: internalJwt,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
       redirectPath: FRONTEND_AUTH_CALLBACK_URL,
     });
   }
