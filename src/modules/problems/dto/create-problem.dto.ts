@@ -14,7 +14,7 @@ import {
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
 import { TagDto } from './tag.dto';
-import { TestcaseDto } from './testcast.dto';
+import { TestcaseDto } from './testcase.dto';
 import { TopicDto } from './topic.dto';
 
 export class CreateProblemDto {

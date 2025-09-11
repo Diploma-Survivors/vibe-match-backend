@@ -21,7 +21,7 @@ export class TestcasesService {
 
   async create(file: Express.Multer.File, user: JwtPayload) {
     const seed = uuidV4();
-    const key = `${user.userId}_${user.iss}_${user.courseId}_${seed}.${TESTCASE_FILE_EXTENSION}`;
+    const key = `${seed}_${user.userId}_${user.courseId}${TESTCASE_FILE_EXTENSION}`;
 
     await this.storagesService.upload({
       bucket: TESTCASE_BUCKET,
