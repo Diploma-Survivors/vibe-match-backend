@@ -11,12 +11,12 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7.2-alpine
+    image: redis:8.2.1-alpine
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass password
 
   mariadb:
     image: mariadb:10.6
@@ -28,9 +28,9 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - '3307:3306'
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-p$$MYSQL_ROOT_PASSWORD"]
+      test: ['CMD', 'mysqladmin', 'ping', '-p$$MYSQL_ROOT_PASSWORD']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -54,8 +54,8 @@ services:
       - moodle_data:/bitnami/moodle
       - moodle_moodledata:/bitnami/moodledata
     ports:
-      - "8888:8080"
-      - "8443:443"
+      - '8888:8080'
+      - '8443:443'
 
 volumes:
   mariadb_data:
