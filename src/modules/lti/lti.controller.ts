@@ -43,7 +43,7 @@ export class LtiController {
     const backendBaseUrl =
       this.configService.get<string>('appConfig.url') ||
       'http://localhost:3000';
-    const postRedirectUrl = `${backendBaseUrl}/v1/auth/set-cookie-and-redirect`;
+    const postRedirectUrl = `${backendBaseUrl}/v1/auth/set-cookies-and-redirect`;
 
     res.setHeader('Content-Type', 'text/html');
     res.send(`
