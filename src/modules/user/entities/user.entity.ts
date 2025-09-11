@@ -15,10 +15,10 @@ import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 export class User {
   @ApiProperty({
     description: 'User unique identifier',
-    example: 1,
+    example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid', { name: 'user_id' })
+  id: string;
 
   @ApiProperty({
     description: 'User email address',
