@@ -21,7 +21,7 @@ export class TestcasesService {
 
   async create(file: Express.Multer.File, user: JwtPayload) {
     const seed = uuidV4();
-    const key = `${user.userId}_${user.iss}_${seed}.${TESTCASE_FILE_EXTENSION}`;
+    const key = `${user.userId}_${user.iss}_${user.courseId}_${seed}.${TESTCASE_FILE_EXTENSION}`;
 
     await this.storagesService.upload({
       bucket: TESTCASE_BUCKET,
@@ -31,24 +31,25 @@ export class TestcasesService {
 
     const url = this.storagesService.getObjectUrl(TESTCASE_BUCKET, key);
 
-    await this.testcaseRepository.save({
+    const testcase = await this.testcaseRepository.save({
       fileUrl: url,
     });
+    return testcase;
   }
 
   findAll() {
     return `This action returns all testcases`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} testcase`;
   }
 
-  update(id: number, updateTestcaseDto: UpdateTestcaseDto) {
-    return `This action updates a #${id} testcase`;
+  update(id: string, updateTestcaseDto: UpdateTestcaseDto) {
+    return `This action updates a #${id} testcase with dto ${updateTestcaseDto.fileUrl}`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} testcase`;
   }
 }
