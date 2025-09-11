@@ -209,7 +209,7 @@ export class LtiService {
       iss: claims.iss,
     };
     const accessToken =
-      this.jwtAuthService.generateAccessToken(internalJwtPayload);
+      await this.jwtAuthService.generateAccessToken(internalJwtPayload);
     this.logger.log('LTI Launch: Generated Access Token.');
 
     const deviceId = await this.jwtAuthService.generateDeviceId();
@@ -220,10 +220,10 @@ export class LtiService {
     this.logger.log('LTI Launch: Generated Refresh Token and stored in DB.');
 
     return JSON.stringify({
-      accessToken,
-      refreshToken,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
       redirectPath: this.getRedirectFrontendUrl(user.roles),
-      deviceId,
+      deviceId: deviceId,
     });
   }
 
