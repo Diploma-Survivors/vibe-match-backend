@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
   IsEnum,
@@ -11,7 +12,6 @@ import {
 } from 'class-validator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
-import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProblemDto {
   @ApiProperty({
@@ -120,16 +120,13 @@ export class CreateProblemDto {
   topicIds: string[];
 
   @ApiProperty({
-    description: 'The IDs of the test cases associated with the problem',
-    type: 'array',
-    items: { type: 'string', format: 'uuid' },
+    description: 'The ID of the test case associated with the problem',
+    type: 'string',
+    format: 'uuid',
   })
-  @IsArray()
-  @IsUUID('all', {
-    each: true,
-    message: 'Each testcase ID must be a valid UUID',
-  })
-  testcaseIds: string[];
+  @IsNotEmpty({ message: 'Testcase ID is required' })
+  @IsUUID('all', { message: 'Testcase ID must be a valid UUID' })
+  testcaseId: string;
 
   @ApiProperty({
     description: 'The IDs of the sample test cases associated with the problem',
