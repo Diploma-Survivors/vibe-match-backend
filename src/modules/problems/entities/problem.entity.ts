@@ -27,16 +27,16 @@ export class Problem {
   @Generated('uuid')
   id: string;
 
-  @Column('nvarchar')
+  @Column('varchar')
   title: string;
 
-  @Column('nvarchar', { name: 'problem_description' })
+  @Column('varchar', { name: 'problem_description' })
   description: string;
 
-  @Column('nvarchar', { name: 'input_description' })
+  @Column('varchar', { name: 'input_description' })
   inputDescription: string;
 
-  @Column('nvarchar', { name: 'output_description' })
+  @Column('varchar', { name: 'output_description' })
   outputDescription: string;
 
   @Column('int2', { name: 'max_score' })
@@ -51,6 +51,7 @@ export class Problem {
   @Column('enum', {
     name: 'difficulty',
     default: DifficultyLevel.EASY,
+    enum: DifficultyLevel,
   })
   difficulty: DifficultyLevel;
 
