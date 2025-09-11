@@ -18,6 +18,7 @@ import { Tag } from '../tags/entities/tag.entity';
 import { Topic } from '../topics/entities/topic.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
+import { Course } from 'src/modules/course/entities/course.entity';
 
 @Entity({
   name: 'problems',
@@ -55,7 +56,9 @@ export class Problem {
   })
   difficulty: DifficultyLevel;
 
-  //   courseId: string;
+  @ManyToOne(() => Course, (course) => course.id)
+  @JoinColumn({ name: 'course_id' })
+  course: Course;
 
   @ManyToOne(() => User, (user) => user.id)
   @JoinColumn({ name: 'author_id' })

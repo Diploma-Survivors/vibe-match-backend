@@ -20,6 +20,7 @@ export class ProblemsService {
       const problem = this.problemsRepository.create({
         ...createProblemDto,
         author: { id: user.userId },
+        course: { id: user.courseId },
       });
       return await this.problemsRepository.save(problem);
     } catch (err) {
