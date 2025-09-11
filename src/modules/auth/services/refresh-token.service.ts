@@ -87,7 +87,7 @@ export class RefreshTokenService {
     this.logger.log(`Refresh token ${hashedToken} revoked.`);
   }
 
-  public async revokeAllRefreshTokensForUser(userId: number): Promise<void> {
+  public async revokeAllRefreshTokensForUser(userId: string): Promise<void> {
     await this.refreshTokenRepository.update(
       { userId: userId, revokedAt: undefined },
       { revokedAt: new Date() },
