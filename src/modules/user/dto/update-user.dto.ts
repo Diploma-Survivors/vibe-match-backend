@@ -5,10 +5,10 @@ import { CreateUserDto } from './create-user.dto';
 export class UpdateUserDto extends PartialType(CreateUserDto) {
   @ApiProperty({
     description: 'User ID',
-    example: 1,
+    example: 'uuid-v4-string',
     required: false,
   })
-  id?: number;
+  id?: string;
 
   @ApiProperty({
     description: 'User email address',

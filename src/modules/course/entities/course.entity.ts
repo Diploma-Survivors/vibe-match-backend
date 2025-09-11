@@ -6,10 +6,10 @@ import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 export class Course {
   @ApiProperty({
     description: 'Course unique identifier',
-    example: 1,
+    example: 'uuid-v4-string',
   })
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @ApiProperty({
     description: 'LTI Course ID from the LTI Platform',

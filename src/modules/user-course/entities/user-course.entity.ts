@@ -16,24 +16,24 @@ import { RoleEnum } from '../../user/enums/role.enum';
 export class UserCourse {
   @ApiProperty({
     description: 'UserCourse unique identifier',
-    example: 1,
+    example: 'uuid-v4-string',
   })
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @ApiProperty({
     description: 'User ID',
-    example: 1,
+    example: 'uuid-v4-string',
   })
   @Column()
-  userId: number;
+  userId: string;
 
   @ApiProperty({
     description: 'Course ID',
-    example: 1,
+    example: 'uuid-v4-string',
   })
   @Column()
-  courseId: number;
+  courseId: string;
 
   @ApiProperty({
     description: 'Roles of the user in this course',
