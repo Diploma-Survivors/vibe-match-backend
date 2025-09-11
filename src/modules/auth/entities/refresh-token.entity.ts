@@ -27,11 +27,11 @@ export class RefreshToken {
 
   @ApiProperty({
     description: 'User ID associated with this refresh token',
-    example: 1,
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @Column()
   @Index()
-  userId: number;
+  userId: string;
 
   @ManyToOne(() => User, (user) => user.refreshTokens, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })

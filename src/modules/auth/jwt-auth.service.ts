@@ -111,7 +111,7 @@ export class JwtAuthService {
   }
 
   public async revokeRefreshToken(
-    userId: number,
+    userId: string,
     deviceId: string,
   ): Promise<void> {
     const redisKey = this.getRefreshTokenKey(userId, deviceId);
@@ -119,13 +119,13 @@ export class JwtAuthService {
     this.logger.log(`Revoked refresh token in Redis with key ${redisKey}.`);
   }
 
-  public async revokeAllRefreshTokensForUser(userId: number): Promise<void> {
+  public async revokeAllRefreshTokensForUser(userId: string): Promise<void> {
     const pattern = `refresh:${userId}:*`;
     await this.redisService.deleteByPattern(pattern);
     this.logger.log(`Revoked all refresh tokens for user ${userId}.`);
   }
 
-  private getRefreshTokenKey(userId: number, deviceId: string): string {
+  private getRefreshTokenKey(userId: string, deviceId: string): string {
     return `refresh:${userId}:${deviceId}`;
   }
 
