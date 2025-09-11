@@ -10,8 +10,10 @@ import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
 import {
+  FRONTEND_AUTH_CALLBACK_URL,
   LTI_CLAIMS,
   LTI_MESSAGE_TYPES,
+  LTI_STATE_TTL_SECONDS,
   LTI_VERSIONS,
 } from './constants/lti.constants';
 import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
@@ -25,12 +27,6 @@ import { UserCourseService } from '../../modules/user-course/services/user-cours
 import { Course } from '../course/entities/course.entity';
 import { RoleEnum } from '../user/enums/role.enum';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
-
-const LTI_STATE_TTL_SECONDS = 300;
-const FRONTEND_AUTH_CALLBACK_URL = {
-  STUDENT: 'http://localhost:3001/problems',
-  INSTRUCTOR: 'http://localhost:3002/create-problem',
-};
 
 @Injectable()
 export class LtiService {
