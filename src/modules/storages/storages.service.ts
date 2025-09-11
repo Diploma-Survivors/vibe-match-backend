@@ -13,8 +13,11 @@ export class StoragesService {
     const secretAccessKey = this.configService.get<string>(
       'awsS3.secretAccessKey',
     );
+    const region = this.configService.get<string>('awsS3.region');
 
-    const clientConfig: S3ClientConfig = {};
+    const clientConfig: S3ClientConfig = {
+      region,
+    };
 
     if (accessKeyId && secretAccessKey) {
       clientConfig.credentials = {

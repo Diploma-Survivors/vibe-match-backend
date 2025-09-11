@@ -32,7 +32,7 @@ export class TopicsController {
   @ApiResponse({ status: 201, description: 'The topic has been created.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.INSTRUCTOR)
   create(@Body() createTopicDto: CreateTopicDto) {
     return this.topicsService.create(createTopicDto);
   }
