@@ -3,6 +3,7 @@ import { RoleEnum } from '../../user/enums/role.enum';
 
 export interface JwtPayload extends JoseJwtPayload {
   userId: number;
+  courseId?: number;
   email?: string;
   firstName?: string;
   lastName?: string;
