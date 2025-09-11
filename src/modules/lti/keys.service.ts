@@ -28,7 +28,9 @@ export class KeysService implements OnModuleInit {
     privateKeyPath: string,
     publicKeyPath: string,
   ): Promise<void> {
-    const { publicKey, privateKey } = await jose.generateKeyPair('RS256');
+    const { publicKey, privateKey } = await jose.generateKeyPair('RS256', {
+      extractable: true,
+    });
 
     const spki = await jose.exportSPKI(publicKey);
     const pkcs8 = await jose.exportPKCS8(privateKey);

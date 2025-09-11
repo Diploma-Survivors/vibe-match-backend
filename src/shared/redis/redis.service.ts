@@ -29,10 +29,10 @@ export class RedisService implements OnModuleDestroy {
   public async set(
     key: string,
     value: string,
-    ttlSeconds?: number,
+    ttlMilliseconds?: number,
   ): Promise<'OK' | null> {
-    if (ttlSeconds) {
-      return this.client.set(key, value, 'EX', ttlSeconds);
+    if (ttlMilliseconds) {
+      return this.client.set(key, value, 'PX', ttlMilliseconds);
     } else {
       return this.client.set(key, value);
     }
@@ -44,5 +44,60 @@ export class RedisService implements OnModuleDestroy {
 
   public async del(...keys: string[]): Promise<number> {
     return this.client.del(...keys);
+  }
+
+  public keys(pattern: string): Promise<string[]> {
+    return this.client.keys(pattern);
+  }
+
+  public deleteByPattern(pattern: string): Promise<void> {
+    const stream = this.client.scanStream({
+      match: pattern,
+    });
+
+    stream.on('data', (keys: string[]) => {
+      if (keys.length) {
+        const pipeline = this.client.pipeline();
+        keys.forEach((key) => {
+          pipeline.del(key);
+        });
+        pipeline.exec().catch((err) => {
+          this.logger.error('Error deleting keys:', err);
+        });
+      }
+    });
+
+    return new Promise((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+  }
+
+  public async hset(
+    key: string,
+    field: string,
+    value: string,
+  ): Promise<number> {
+    return this.client.hset(key, field, value);
+  }
+
+  public async hget(key: string, field: string): Promise<string | null> {
+    return this.client.hget(key, field);
+  }
+
+  public async hkeys(key: string): Promise<string[]> {
+    return this.client.hkeys(key);
+  }
+
+  public async hdel(key: string, ...fields: string[]): Promise<number> {
+    return this.client.hdel(key, ...fields);
+  }
+
+  public async exists(key: string): Promise<number> {
+    return this.client.exists(key);
+  }
+
+  public async expire(key: string, ttlSeconds: number): Promise<number> {
+    return this.client.expire(key, ttlSeconds);
   }
 }
