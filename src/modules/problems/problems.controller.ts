@@ -35,7 +35,11 @@ export class ProblemsController {
 
   @Post()
   @ApiOperation({ summary: 'Create a problem (Instructor only)' })
-  @ApiResponse({ status: 201, description: 'The problem has been created.' })
+  @ApiResponse({
+    type: CreateProblemResponseDto,
+    status: 201,
+    description: 'The problem has been created.',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)

@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { CreateProblemDto } from './dto/create-problem.dto';
-import { UpdateProblemDto } from './dto/update-problem.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Problem } from './entities/problem.entity';
 import { Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { CreateProblemDto } from './dto/create-problem.dto';
+import { UpdateProblemDto } from './dto/update-problem.dto';
+import { Problem } from './entities/problem.entity';
 
 @Injectable()
 export class ProblemsService {
@@ -22,6 +22,7 @@ export class ProblemsService {
         author: { id: user.userId },
         course: { id: user.courseId },
       });
+
       return await this.problemsRepository.save(problem);
     } catch (err) {
       this.logger.error(err);
