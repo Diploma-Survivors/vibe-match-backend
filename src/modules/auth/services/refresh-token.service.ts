@@ -17,6 +17,9 @@ export class RefreshTokenService {
     private readonly configService: ConfigService,
   ) {}
 
+  /**
+   * @deprecated use jwt-auth.service.ts to generate refresh token instead of unique string
+   */
   public async createRefreshToken(user: User): Promise<string> {
     const refreshTokenTTL = this.configService.get<number>(
       'auth.jwt.refreshTokenTtl',
@@ -54,6 +57,7 @@ export class RefreshTokenService {
       const isMatch: boolean = await (
         compare as (data: string, encrypted: string) => Promise<boolean>
       )(tokenString, rt.token);
+
       if (isMatch) {
         if (rt.expiresAt < new Date()) {
           this.logger.warn(
