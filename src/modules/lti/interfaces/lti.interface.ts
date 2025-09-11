@@ -65,4 +65,5 @@ export interface LtiLaunchResponse {
   accessToken: string;
   refreshToken: string;
   redirectPath: string;
+  deviceId: string;
 }
