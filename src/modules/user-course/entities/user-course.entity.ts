@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   Unique,
+  CreateDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { Course } from '../../course/entities/course.entity';
@@ -56,6 +57,6 @@ export class UserCourse {
     description: 'Enrollment timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   enrolledAt: Date;
 }
