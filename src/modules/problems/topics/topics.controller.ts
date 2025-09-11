@@ -6,37 +6,75 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { TopicsService } from './topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RoleEnum } from 'src/modules/user/enums/role.enum';
 
+@ApiTags('Topics')
+@ApiCookieAuth('access_token')
 @Controller('topics')
 export class TopicsController {
   constructor(private readonly topicsService: TopicsService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a topic' })
+  @ApiResponse({ status: 201, description: 'The topic has been created.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.ADMIN)
   create(@Body() createTopicDto: CreateTopicDto) {
     return this.topicsService.create(createTopicDto);
   }
 
   @Get()
+  @ApiOperation({ summary: 'Get all topics' })
+  @ApiResponse({ status: 200, description: 'List of topics.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard)
   findAll() {
     return this.topicsService.findAll();
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a topic by ID' })
+  @ApiResponse({ status: 200, description: 'The topic has been found.' })
+  @ApiResponse({ status: 404, description: 'Topic not found.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard)
   findOne(@Param('id') id: string) {
-    return this.topicsService.findOne(+id);
+    return this.topicsService.findOne(id);
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a topic' })
+  @ApiResponse({ status: 200, description: 'The topic has been updated.' })
+  @ApiResponse({ status: 404, description: 'Topic not found.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.ADMIN)
   update(@Param('id') id: string, @Body() updateTopicDto: UpdateTopicDto) {
-    return this.topicsService.update(+id, updateTopicDto);
+    return this.topicsService.update(id, updateTopicDto);
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a topic' })
+  @ApiResponse({ status: 200, description: 'The topic has been deleted.' })
+  @ApiResponse({ status: 404, description: 'Topic not found.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.ADMIN)
   remove(@Param('id') id: string) {
-    return this.topicsService.remove(+id);
+    return this.topicsService.remove(id);
   }
 }
