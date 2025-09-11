@@ -1,27 +1,31 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Expose, Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
   IsNotEmpty,
+  IsNotEmptyObject,
   IsPositive,
   IsString,
-  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
+import { TagDto } from './tag.dto';
+import { TestcaseDto } from './testcast.dto';
+import { TopicDto } from './topic.dto';
 
 export class CreateProblemDto {
   @ApiProperty({
     description: 'The title of the problem',
-    minLength: 8,
+    minLength: 3,
     maxLength: 128,
   })
   @IsString()
   @IsNotEmpty({ message: 'Title is required' })
-  @MinLength(8, { message: 'Title must be at least 8 characters long' })
+  @MinLength(3, { message: 'Title must be at least 3 characters long' })
   @MaxLength(128, { message: 'Title must be at most 128 characters long' })
   title: string;
 
@@ -40,13 +44,13 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The input description of the problem',
-    minLength: 16,
+    minLength: 8,
     maxLength: 512,
   })
   @IsString()
   @IsNotEmpty({ message: 'Input description is required' })
-  @MinLength(16, {
-    message: 'Input description must be at least 16 characters long',
+  @MinLength(8, {
+    message: 'Input description must be at least 8 characters long',
   })
   @MaxLength(512, {
     message: 'Input description must be at most 512 characters long',
@@ -55,13 +59,13 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The output description of the problem',
-    minLength: 16,
+    minLength: 3,
     maxLength: 512,
   })
   @IsString()
   @IsNotEmpty({ message: 'Output description is required' })
-  @MinLength(16, {
-    message: 'Output description must be at least 16 characters long',
+  @MinLength(3, {
+    message: 'Output description must be at least 3 characters long',
   })
   @MaxLength(512, {
     message: 'Output description must be at most 512 characters long',
@@ -107,8 +111,12 @@ export class CreateProblemDto {
     type: 'array',
     items: { type: 'string', format: 'uuid' },
   })
-  @IsUUID('all', { each: true, message: 'Each tag ID must be a valid UUID' })
-  tagIds: string[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TagDto)
+  @Transform(({ value }: { value: string[] }) => value.map((id) => ({ id })))
+  @Expose({ name: 'tagIds' })
+  tags: TagDto[];
 
   @ApiProperty({
     description: 'The IDs of the topics associated with the problem',
@@ -116,24 +124,33 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
   })
   @IsArray()
-  @IsUUID('all', { each: true, message: 'Each topic ID must be a valid UUID' })
-  topicIds: string[];
+  @ValidateNested({ each: true })
+  @Type(() => TopicDto)
+  @Transform(({ value }: { value: string[] }) => value.map((id) => ({ id })))
+  @Expose({ name: 'topicIds' })
+  topics: TopicDto[];
 
   @ApiProperty({
     description: 'The ID of the test case associated with the problem',
     type: 'string',
     format: 'uuid',
   })
-  @IsNotEmpty({ message: 'Testcase ID is required' })
-  @IsUUID('all', { message: 'Testcase ID must be a valid UUID' })
-  testcaseId: string;
+  @IsNotEmptyObject()
+  @ValidateNested()
+  @Type(() => TestcaseDto)
+  @Transform(({ value }: { value: string }) => ({ id: value }))
+  @Expose({ name: 'testcaseId' })
+  testcase: TestcaseDto;
 
   @ApiProperty({
     description: 'The IDs of the sample test cases associated with the problem',
     type: 'array',
-    items: { type: 'string', format: 'uuid' },
+    items: {
+      type: 'object',
+    },
   })
   @IsArray()
+  @Type(() => CreateTestcaseSampleDto)
   @ValidateNested({ each: true })
   testcaseSamples: CreateTestcaseSampleDto[];
 }
