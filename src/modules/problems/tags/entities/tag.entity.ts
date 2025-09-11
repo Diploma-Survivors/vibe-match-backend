@@ -13,7 +13,7 @@ export class Tag {
   @Generated('uuid')
   id: string;
 
-  @Column('nvarchar', { nullable: false, unique: true })
+  @Column('varchar', { nullable: false, unique: true })
   name: string;
 
   @CreateDateColumn({ name: 'created_at' })

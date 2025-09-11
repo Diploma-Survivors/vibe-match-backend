@@ -13,10 +13,10 @@ export class Topic {
   @Generated('uuid')
   id: string;
 
-  @Column('nvarchar', { nullable: false, unique: true })
+  @Column('varchar', { nullable: false, unique: true })
   name: string;
 
-  @Column('nvarchar')
+  @Column('varchar')
   description: string;
 
   @CreateDateColumn({ name: 'created_at' })
