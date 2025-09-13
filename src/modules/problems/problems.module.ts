@@ -6,6 +6,7 @@ import { TagsModule } from './tags/tags.module';
 import { TestcasesModule } from './testcases/testcases.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Problem } from './entities/problem.entity';
+import { TestcaseSample } from './testcases/entities/testcase-sample.entity';
 
 @Module({
   controllers: [ProblemsController],
@@ -14,7 +15,7 @@ import { Problem } from './entities/problem.entity';
     TopicsModule,
     TagsModule,
     TestcasesModule,
-    TypeOrmModule.forFeature([Problem]),
+    TypeOrmModule.forFeature([Problem, TestcaseSample]),
   ],
 })
 export class ProblemsModule {}

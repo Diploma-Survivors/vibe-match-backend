@@ -11,12 +11,14 @@ export class Judge0Service {
   private readonly logger = new Logger(Judge0Service.name);
   private readonly judge0Url: string;
   private readonly publicUrl: string;
+  private readonly apiVersion: string;
 
   constructor(private readonly configService: ConfigService) {
     this.judge0Url = this.configService.get<string>('appConfig.judge0Url')!;
     this.publicUrl = this.configService.get<string>(
       'appConfig.judge0CallbackUrl',
     )!;
+    this.apiVersion = this.configService.get<string>('appConfig.apiVersion')!;
   }
 
   /**
@@ -26,13 +28,12 @@ export class Judge0Service {
     items: Judge0SubmissionPayload[],
   ): Promise<Judge0BatchResponse> {
     try {
-      const url = `${this.judge0Url}/submissions/batch?base64_encoded=true&wait=false`;
+      const url = `${this.judge0Url}/submissions/batch?base64_encoded=true`;
 
       const response: AxiosResponse<Judge0BatchResponse> = await axios.post(
         url,
         { submissions: items },
         {
-          timeout: 30000,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -63,7 +64,7 @@ export class Judge0Service {
   }
 
   getCallbackUrl(submissionId: string, testcaseId: string): string {
-    return `${this.publicUrl}/judge0/callback?sid=${submissionId}&tcid=${testcaseId}`;
+    return `${this.publicUrl}/${this.apiVersion}/submissions/judge0/callback?sid=${submissionId}&tcid=${testcaseId}`;
   }
 
   normalizeOutput(output: string = ''): string {

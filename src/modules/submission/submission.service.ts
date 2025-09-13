@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { judge0StatusMap, SubmissionStatus } from './enums/submission.enum';
@@ -15,6 +21,8 @@ import { Problem } from '../problems/entities/problem.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { RedisKeys } from './helpers/redis-keys.helper';
 import Redis from 'ioredis';
+import { InjectRepository } from '@nestjs/typeorm';
+import { REDIS } from '../../shared/redis/redis.module';
 
 @Injectable()
 export class SubmissionService {
@@ -23,10 +31,13 @@ export class SubmissionService {
   private static readonly SUBMISSION_TIMEOUT_MS = 60_000; // 60s
 
   constructor(
+    @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
+    @InjectRepository(Problem)
     private readonly problemRepository: Repository<Problem>,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
+    @Inject(REDIS)
     private readonly redis: Redis,
   ) {}
 
@@ -57,9 +68,6 @@ export class SubmissionService {
 
     // === Precompute invariants ===
     const isMultiFile = dto.languageId === 89;
-    const now = Date.now();
-    const timeoutAt = now + SubmissionService.SUBMISSION_TIMEOUT_MS;
-
     const cpuSeconds = this.judge0Service.msToSeconds(problem.timeLimitMs);
 
     // Encode source/additional files
@@ -74,34 +82,32 @@ export class SubmissionService {
     const tcCount = dto.testCases.length;
 
     // Build Judge0 batch items
-    const items: Judge0SubmissionPayload[] = new Array<Judge0SubmissionPayload>(
-      tcCount,
+    const items: Judge0SubmissionPayload[] = await Promise.all(
+      dto.testCases.map((testCase, i) => {
+        const input = testCase.input;
+        return {
+          language_id: dto.languageId,
+          source_code: sourceBase64,
+          additional_files: additionalFilesBase64,
+          stdin: input ? this.judge0Service.encodeBase64(input) : undefined,
+          redirect_stderr_to_stdout: true,
+          cpu_time_limit: cpuSeconds,
+          memory_limit: problem.memoryLimitKb,
+          callback_url: this.judge0Service.getCallbackUrl(
+            submissionId,
+            String(i),
+          ),
+        };
+      }),
     );
-    for (let i = 0; i < tcCount; i++) {
-      const input = dto.testCases[i].input;
-      items[i] = {
-        language_id: dto.languageId,
-        source_code: sourceBase64,
-        additional_files: additionalFilesBase64,
-        stdin: input ? this.judge0Service.encodeBase64(input) : undefined,
-        redirect_stderr_to_stdout: true,
-        cpu_time_limit: cpuSeconds,
-        memory_limit: problem.memoryLimitKb,
-        callback_url: this.judge0Service.getCallbackUrl(
-          submissionId,
-          String(i),
-        ),
-      };
-    }
 
     // === Submit to Judge0 ===
     const judge0BatchResponse: Judge0BatchResponse =
       await this.judge0Service.createSubmissionBatch(items);
 
-    const returned = judge0BatchResponse?.submissions ?? [];
-    if (returned.length !== tcCount) {
+    if (judge0BatchResponse.length !== tcCount) {
       throw new Error(
-        `Judge0 returned ${returned.length} tokens, expected ${tcCount}. submissionId=${submissionId}`,
+        `Judge0 returned ${judge0BatchResponse.length} tokens, expected ${tcCount}. submissionId=${submissionId}`,
       );
     }
 
@@ -119,8 +125,6 @@ export class SubmissionService {
       total: String(tcCount),
       received: '0',
       problemId: String(problem.id),
-      startAt: String(now),
-      timeoutAt: String(timeoutAt),
     });
 
     // TTL
@@ -155,7 +159,7 @@ export class SubmissionService {
     };
   }
 
-  public async buildSubmissionResult(
+  async buildSubmissionResult(
     results: TestResultDto[],
     problemId: string,
   ): Promise<SubmissionResultDto> {
@@ -166,7 +170,7 @@ export class SubmissionService {
       throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
     }
     const { overallStatus, passedTests, totalTests, sumRuntime, sumMemory } =
-      this.determineSubmissionStatus(results);
+      this.calStats(results);
     const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
@@ -180,7 +184,7 @@ export class SubmissionService {
     };
   }
 
-  public determineSubmissionStatus(results: TestResultDto[]) {
+  calStats(results: TestResultDto[]) {
     let overallStatus = SubmissionStatus.ACCEPTED;
     const totalTests = results.length;
     let passedTests = 0;

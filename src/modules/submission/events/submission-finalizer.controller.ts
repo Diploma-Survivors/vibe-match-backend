@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { CallbackProcessor } from './callback.processor';
+import { CallbackProcessor } from '../helpers/callback.processor';
 
 /**
  * Processor for finalizing submissions after all test cases have been processed.

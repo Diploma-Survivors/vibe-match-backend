@@ -7,21 +7,36 @@ import { Submission } from './entities/submission.entity';
 import { Problem } from '../problems/entities/problem.entity';
 import { Judge0Module } from '../judge0/judge0.module';
 import { RedisKeys } from './helpers/redis-keys.helper';
-import { CallbackProcessor } from './callback.processor';
-import { SubmissionFinalizeProcessor } from './submission-finalizer.controller';
+import { CallbackProcessor } from './helpers/callback.processor';
+import { SubmissionFinalizeProcessor } from './events/submission-finalizer.controller';
 import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-events.gateway';
+import { ConfigService } from '@nestjs/config';
+import { Language } from './language/language.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Submission, Problem]),
+    TypeOrmModule.forFeature([Submission, Problem, Language]),
     Judge0Module,
     RedisModule,
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST,
-        port: Number(process.env.REDIS_PORT),
-        password: process.env.REDIS_PASSWORD,
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('redis.host');
+        const portFromConfig = config.get<number>('redis.port');
+        const password = config.get<string>('redis.password');
+
+        const port = Number.isInteger(portFromConfig)
+          ? portFromConfig!
+          : parseInt(process.env.REDIS_PORT ?? '6379', 10);
+        return {
+          connection: {
+            host,
+            port,
+            password: password || undefined,
+            maxRetriesPerRequest: null,
+          },
+        };
       },
     }),
     BullModule.registerQueue({

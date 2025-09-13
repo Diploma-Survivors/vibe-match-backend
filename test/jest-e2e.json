@@ -1,9 +1,25 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "rootDir": "..",
   "testEnvironment": "node",
-  "testRegex": ".e2e-spec.ts$",
+  "testMatch": ["**/?(*.)+(e2e-spec).[tj]s?(x)"],
+  "extensionsToTreatAsEsm": [".ts"],
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  }
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "useESM": true,
+        "tsconfig": "./test/tsconfig.e2e.json"
+      }
+    ]
+  },
+  "transformIgnorePatterns": ["node_modules/(?!(jose)/)"],
+  "moduleNameMapper": {
+    "^jose/(.*)$": "<rootDir>/node_modules/jose/dist/node/cjs/$1",
+    "^src/(.*)$": "<rootDir>/src/$1",
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
+  "moduleDirectories": ["node_modules", "<rootDir>/src"],
+  "testTimeout": 60000,
+  "verbose": true
 }

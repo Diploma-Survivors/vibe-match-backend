@@ -19,7 +19,7 @@ export class TestcaseSample {
   @Generated('uuid')
   id: string;
 
-  @ManyToOne(() => Problem, (problem) => problem.id)
+  @ManyToOne(() => Problem, (problem) => problem.testcaseSamples)
   @JoinColumn({ name: 'problem_id' })
   problem: Problem;
 

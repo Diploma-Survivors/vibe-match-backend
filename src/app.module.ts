@@ -21,6 +21,7 @@ import { CourseModule } from './modules/course/course.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { ProblemsModule } from './modules/problems/problems.module';
 import { awsS3Config } from './config/aws-s3.config';
+import { SubmissionModule } from './modules/submission/submission.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { awsS3Config } from './config/aws-s3.config';
     CourseModule,
     UserCourseModule,
     ProblemsModule,
+    SubmissionModule,
   ],
   controllers: [AppController],
   providers: [

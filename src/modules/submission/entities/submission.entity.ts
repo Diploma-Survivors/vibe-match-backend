@@ -25,15 +25,9 @@ export class Submission {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ name: 'user_id', nullable: true })
-  userId: string;
-
   @ManyToOne(() => Problem)
   @JoinColumn({ name: 'problem_id' })
   problem: Problem;
-
-  @Column({ name: 'problem_id' })
-  problemId: string;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
   score: number;

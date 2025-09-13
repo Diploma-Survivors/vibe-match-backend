@@ -76,9 +76,7 @@ export class Problem {
   @JoinColumn({ name: 'testcase_id' })
   testcase: Testcase;
 
-  @OneToMany(() => TestcaseSample, (testcaseSample) => testcaseSample.id, {
-    cascade: true,
-  })
+  @OneToMany(() => TestcaseSample, (testcaseSample) => testcaseSample.problem)
   testcaseSamples: TestcaseSample[];
 
   @CreateDateColumn({ name: 'created_at' })

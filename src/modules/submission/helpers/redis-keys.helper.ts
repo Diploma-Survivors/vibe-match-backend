@@ -7,6 +7,7 @@ export class RedisKeys {
   meta(submissionId: string) {
     return `${this.prefix}:{${submissionId}}:meta`;
   }
+
   resultsByIndex(submissionId: string) {
     return `${this.prefix}:{${submissionId}}:resultsI`;
   }

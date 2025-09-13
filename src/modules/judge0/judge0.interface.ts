@@ -25,15 +25,4 @@ export interface Judge0Response {
   status: Judge0Status;
 }
 
-export interface Judge0BatchResponse {
-  submissions: { token: string }[];
-}
-
-export interface Judge0BatchSubmissionResult {
-  token: string;
-  status_id: number;
-  stdout: string;
-  stderr: string;
-  time: string;
-  memory: number;
-}
+export type Judge0BatchResponse = Array<{ token: string }>;

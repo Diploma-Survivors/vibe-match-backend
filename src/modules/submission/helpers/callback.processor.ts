@@ -1,13 +1,14 @@
 // submissions/submission-callback.service.ts
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { RedisKeys } from './helpers/redis-keys.helper';
-import { Judge0Response } from '../judge0/judge0.interface';
+import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
+import { RedisKeys } from './redis-keys.helper';
+import { Judge0Response } from '../../judge0/judge0.interface';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { SubmissionService } from './submission.service';
-import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
-import { SubmissionsSseService } from './events/submission-events.gateway';
+import { SubmissionService } from '../submission.service';
+import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
+import { SubmissionsSseService } from '../events/submission-events.gateway';
 import Redis from 'ioredis';
+import { REDIS } from '../../../shared/redis/redis.module';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -49,6 +50,7 @@ export class CallbackProcessor implements OnModuleInit {
   private luaShaAddResult: string;
 
   constructor(
+    @Inject(REDIS)
     private readonly redis: Redis,
     private readonly redisKeys: RedisKeys,
     @InjectQueue('submission-finalize') private readonly finalizeQueue: Queue,
@@ -215,7 +217,6 @@ export class CallbackProcessor implements OnModuleInit {
 
       return { added: added === 1, received, total };
     } catch (err) {
-      // Do NOT throw to controller; we want 204 to avoid Judge0 retries.
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(
         `Callback Redis error [${submissionId} idx=${index}]: ${msg}`,
