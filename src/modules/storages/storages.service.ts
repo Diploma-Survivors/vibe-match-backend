@@ -9,12 +9,15 @@ export class StoragesService {
   private readonly client: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    const accessKeyId = this.configService.get<string>('awss3.accessKeyId');
+    const accessKeyId = this.configService.get<string>('awsS3.accessKeyId');
     const secretAccessKey = this.configService.get<string>(
-      'awss3.secretAccessKey',
+      'awsS3.secretAccessKey',
     );
+    const region = this.configService.get<string>('awsS3.region');
 
-    const clientConfig: S3ClientConfig = {};
+    const clientConfig: S3ClientConfig = {
+      region,
+    };
 
     if (accessKeyId && secretAccessKey) {
       clientConfig.credentials = {
@@ -49,7 +52,9 @@ export class StoragesService {
   }
 
   update(id: number, updateStorageDto: UpdateStorageDto) {
-    return `This action updates a #${id} storage`;
+    return `This action updates a #${id} storage, with data: ${JSON.stringify(
+      updateStorageDto,
+    )}`;
   }
 
   remove(id: number) {

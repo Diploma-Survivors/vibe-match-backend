@@ -26,28 +26,29 @@ export class UserCourseService {
         courseId: course.id,
       },
     });
+    const rolesInCourseSorted = rolesInCourse.toSorted((a, b) =>
+      a.localeCompare(b),
+    );
 
     if (!userCourse) {
       userCourse = this.userCourseRepository.create({
         userId: user.id,
         courseId: course.id,
-        rolesInCourse: rolesInCourse,
+        rolesInCourse: rolesInCourseSorted,
       });
       await this.userCourseRepository.save(userCourse);
       this.logger.log(
-        `Enrolled user ${user.id} in course ${course.id} with roles: ${rolesInCourse.join(', ')}`,
+        `Enrolled user ${user.id} in course ${course.id} with roles: ${rolesInCourseSorted.join(', ')}`,
       );
-    } else {
-      if (
-        JSON.stringify(userCourse.rolesInCourse) !==
-        JSON.stringify(rolesInCourse)
-      ) {
-        userCourse.rolesInCourse = rolesInCourse;
-        await this.userCourseRepository.save(userCourse);
-        this.logger.log(
-          `Updated roles for user ${user.id} in course ${course.id} to: ${rolesInCourse.join(', ')}`,
-        );
-      }
+    } else if (
+      JSON.stringify(userCourse.rolesInCourse) !==
+      JSON.stringify(rolesInCourseSorted)
+    ) {
+      userCourse.rolesInCourse = rolesInCourseSorted;
+      await this.userCourseRepository.save(userCourse);
+      this.logger.log(
+        `Updated roles for user ${user.id} in course ${course.id} to: ${rolesInCourseSorted.join(', ')}`,
+      );
     }
 
     return userCourse;

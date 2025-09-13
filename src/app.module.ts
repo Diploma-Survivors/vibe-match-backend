@@ -19,12 +19,21 @@ import { LtiModule } from './modules/lti/lti.module';
 import { RedisModule } from './shared/redis/redis.module';
 import { CourseModule } from './modules/course/course.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
+import { ProblemsModule } from './modules/problems/problems.module';
+import { awsS3Config } from './config/aws-s3.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: '.env',
-      load: [appConfig, databaseConfig, redisConfig, ltiConfig, authConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        ltiConfig,
+        authConfig,
+        awsS3Config,
+      ],
       validationSchema: environmentValidationSchema,
       isGlobal: true,
     }),
@@ -47,6 +56,7 @@ import { UserCourseModule } from './modules/user-course/user-course.module';
     RedisModule,
     CourseModule,
     UserCourseModule,
+    ProblemsModule,
   ],
   controllers: [AppController],
   providers: [

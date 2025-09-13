@@ -18,6 +18,7 @@ import { Tag } from '../tags/entities/tag.entity';
 import { Topic } from '../topics/entities/topic.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
+import { Course } from 'src/modules/course/entities/course.entity';
 
 @Entity({
   name: 'problems',
@@ -27,16 +28,16 @@ export class Problem {
   @Generated('uuid')
   id: string;
 
-  @Column('nvarchar')
+  @Column('varchar')
   title: string;
 
-  @Column('nvarchar', { name: 'problem_description' })
+  @Column('varchar', { name: 'problem_description' })
   description: string;
 
-  @Column('nvarchar', { name: 'input_description' })
+  @Column('varchar', { name: 'input_description' })
   inputDescription: string;
 
-  @Column('nvarchar', { name: 'output_description' })
+  @Column('varchar', { name: 'output_description' })
   outputDescription: string;
 
   @Column('int2', { name: 'max_score' })
@@ -51,10 +52,13 @@ export class Problem {
   @Column('enum', {
     name: 'difficulty',
     default: DifficultyLevel.EASY,
+    enum: DifficultyLevel,
   })
   difficulty: DifficultyLevel;
 
-  //   courseId: string;
+  @ManyToOne(() => Course, (course) => course.id)
+  @JoinColumn({ name: 'course_id' })
+  course: Course;
 
   @ManyToOne(() => User, (user) => user.id)
   @JoinColumn({ name: 'author_id' })
@@ -82,6 +86,4 @@ export class Problem {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  // no submissions to avoid use Problem.submissions --> join a lot of data
 }

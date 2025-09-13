@@ -72,34 +72,38 @@ export class JwtAuthService {
     token: string,
     deviceId: string,
   ): Promise<JwtPayload> {
-    const jwt: JwtPayload = await this.jwtService.decode(token);
+    try {
+      const jwt: JwtPayload = await this.jwtService.decode(token);
 
-    const redisKey = this.getRefreshTokenKey(jwt.userId, deviceId);
-    const storedHashedToken = await this.redisService.get(redisKey);
+      const redisKey = this.getRefreshTokenKey(jwt.userId, deviceId);
+      const storedHashedToken = await this.redisService.get(redisKey);
 
-    const handleInvalidRefreshToken = async () => {
-      await this.revokeAllRefreshTokensForUser(jwt.userId);
-      this.logger.warn(
-        `No refresh token found in Redis for user ${jwt.userId} and device ${deviceId}. Possible token reuse.`,
+      const handleInvalidRefreshToken = async () => {
+        await this.revokeAllRefreshTokensForUser(jwt.userId);
+        this.logger.warn(
+          `No refresh token found in Redis for user ${jwt.userId} and device ${deviceId}. Possible token reuse.`,
+        );
+        throw new UnauthorizedException('Invalid refresh token');
+      };
+
+      if (!storedHashedToken) {
+        await handleInvalidRefreshToken();
+      }
+
+      const isValid = this.compareRefreshTokens(
+        token,
+        storedHashedToken as string,
       );
+      if (!isValid) {
+        await handleInvalidRefreshToken();
+      }
+
+      await this.revokeRefreshToken(jwt.userId, deviceId);
+
+      return jwt;
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
-    };
-
-    if (!storedHashedToken) {
-      await handleInvalidRefreshToken();
     }
-
-    const isValid = this.compareRefreshTokens(
-      token,
-      storedHashedToken as string,
-    );
-    if (!isValid) {
-      await handleInvalidRefreshToken();
-    }
-
-    await this.revokeRefreshToken(jwt.userId, deviceId);
-
-    return jwt;
   }
 
   public async generateDeviceId(): Promise<string> {

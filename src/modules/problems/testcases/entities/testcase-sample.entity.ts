@@ -25,7 +25,6 @@ export class TestcaseSample {
 
   @Column('text')
   input: string;
-
   @Column('text')
   output: string;
 
