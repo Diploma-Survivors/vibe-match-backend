@@ -36,14 +36,14 @@ export class LtiController {
     @Body() ltiLaunchRequestDto: LtiLaunchRequestDto,
     @Res() res: Response,
   ): Promise<void> {
-    const { accessToken, refreshToken, redirectPath } = JSON.parse(
+    const { accessToken, refreshToken, redirectPath, deviceId } = JSON.parse(
       await this.ltiService.handleLtiLaunch(ltiLaunchRequestDto),
     ) as LtiLaunchResponse;
 
     const backendBaseUrl =
       this.configService.get<string>('appConfig.url') ||
       'http://localhost:3000';
-    const postRedirectUrl = `${backendBaseUrl}/v1/auth/set-cookie-and-redirect`;
+    const postRedirectUrl = `${backendBaseUrl}/v1/auth/set-cookies-and-redirect`;
 
     res.setHeader('Content-Type', 'text/html');
     res.send(`
@@ -58,6 +58,7 @@ export class LtiController {
           <form id="postRedirectForm" action="${postRedirectUrl}" method="POST">
               <input type="hidden" name="accessToken" value="${accessToken}" /> <!-- Changed name to accessToken -->
               <input type="hidden" name="refreshToken" value="${refreshToken}" /> <!-- Added refreshToken -->
+              <input type="hidden" name="deviceId" value="${deviceId}" /> <!-- Added deviceId -->
               <input type="hidden" name="redirect" value="${redirectPath}" />
           </form>
           <script type="text/javascript">

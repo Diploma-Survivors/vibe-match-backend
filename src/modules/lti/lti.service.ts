@@ -10,8 +10,10 @@ import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
 import {
+  FRONTEND_AUTH_CALLBACK_URL,
   LTI_CLAIMS,
   LTI_MESSAGE_TYPES,
+  LTI_STATE_TTL_SECONDS,
   LTI_VERSIONS,
 } from './constants/lti.constants';
 import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
@@ -23,9 +25,8 @@ import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
 
 import { Course } from '../course/entities/course.entity';
-
-const LTI_STATE_TTL_SECONDS = 300;
-const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems';
+import { RoleEnum } from '../user/enums/role.enum';
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @Injectable()
 export class LtiService {
@@ -65,7 +66,7 @@ export class LtiService {
     await this.redisService.set(
       `lti:state:${state}`,
       JSON.stringify(stateData),
-      LTI_STATE_TTL_SECONDS,
+      LTI_STATE_TTL_SECONDS * 1000,
     );
     this.logger.log(
       `Stored state '${state}' in Redis: ${JSON.stringify(stateData)}`,
@@ -91,9 +92,7 @@ export class LtiService {
     redirectUrl.searchParams.append('prompt', 'none');
     redirectUrl.searchParams.append('login_hint', loginHint);
 
-    this.logger.log(
-      `Redirecting to Moodle with URL: ${redirectUrl.toString()}`,
-    );
+    this.logger.log(`Redirecting to LMS with URL: ${redirectUrl.toString()}`);
     return redirectUrl.toString();
   }
 
@@ -195,8 +194,9 @@ export class LtiService {
       }
     }
 
-    const internalJwtPayload = {
+    const internalJwtPayload: JwtPayload = {
       userId: user.id,
+      courseId: course?.id || undefined,
       email: user.email || undefined,
       firstName: user.firstName || undefined,
       lastName: user.lastName || undefined,
@@ -205,17 +205,28 @@ export class LtiService {
       iss: claims.iss,
     };
     const accessToken =
-      this.jwtAuthService.generateAccessToken(internalJwtPayload);
+      await this.jwtAuthService.generateAccessToken(internalJwtPayload);
     this.logger.log('LTI Launch: Generated Access Token.');
 
-    const refreshToken =
-      await this.refreshTokenService.createRefreshToken(user);
+    const deviceId = await this.jwtAuthService.generateDeviceId();
+    const refreshToken = await this.jwtAuthService.generateRefreshToken(
+      internalJwtPayload,
+      deviceId,
+    );
     this.logger.log('LTI Launch: Generated Refresh Token and stored in DB.');
 
     return JSON.stringify({
       accessToken: accessToken,
       refreshToken: refreshToken,
-      redirectPath: FRONTEND_AUTH_CALLBACK_URL,
+      redirectPath: this.getRedirectFrontendUrl(user.roles),
+      deviceId: deviceId,
     });
+  }
+
+  private getRedirectFrontendUrl(roles: RoleEnum[]): string {
+    if (roles.includes(RoleEnum.INSTRUCTOR)) {
+      return FRONTEND_AUTH_CALLBACK_URL.INSTRUCTOR;
+    }
+    return FRONTEND_AUTH_CALLBACK_URL.STUDENT;
   }
 }

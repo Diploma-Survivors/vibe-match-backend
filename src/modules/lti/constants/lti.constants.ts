@@ -11,6 +11,14 @@ export const LTI_CLAIMS = {
   DEPLOYMENT_ID: 'https://purl.imsglobal.org/spec/lti/claim/deployment_id',
   DEEP_LINKING_SETTINGS:
     'https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings',
+  TARGET_LINK_URI: 'https://purl.imsglobal.org/spec/lti/claim/target_link_uri',
+  LAUNCH_PRESENTATION:
+    'https://purl.imsglobal.org/spec/lti/claim/launch_presentation',
+  LIS: 'https://purl.imsglobal.org/spec/lti/claim/lis',
+  ROLE_SCOPE_MENTOR:
+    'https://purl.imsglobal.org/spec/lti/claim/role_scope_mentor',
+  TOOL_PLATFORM: 'https://purl.imsglobal.org/spec/lti/claim/tool_platform',
+  SESSION: 'https://purl.imsglobal.org/spec/lti/claim/session',
 };
 
 export const LTI_MESSAGE_TYPES = {
@@ -25,4 +33,15 @@ export const LTI_VERSIONS = {
 export const LTI_ROLES = {
   STUDENT: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Learner',
   INSTRUCTOR: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor',
+  TEACHING_ASSISTANT:
+    'http://purl.imsglobal.org/vocab/lis/v2/membership#TeachingAssistant',
+};
+
+export const LTI_ROLES_ARRAY = Object.values(LTI_ROLES);
+
+export const LTI_STATE_TTL_SECONDS = 300;
+
+export const FRONTEND_AUTH_CALLBACK_URL = {
+  STUDENT: 'http://localhost:3001/problems',
+  INSTRUCTOR: 'http://localhost:3002/create-problem',
 };

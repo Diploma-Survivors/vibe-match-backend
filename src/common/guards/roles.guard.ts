@@ -4,10 +4,11 @@ import { Observable } from 'rxjs';
 import { ROLES_KEY } from '../constants/role.constant';
 import { Request } from 'express';
 import { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
+import { RoleEnum } from 'src/modules/user/enums/role.enum';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private readonly reflector: Reflector) {}
 
   canActivate(
     context: ExecutionContext,
@@ -28,6 +29,8 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    return requiredRoles.some((role) => user?.roles?.includes(role));
+    return requiredRoles.some((role) =>
+      user?.roles?.includes(role as RoleEnum),
+    );
   }
 }
