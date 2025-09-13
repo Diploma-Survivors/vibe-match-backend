@@ -6,6 +6,7 @@ export interface Judge0SubmissionPayload {
   cpu_time_limit?: number;
   memory_limit?: number;
   redirect_stderr_to_stdout?: boolean;
+  callback_url?: string;
 }
 
 export interface Judge0Status {
@@ -15,10 +16,24 @@ export interface Judge0Status {
 
 export interface Judge0Response {
   token: string;
-  status: Judge0Status;
   stdout?: string;
+  time?: number;
+  memory?: number;
   stderr?: string;
   compile_output?: string;
-  time?: string;
-  memory?: number;
+  message?: string;
+  status: Judge0Status;
+}
+
+export interface Judge0BatchResponse {
+  submissions: { token: string }[];
+}
+
+export interface Judge0BatchSubmissionResult {
+  token: string;
+  status_id: number;
+  stdout: string;
+  stderr: string;
+  time: string;
+  memory: number;
 }

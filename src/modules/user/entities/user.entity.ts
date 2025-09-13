@@ -1,6 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import {
+  Column,
+  Entity,
+  PrimaryGeneratedColumn,
+  Unique,
+  OneToMany,
+} from 'typeorm';
 import { AuthTypeEnum } from '../enums/auth-type.enum';
+import { RoleEnum } from '../enums/role.enum';
+import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 
 @Entity()
 @Unique(['ltiSubjectId', 'ltiPlatformId'])
@@ -45,6 +53,15 @@ export class User {
   lastName: string | null;
 
   @ApiProperty({
+    description: 'User roles',
+    example: [RoleEnum.STUDENT],
+    enum: RoleEnum,
+    isArray: true,
+  })
+  @Column('simple-array', { nullable: true })
+  roles: RoleEnum[];
+
+  @ApiProperty({
     description: 'Authentication type (local or lti)',
     enum: AuthTypeEnum,
     example: AuthTypeEnum.LTI,
@@ -69,6 +86,14 @@ export class User {
   ltiPlatformId: string | null;
 
   @ApiProperty({
+    description: 'Refresh tokens associated with this user',
+    type: () => [RefreshToken],
+    nullable: true,
+  })
+  @OneToMany(() => RefreshToken, (refreshToken) => refreshToken.user)
+  refreshTokens: RefreshToken[];
+
+  @ApiProperty({
     description: 'User creation timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
@@ -85,12 +110,4 @@ export class User {
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
-
-  // TODO: CONSIDER ABOUT PERFORMANCE
-  @OneToMany(() => Submission, (submission) => submission.user)
-  submissions: Submission[];
-
-  // TODO: CONSIDER ABOUT PERFORMANCE
-  @OneToMany(() => Problem, (problem) => problem.user)
-  problems: Problem[];
 }

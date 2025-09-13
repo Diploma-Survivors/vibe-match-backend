@@ -1,5 +1,4 @@
-import { Entity, OneToOne, PrimaryColumn } from 'typeorm';
-import { JudgeLanguage } from './judge0.language.entity';
+import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity()
 export class Language {
@@ -7,5 +6,5 @@ export class Language {
   id: number; // matches Judge0 language ID
 
   @Column()
-  name: string
+  name: string;
 }

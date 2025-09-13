@@ -1,55 +1,69 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Sse,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { SubmissionService } from './submission.service';
-import { SubmitBatchDto } from './dto/submit-batch.dto';
-import { BatchResultsResponseDto, GetBatchResultsDto } from './dto/batch-results.dto';
-import { Judge0BatchSubmissionResponse } from './interfaces/judge0-batch.interface';
+import { Observable } from 'rxjs';
+import * as judge0Interface from '../judge0/judge0.interface';
+import { CallbackProcessor } from './callback.processor';
+import {
+  SseEvent,
+  SubmissionsSseService,
+} from './events/submission-events.gateway';
 
 @ApiTags('submissions')
 @Controller('submissions')
 export class SubmissionController {
-  constructor(private readonly submissionService: SubmissionService) {}
+  constructor(
+    private readonly submissionService: SubmissionService,
+    private readonly submissionsSseService: SubmissionsSseService,
+    private readonly submissionCallbackProcessor: CallbackProcessor,
+  ) {}
 
-  @Post()
+  @Post('/run')
   @ApiOperation({ summary: 'Submit code for execution' })
   @ApiResponse({
     status: 201,
-    description: 'The code has been submitted successfully',
-    type: Judge0BatchSubmissionResponse,
+    description: 'Code submitted successfully',
+    type: String,
   })
-  async submitCode(@Body() dto: SubmitBatchDto): Promise<Judge0BatchSubmissionResponse> {
-    return this.submissionService.submitCode(dto);
+  async run(
+    @Body() dto: CreateSubmissionDto,
+  ): Promise<{ submissionId: string }> {
+    return this.submissionService.run(dto);
   }
 
-  @Post('results')
-  @ApiOperation({ summary: 'Get results for submitted code' })
+  // Called by Redis to get final result
+  @Post('callback')
+  @ApiOperation({ summary: 'Judge0 callback endpoint' })
   @ApiResponse({
-    status: 200,
-    description: 'The results have been retrieved successfully',
-    type: BatchResultsResponseDto,
+    status: 204,
+    description: 'Returned callback endpoint successfully',
   })
-  async getResults(@Body() dto: GetBatchResultsDto): Promise<BatchResultsResponseDto> {
-    return this.submissionService.getResults(dto);
-  }
-   @Post()
-  @ApiOperation({ summary: 'Submit code for execution' })
-  @ApiResponse({
-    status: 201,
-    description: 'The code has been submitted successfully',
-    type: Judge0BatchSubmissionResponse,
-  })
-  async submitCode(@Body() dto: SubmitBatchDto): Promise<Judge0BatchSubmissionResponse> {
-    return this.submissionService.submitCode(dto);
+  @HttpCode(204)
+  handleCallback(
+    @Query('sid') submissionId: string,
+    @Query('tcid') testCaseId: number,
+    @Body() result: judge0Interface.Judge0Response,
+  ) {
+    // fire and forget
+    this.submissionCallbackProcessor.handleCallback(
+      submissionId,
+      testCaseId,
+      result,
+    );
   }
 
-  @Post('results')
-  @ApiOperation({ summary: 'Get results for submitted code' })
-  @ApiResponse({
-    status: 200,
-    description: 'The results have been retrieved successfully',
-    type: BatchResultsResponseDto,
-  })
-  async getResults(@Body() dto: GetBatchResultsDto): Promise<BatchResultsResponseDto> {
-    return this.submissionService.getResults(dto);
+  @Sse(':id/stream')
+  @ApiOperation({ summary: 'Stream submission results' })
+  streamResults(@Param('id') submissionId: string): Observable<SseEvent> {
+    return this.submissionsSseService.connect(submissionId);
   }
 }

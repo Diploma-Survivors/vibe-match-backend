@@ -4,9 +4,11 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
+  IsUUID,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
+import { CreateTestcaseSampleDto } from '../../problems/testcases/dto/create-testcase-sample.dto';
 
 export class CreateSubmissionDto {
   @ApiProperty({
@@ -15,7 +17,7 @@ export class CreateSubmissionDto {
   })
   @IsNumber()
   @IsNotEmpty()
-  readonly userId: number;
+  readonly userId: string;
 
   @ApiProperty({
     description: 'Programming language identifier',
@@ -35,11 +37,25 @@ export class CreateSubmissionDto {
 
   @ApiProperty({
     description: 'Problem identifier',
-    example: '1',
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsNumber()
+  @IsUUID()
   @IsNotEmpty()
-  readonly problemId: number;
+  readonly problemId: string;
+
+  @ApiPropertyOptional({
+    description: 'LTI Context ID',
+  })
+  @IsString()
+  @IsOptional()
+  readonly ltiContextId?: string;
+
+  @ApiPropertyOptional({
+    description: 'LTI Resource Link ID',
+  })
+  @IsString()
+  @IsOptional()
+  readonly resourceLinkId?: string;
 
   @Transform(({ value }) => {
     let parsed: unknown = value;
@@ -53,7 +69,9 @@ export class CreateSubmissionDto {
     }
 
     return Array.isArray(parsed)
-      ? parsed.map((v) => Object.assign(new CreateTestCaseDto(), v as object))
+      ? parsed.map((v) =>
+          Object.assign(new CreateTestcaseSampleDto(), v as object),
+        )
       : parsed;
   })
   @ValidateNested({ each: true })

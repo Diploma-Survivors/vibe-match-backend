@@ -1,32 +1,39 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
-import { CreateTestCaseDto } from '../testcase/dto/create-testcase.dto';
 import { judge0StatusMap, SubmissionStatus } from './enums/submission.enum';
 import { SubmissionResultDto } from './dto/submission.response.dto';
-import { Repository } from 'typeorm';
-import { Problem } from '../problem/entities/problem.entity';
-import { Submission } from './entities/submission.entity';
 import { Judge0Service } from '../judge0/judge0.service';
 import {
+  Judge0BatchResponse,
   Judge0Response,
   Judge0SubmissionPayload,
 } from '../judge0/judge0.interface';
+import { Submission } from './entities/submission.entity';
+import { Repository } from 'typeorm';
+import { Problem } from '../problems/entities/problem.entity';
+import { v4 as uuidv4 } from 'uuid';
+import { RedisKeys } from './helpers/redis-keys.helper';
+import Redis from 'ioredis';
 
 @Injectable()
 export class SubmissionService {
   private readonly logger = new Logger(SubmissionService.name);
+  private static readonly REDIS_TTL_SECONDS = 3600; // 1 hour
+  private static readonly SUBMISSION_TIMEOUT_MS = 60_000; // 60s
 
   constructor(
-    @InjectRepository(SubmissionRepository)
-    private readonly submissionRepository: SubmissionRepository,
+    private readonly submissionRepository: Repository<Submission>,
+    private readonly problemRepository: Repository<Problem>,
     private readonly judge0Service: Judge0Service,
+    private readonly redisKeys: RedisKeys,
+    private readonly redis: Redis,
   ) {}
 
-  async runCode(
+  async run(
     dto: CreateSubmissionDto,
     file?: Express.Multer.File,
-  ): Promise<SubmissionResultDto> {
+  ): Promise<{ submissionId: string }> {
     const problem = await this.problemRepository.findOne({
       where: { id: dto.problemId },
     });
@@ -34,138 +41,165 @@ export class SubmissionService {
       throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
     }
 
-    let passedCount = 0;
-
-    const results: TestResultDto[] = await Promise.all(
-      dto.testCases.map(async (testCase) => {
-        const judge0Response = await this.executeTestCase(
-          dto,
-          testCase,
-          problem,
-          file,
-        );
-
-        const actualOutput =
-          this.judge0Service.decodeBase64(judge0Response.stdout) || '';
-        const expectedOutput = testCase.expectedOutput || '';
-
-        if (actualOutput === expectedOutput) {
-          passedCount++;
-        }
-
-        return this.buildTestResult(testCase, judge0Response);
-      }),
-    );
-
-    return this.buildSubmissionResult(
-      problem.testCases.length,
-      passedCount,
-      results,
-      problem.problemProperties.score,
-    );
+    return this.submitBatch(dto, problem, file);
   }
 
-  private async executeTestCase(
+  async submitBatch(
     dto: CreateSubmissionDto,
-    testCase: CreateTestCaseDto,
     problem: Problem,
     file?: Express.Multer.File,
-  ) {
-    const payload = this.buildJudge0Payload(dto, testCase, problem, file);
-    return this.judge0Service.createSubmission(payload);
-  }
-
-  private buildJudge0Payload(
-    dto: CreateSubmissionDto,
-    testCase: CreateTestCaseDto,
-    problem: Problem,
-    file?: Express.Multer.File,
-  ): Judge0SubmissionPayload {
-    const payload: Judge0SubmissionPayload = {
-      language_id: dto.languageId,
-      stdin: this.judge0Service.encodeBase64(testCase.input),
-      redirect_stderr_to_stdout: true,
-      cpu_time_limit: problem.problemProperties.timeLimit,
-      memory_limit: problem.problemProperties.memoryLimit,
-    };
-
-    // Handle multi-file submissions
-    if (dto.languageId === 89) {
-      if (!file) {
-        throw new HttpException(
-          'Multi-file program requires additional files (Base64 ZIP)',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      payload.additional_files = file.buffer.toString('base64');
-      payload.source_code = '';
-    } else {
-      if (!dto.sourceCode) {
-        throw new HttpException(
-          'Single-file program requires source code',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      payload.source_code = this.judge0Service.encodeBase64(dto.sourceCode);
+  ): Promise<{ submissionId: string }> {
+    if (!dto?.testCases?.length) {
+      throw new Error('submitBatch: testCases must be a non-empty array.');
     }
 
-    return payload;
+    const submissionId = uuidv4();
+
+    // === Precompute invariants ===
+    const isMultiFile = dto.languageId === 89;
+    const now = Date.now();
+    const timeoutAt = now + SubmissionService.SUBMISSION_TIMEOUT_MS;
+
+    const cpuSeconds = this.judge0Service.msToSeconds(problem.timeLimitMs);
+
+    // Encode source/additional files
+    const sourceBase64 =
+      !isMultiFile && dto.sourceCode
+        ? this.judge0Service.encodeBase64(dto.sourceCode)
+        : undefined;
+
+    const additionalFilesBase64 =
+      isMultiFile && file?.buffer ? file.buffer.toString('base64') : undefined;
+
+    const tcCount = dto.testCases.length;
+
+    // Build Judge0 batch items
+    const items: Judge0SubmissionPayload[] = new Array<Judge0SubmissionPayload>(
+      tcCount,
+    );
+    for (let i = 0; i < tcCount; i++) {
+      const input = dto.testCases[i].input;
+      items[i] = {
+        language_id: dto.languageId,
+        source_code: sourceBase64,
+        additional_files: additionalFilesBase64,
+        stdin: input ? this.judge0Service.encodeBase64(input) : undefined,
+        redirect_stderr_to_stdout: true,
+        cpu_time_limit: cpuSeconds,
+        memory_limit: problem.memoryLimitKb,
+        callback_url: this.judge0Service.getCallbackUrl(
+          submissionId,
+          String(i),
+        ),
+      };
+    }
+
+    // === Submit to Judge0 ===
+    const judge0BatchResponse: Judge0BatchResponse =
+      await this.judge0Service.createSubmissionBatch(items);
+
+    const returned = judge0BatchResponse?.submissions ?? [];
+    if (returned.length !== tcCount) {
+      throw new Error(
+        `Judge0 returned ${returned.length} tokens, expected ${tcCount}. submissionId=${submissionId}`,
+      );
+    }
+
+    // === Redis keys ===
+    const metaKey = this.redisKeys.meta(submissionId);
+    const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
+    const seenKey = this.redisKeys.seen(submissionId);
+
+    // === Initialize Redis atomically via MULTI/EXEC ===
+    const ttlSec = SubmissionService.REDIS_TTL_SECONDS;
+    const tx = this.redis.multi();
+
+    // Meta
+    tx.hset(metaKey, {
+      total: String(tcCount),
+      received: '0',
+      problemId: String(problem.id),
+      startAt: String(now),
+      timeoutAt: String(timeoutAt),
+    });
+
+    // TTL
+    tx.expire(metaKey, ttlSec);
+    tx.expire(resultsIKey, ttlSec);
+    tx.expire(seenKey, ttlSec);
+
+    try {
+      await tx.exec();
+    } catch (err) {
+      this.logger.error(
+        `Redis init failed for submission ${submissionId}: ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw err;
+    }
+
+    return { submissionId };
   }
 
-  private buildTestResult(
-    testCase: CreateTestCaseDto,
-    judge0Response: Judge0Response,
-  ): TestResultDto {
-    const actualOutput =
-      this.judge0Service.decodeBase64(judge0Response.stdout) || '';
-    const expectedOutput = testCase.expectedOutput || '';
+  public buildTestResult(judge0Response: Judge0Response): TestResultDto {
+    const stdout = this.judge0Service.decodeBase64(judge0Response.stdout) || '';
 
     return {
-      input: testCase.input,
-      expectedOutput,
-      actualOutput,
-      runtime: judge0Response.time
-        ? `${(parseFloat(judge0Response.time) * 1000).toFixed(0)}ms`
-        : '0ms',
-      memory: judge0Response.memory
-        ? `${(judge0Response.memory / 1024).toFixed(2)}MB`
-        : '0MB',
+      stdout: stdout,
+      time: judge0Response.time,
+      memory: judge0Response.memory,
       status: judge0Response.status,
-      errorMessage:
-        this.judge0Service.decodeBase64(judge0Response.compile_output) ||
-        this.judge0Service.decodeBase64(judge0Response.stderr) ||
-        undefined,
+      stderr:
+        this.judge0Service.decodeBase64(judge0Response.stderr) || undefined,
+      token: judge0Response.token,
     };
   }
 
-  private buildSubmissionResult(
-    totalTests: number,
-    passedTests: number,
+  public async buildSubmissionResult(
     results: TestResultDto[],
-    maxScore: number,
-  ): SubmissionResultDto {
-    const overallStatus = this.determineSubmissionStatus(results);
-    const overallScore = (maxScore * passedTests) / totalTests;
+    problemId: string,
+  ): Promise<SubmissionResultDto> {
+    const problem: Problem | null = await this.problemRepository.findOne({
+      where: { id: problemId },
+    });
+    if (!problem) {
+      throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
+    }
+    const { overallStatus, passedTests, totalTests, sumRuntime, sumMemory } =
+      this.determineSubmissionStatus(results);
+    const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
       status: overallStatus,
       totalTests,
       passedTests,
       results,
-      score: Math.round(overallScore * 100) / 100, // Round to 2 decimal places
+      score: Math.round(score * 100) / 100, // Round to 2 decimal places
+      runtime: sumRuntime,
+      memory: sumMemory,
     };
   }
 
-  private determineSubmissionStatus(
-    results: TestResultDto[],
-  ): SubmissionStatus {
+  public determineSubmissionStatus(results: TestResultDto[]) {
+    let overallStatus = SubmissionStatus.ACCEPTED;
+    const totalTests = results.length;
+    let passedTests = 0;
+    let sumRuntime = 0;
+    let sumMemory = 0;
     for (const result of results) {
-      if (result.status.id !== 3) {
-        return (
-          judge0StatusMap[result.status.id] ?? SubmissionStatus.UNKNOWN_ERROR
-        );
+      sumRuntime += result.time || 0;
+      sumMemory += result.memory || 0;
+      if (result.status.id === 3) {
+        passedTests++;
+      } else if (
+        result.status.id !== 3 &&
+        overallStatus === SubmissionStatus.ACCEPTED
+      ) {
+        // only set the first not accepted status
+        overallStatus =
+          judge0StatusMap[result.status.id] ?? SubmissionStatus.UNKNOWN_ERROR;
       }
     }
-    return SubmissionStatus.ACCEPTED;
+    return { overallStatus, passedTests, totalTests, sumRuntime, sumMemory };
   }
 }

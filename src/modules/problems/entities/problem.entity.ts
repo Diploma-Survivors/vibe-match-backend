@@ -82,4 +82,6 @@ export class Problem {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // no submissions to avoid use Problem.submissions --> join a lot of data
 }

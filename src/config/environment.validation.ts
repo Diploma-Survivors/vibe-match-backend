@@ -17,6 +17,7 @@ export default Joi.object({
   REDIS_DB: Joi.number().required(),
   // JWT Configuration
   JWT_SECRET: Joi.string().required(),
+  JWT_REFRESH_TOKEN_SECRET: Joi.string().required(),
   JWT_TOKEN_AUDIENCE: Joi.required(),
   JWT_TOKEN_ISSUER: Joi.string().required(),
   JWT_ACCESS_TOKEN_TTL: Joi.number().required(),
@@ -32,4 +33,7 @@ export default Joi.object({
   LTI_TOOL_PUBLIC_KEYSET_URL: Joi.string().uri().required(),
   LTI_TOOL_INITIATE_LOGIN_URL: Joi.string().uri().required(),
   LTI_TOOL_REDIRECTION_URI: Joi.string().uri().required(),
+  // Judge0
+  JUDGE0_URL: Joi.string().uri().required(),
+  JUDGE0_CALLBACK_URL: Joi.string().uri().required(),
 });

@@ -18,5 +18,6 @@ export default registerAs('appConfig', function () {
     smtpPassword: process.env.SMTP_PASSWORD,
     url: process.env.APP_URL,
     judge0Url: process.env.JUDGE0_URL,
+    judge0CallbackUrl: process.env.JUDGE0_CALLBACK_URL,
   };
 });

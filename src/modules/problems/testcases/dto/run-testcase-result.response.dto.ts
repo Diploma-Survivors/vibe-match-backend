@@ -1,19 +1,31 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import * as judge0Interface_1 from '../../../judge0/judge0.interface';
+import { ApiProperty } from '@nestjs/swagger';
 import { SubmissionStatus } from '../../../submission/enums/submission.enum';
+import * as judge0Interface_1 from '../../../judge0/judge0.interface';
 
 export class TestResultDto {
   @ApiProperty({
-    description: 'Test case input',
-    example: '5 3',
-  })
-  input: string;
-
-  @ApiProperty({
-    description: 'Expected output',
+    description: 'Program output',
     example: '8',
   })
-  output: string;
+  stdout: string;
+
+  @ApiProperty({
+    description: 'Error output if any',
+    example: 'Error: Segmentation fault',
+  })
+  stderr?: string;
+
+  @ApiProperty({
+    description: 'Execution time in milliseconds',
+    example: '0.123',
+  })
+  time?: number;
+
+  @ApiProperty({
+    description: 'Memory usage in MB',
+    example: 128,
+  })
+  memory?: number;
 
   @ApiProperty({
     description: 'Submission token',
@@ -26,28 +38,4 @@ export class TestResultDto {
     example: SubmissionStatus.ACCEPTED,
   })
   status: judge0Interface_1.Judge0Status;
-
-  @ApiProperty({
-    description: 'Program output',
-    example: '8',
-  })
-  stdout: string;
-
-  @ApiProperty({
-    description: 'Error output if any',
-    example: 'Error: Segmentation fault',
-  })
-  stderr: string;
-
-  @ApiProperty({
-    description: 'Execution time in seconds',
-    example: '0.123',
-  })
-  time: string;
-
-  @ApiProperty({
-    description: 'Memory usage in KB',
-    example: 128,
-  })
-  memory: number;
 }

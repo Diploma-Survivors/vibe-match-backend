@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
   OneToOne,
   PrimaryGeneratedColumn,
@@ -14,17 +15,28 @@ import { User } from '../../user/entities/user.entity';
 // TODO: missing contest participant id
 @Entity()
 export class Submission {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column('text')
+  @Column('text', { nullable: true })
   sourceCode: string;
 
-  @ManyToOne(() => User, (user) => user.submissions)
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => Problem, (problem) => problem.submissions)
+  @Column({ name: 'user_id', nullable: true })
+  userId: string;
+
+  @ManyToOne(() => Problem)
+  @JoinColumn({ name: 'problem_id' })
   problem: Problem;
+
+  @Column({ name: 'problem_id' })
+  problemId: string;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
+  score: number;
 
   @Column({
     type: 'enum',
@@ -32,6 +44,15 @@ export class Submission {
     default: SubmissionStatus.PENDING,
   })
   status: SubmissionStatus;
+
+  @Column('jsonb', { nullable: true })
+  results: any[];
+
+  @Column({ nullable: true })
+  ltiContextId: string;
+
+  @Column({ nullable: true })
+  resourceLinkId: string;
 
   @Column({ type: 'float', nullable: true })
   runtime: number;
@@ -44,9 +65,6 @@ export class Submission {
 
   @OneToOne(() => Language, (language) => language.id)
   language: Language;
-
-  @Column('text')
-  sourceCode: string;
 
   @Column()
   fileUrl: string;

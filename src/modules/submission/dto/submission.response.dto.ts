@@ -29,6 +29,18 @@ export class SubmissionResultDto {
   score: number;
 
   @ApiProperty({
+    description: 'Sum of runtime in milliseconds',
+    example: 5,
+  })
+  runtime: number;
+
+  @ApiProperty({
+    description: 'Sum of memory in kbs',
+    example: 5,
+  })
+  memory: number;
+
+  @ApiProperty({
     description: 'Results for each test case',
     type: [TestResultDto],
   })

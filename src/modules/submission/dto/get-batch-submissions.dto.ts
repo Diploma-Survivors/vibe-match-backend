@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsArray, IsNotEmpty, IsString } from 'class-validator';
 
-export class GetBatchResultsDto {
+export class GetBatchSubmissionsDto {
   @ApiProperty({
     description: 'Array of submission tokens to get results for',
     example: ['d85cd024-1548-4165-96c7-7bc88673f194'],
