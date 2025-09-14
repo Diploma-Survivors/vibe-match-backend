@@ -60,7 +60,11 @@ export class JwtAuthService {
 
     const refreshTokenHashed = this.hashRefreshToken(refreshToken);
     const redisKey = this.getRefreshTokenKey(payload.userId, deviceId);
-    await this.redisService.set(redisKey, refreshTokenHashed, refreshTokenTtl);
+    await this.redisService.set(
+      redisKey,
+      refreshTokenHashed,
+      refreshTokenTtl * 1000,
+    );
     this.logger.log(
       `Stored refresh token in Redis with key ${redisKey} and TTL ${refreshTokenTtl} seconds.`,
     );

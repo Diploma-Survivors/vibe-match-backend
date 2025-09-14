@@ -112,7 +112,7 @@ export class RedisService implements OnModuleDestroy {
     return this.client.exists(key);
   }
 
-  public async expire(key: string, ttlSeconds: number): Promise<number> {
-    return this.client.expire(key, ttlSeconds);
+  public async expire(key: string, ttlMilliseconds: number): Promise<number> {
+    return this.client.pexpire(key, ttlMilliseconds);
   }
 }
