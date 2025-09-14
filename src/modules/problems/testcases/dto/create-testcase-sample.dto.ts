@@ -4,6 +4,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class CreateTestcaseSampleDto {
   @ApiProperty({
     description: 'The input for the testcase',
+    example: '1 2',
   })
   @IsString()
   @IsNotEmpty()
@@ -11,6 +12,7 @@ export class CreateTestcaseSampleDto {
 
   @ApiProperty({
     description: 'The output for the testcase',
+    example: '3',
   })
   @IsString()
   @IsNotEmpty()

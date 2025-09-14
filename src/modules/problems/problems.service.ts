@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
@@ -16,54 +16,28 @@ export class ProblemsService {
   ) {}
 
   async create(createProblemDto: CreateProblemDto, user: JwtPayload) {
-    try {
-      const problem = this.problemsRepository.create({
-        ...createProblemDto,
-        author: { id: user.userId },
-        course: { id: user.courseId },
-      });
+    const problem = this.problemsRepository.create({
+      ...createProblemDto,
+      author: { id: user.userId },
+      course: { id: user.courseId },
+    });
 
-      return await this.problemsRepository.save(problem);
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    return await this.problemsRepository.save(problem);
   }
 
   async findAll() {
-    try {
-      return await this.problemsRepository.find();
-    } catch (err) {
-      this.logger.error(err);
-
-      throw new BadRequestException();
-    }
+    return await this.problemsRepository.find();
   }
 
   async findOne(id: string) {
-    try {
-      return await this.problemsRepository.findOne({ where: { id } });
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    return await this.problemsRepository.findOne({ where: { id } });
   }
 
   async update(id: string, updateProblemDto: UpdateProblemDto) {
-    try {
-      await this.problemsRepository.update(id, updateProblemDto);
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    await this.problemsRepository.update(id, updateProblemDto);
   }
 
   async remove(id: string) {
-    try {
-      await this.problemsRepository.delete(id);
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    await this.problemsRepository.delete(id);
   }
 }
