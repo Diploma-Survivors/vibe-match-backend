@@ -27,10 +27,6 @@ import { RoleEnum } from '../user/enums/role.enum';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 const LTI_STATE_TTL_SECONDS = 300;
-const FRONTEND_AUTH_CALLBACK_URL = {
-  STUDENT: 'http://localhost:3001/problems',
-  INSTRUCTOR: 'http://localhost:3002/create-problem',
-};
 
 @Injectable()
 export class LtiService {
@@ -229,8 +225,12 @@ export class LtiService {
 
   private getRedirectFrontendUrl(roles: RoleEnum[]): string {
     if (roles.includes(RoleEnum.INSTRUCTOR)) {
-      return FRONTEND_AUTH_CALLBACK_URL.INSTRUCTOR;
+      return this.configService.get<string>(
+        'lti.frontendCallbackUrl.instructor',
+      ) as string;
     }
-    return FRONTEND_AUTH_CALLBACK_URL.STUDENT;
+    return this.configService.get<string>(
+      'lti.frontendCallbackUrl.student',
+    ) as string;
   }
 }
