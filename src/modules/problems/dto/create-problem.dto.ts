@@ -144,10 +144,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The IDs of the sample test cases associated with the problem',
-    type: 'array',
-    items: {
-      type: 'object',
-    },
+    type: () => [CreateTestcaseSampleDto],
   })
   @IsArray()
   @Type(() => CreateTestcaseSampleDto)

@@ -6,6 +6,7 @@ export default registerAs('appConfig', function () {
     apiVersion: process.env.API_VERSION || 'v1',
     port: parseInt(process.env.PORT || '3000'),
     // Swagger Configuration
+    swaggerEndpoint: process.env.SWAGGER_ENDPOINT || 'api/docs',
     swaggerTitle: process.env.SWAGGER_TITLE || 'Vibe Match API',
     swaggerDescription:
       process.env.SWAGGER_DESCRIPTION ||

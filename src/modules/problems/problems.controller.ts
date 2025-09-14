@@ -1,31 +1,32 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  ClassSerializerInterceptor,
+  Controller,
   Delete,
+  Get,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
   UseGuards,
   UseInterceptors,
-  ClassSerializerInterceptor,
 } from '@nestjs/common';
-import { ProblemsService } from './problems.service';
-import { CreateProblemDto } from './dto/create-problem.dto';
-import { UpdateProblemDto } from './dto/update-problem.dto';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import type { JwtPayload } from '../auth/interfaces/jwt.interface';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RoleEnum } from '../user/enums/role.enum';
 import {
   ApiCookieAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { plainToInstance } from 'class-transformer';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { RoleEnum } from '../user/enums/role.enum';
+import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
+import { CreateProblemDto } from './dto/create-problem.dto';
+import { UpdateProblemDto } from './dto/update-problem.dto';
+import { ProblemsService } from './problems.service';
 
 @ApiTags('Problems')
 @ApiCookieAuth('access_token')
@@ -37,10 +38,10 @@ export class ProblemsController {
   @ApiOperation({ summary: 'Create a problem (Instructor only)' })
   @ApiResponse({
     type: CreateProblemResponseDto,
-    status: 201,
+    status: HttpStatus.CREATED,
     description: 'The problem has been created.',
   })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   @UseInterceptors(ClassSerializerInterceptor)
@@ -54,8 +55,12 @@ export class ProblemsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all problems' })
-  @ApiResponse({ status: 200, description: 'List of problems.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({
+    type: [CreateProblemResponseDto],
+    status: HttpStatus.OK,
+    description: 'List of problems.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   async findAll() {
     return await this.problemsService.findAll();
@@ -63,9 +68,16 @@ export class ProblemsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a problem by ID' })
-  @ApiResponse({ status: 200, description: 'The problem has been found.' })
-  @ApiResponse({ status: 404, description: 'Problem not found.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({
+    type: CreateProblemResponseDto,
+    status: HttpStatus.OK,
+    description: 'The problem has been found.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Problem not found.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
     return await this.problemsService.findOne(id);
@@ -73,9 +85,16 @@ export class ProblemsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a problem (Instructor only)' })
-  @ApiResponse({ status: 200, description: 'The problem has been updated.' })
-  @ApiResponse({ status: 404, description: 'Problem not found.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({
+    type: CreateProblemResponseDto,
+    status: HttpStatus.OK,
+    description: 'The problem has been updated.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Problem not found.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async update(
@@ -87,9 +106,15 @@ export class ProblemsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a problem (Instructor only)' })
-  @ApiResponse({ status: 200, description: 'The problem has been deleted.' })
-  @ApiResponse({ status: 404, description: 'Problem not found.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The problem has been deleted.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Problem not found.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async remove(@Param('id') id: string) {
