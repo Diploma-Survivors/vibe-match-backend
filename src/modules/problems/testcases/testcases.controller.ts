@@ -2,6 +2,7 @@ import {
   ClassSerializerInterceptor,
   Controller,
   FileTypeValidator,
+  HttpStatus,
   MaxFileSizeValidator,
   ParseFilePipe,
   Post,
@@ -11,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBody,
+  ApiConsumes,
   ApiCookieAuth,
   ApiOperation,
   ApiResponse,
@@ -29,6 +32,7 @@ import {
 } from './constants/testcases.constant';
 import { CreateTestcaseResponseDto } from './dto/create-testcase-response.dto';
 import { TestcasesService } from './testcases.service';
+import { CreateTestcaseDto } from './dto/create-testcase.dto';
 
 @ApiTags('Testcases')
 @ApiCookieAuth('access_token')
@@ -38,8 +42,17 @@ export class TestcasesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a testcase by uploading a text file' })
-  @ApiResponse({ status: 201, description: 'The testcase has been created.' })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    type: CreateTestcaseDto,
+    description: 'Upload a text file containing the testcase data',
+  })
+  @ApiResponse({
+    type: CreateTestcaseResponseDto,
+    status: HttpStatus.CREATED,
+    description: 'The testcase has been created.',
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request.' })
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   @UseInterceptors(

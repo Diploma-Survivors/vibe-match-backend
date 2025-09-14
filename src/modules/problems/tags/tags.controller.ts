@@ -9,6 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
   ClassSerializerInterceptor,
+  HttpStatus,
 } from '@nestjs/common';
 import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
@@ -34,10 +35,11 @@ export class TagsController {
   @Post()
   @ApiOperation({ summary: 'Create a new tag' })
   @ApiResponse({
-    status: 201,
+    type: CreateTagResponseDto,
+    status: HttpStatus.CREATED,
     description: 'The tag has been successfully created.',
   })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   @UseInterceptors(ClassSerializerInterceptor)
@@ -49,10 +51,11 @@ export class TagsController {
   @Get()
   @ApiOperation({ summary: 'Get all tags' })
   @ApiResponse({
-    status: 200,
+    type: [CreateTagResponseDto],
+    status: HttpStatus.OK,
     description: 'List of tags retrieved successfully.',
   })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   async findAll() {
     return await this.tagsService.findAll();
