@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Tag } from './entities/tag.entity';
-import { Repository } from 'typeorm';
 
 @Injectable()
 export class TagsService {
@@ -14,48 +14,23 @@ export class TagsService {
   ) {}
 
   async create(createTagDto: CreateTagDto) {
-    try {
-      const tag = this.tagsRepository.create(createTagDto);
-      return await this.tagsRepository.save(tag);
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    const tag = this.tagsRepository.create(createTagDto);
+    return await this.tagsRepository.save(tag);
   }
 
   async findAll() {
-    try {
-      return await this.tagsRepository.find();
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    return await this.tagsRepository.find();
   }
 
   async findOne(id: string) {
-    try {
-      return await this.tagsRepository.findOne({ where: { id } });
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    return await this.tagsRepository.findOne({ where: { id } });
   }
 
   async update(id: string, updateTagDto: UpdateTagDto) {
-    try {
-      await this.tagsRepository.update(id, updateTagDto);
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    await this.tagsRepository.update(id, updateTagDto);
   }
 
   async remove(id: string) {
-    try {
-      await this.tagsRepository.delete(id);
-    } catch (err) {
-      this.logger.error(err);
-      throw new BadRequestException();
-    }
+    await this.tagsRepository.delete(id);
   }
 }
