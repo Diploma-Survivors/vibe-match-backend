@@ -40,7 +40,8 @@ export class StoragesService {
   }
 
   getObjectUrl(bucket: string, key: string) {
-    return `https://${bucket}.s3.amazonaws.com/${key}`;
+    const region = this.configService.get<string>('awsS3.region');
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
   }
 
   findAll() {
