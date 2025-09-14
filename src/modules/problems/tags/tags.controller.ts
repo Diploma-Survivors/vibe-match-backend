@@ -43,9 +43,7 @@ export class TagsController {
   @UseInterceptors(ClassSerializerInterceptor)
   async create(@Body() createTagDto: CreateTagDto) {
     const tag = await this.tagsService.create(createTagDto);
-    return plainToInstance(CreateTagResponseDto, tag, {
-      excludeExtraneousValues: true,
-    });
+    return plainToInstance(CreateTagResponseDto, tag);
   }
 
   @Get()
