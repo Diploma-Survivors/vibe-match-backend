@@ -51,6 +51,8 @@ export class RedisService implements OnModuleDestroy {
   }
 
   public deleteByPattern(pattern: string): Promise<void> {
+    const pipelinePromises: Promise<any>[] = [];
+
     const stream = this.client.scanStream({
       match: pattern,
     });
@@ -58,18 +60,31 @@ export class RedisService implements OnModuleDestroy {
     stream.on('data', (keys: string[]) => {
       if (keys.length) {
         const pipeline = this.client.pipeline();
+
         keys.forEach((key) => {
           pipeline.del(key);
         });
-        pipeline.exec().catch((err) => {
-          this.logger.error('Error deleting keys:', err);
-        });
+
+        pipelinePromises.push(
+          pipeline.exec().catch((err) => {
+            this.logger.error('Error deleting keys:', err);
+            throw err;
+          }),
+        );
       }
     });
 
-    return new Promise((resolve, reject) => {
-      stream.on('end', resolve);
-      stream.on('error', reject);
+    return new Promise<void>((resolve, reject) => {
+      stream.on('end', () => {
+        Promise.all(pipelinePromises)
+          .then(() => resolve())
+          .catch((err) =>
+            reject(err instanceof Error ? err : new Error(String(err))),
+          );
+      });
+      stream.on('error', (err) =>
+        err instanceof Error ? err : new Error(String(err)),
+      );
     });
   }
 
