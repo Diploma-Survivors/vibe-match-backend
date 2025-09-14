@@ -9,7 +9,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { DataResponseInterceptor } from './common/interceptors/data-response.interceptor';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
-import { awsS3Config } from './config/aws-s3.config';
+import { awsConfig } from './config/aws.config';
 import databaseConfig from './config/database.config';
 import environmentValidationSchema from './config/environment.validation';
 import { ltiConfig } from './config/lti.config';
@@ -32,7 +32,7 @@ import { RedisModule } from './shared/redis/redis.module';
         redisConfig,
         ltiConfig,
         authConfig,
-        awsS3Config,
+        awsConfig,
       ],
       validationSchema: environmentValidationSchema,
       isGlobal: true,
