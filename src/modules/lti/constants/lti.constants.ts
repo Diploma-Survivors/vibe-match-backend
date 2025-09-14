@@ -38,10 +38,3 @@ export const LTI_ROLES = {
 };
 
 export const LTI_ROLES_ARRAY = Object.values(LTI_ROLES);
-
-export const LTI_STATE_TTL_SECONDS = 300;
-
-export const FRONTEND_AUTH_CALLBACK_URL = {
-  STUDENT: 'http://localhost:3001/problems',
-  INSTRUCTOR: 'http://localhost:3002/create-problem',
-};

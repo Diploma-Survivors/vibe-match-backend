@@ -1,32 +1,32 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
-  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
-import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
-import {
-  FRONTEND_AUTH_CALLBACK_URL,
-  LTI_CLAIMS,
-  LTI_MESSAGE_TYPES,
-  LTI_STATE_TTL_SECONDS,
-  LTI_VERSIONS,
-} from './constants/lti.constants';
-import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
-import { RedisService } from '../../shared/redis/redis.service';
-import { UserService } from '../../modules/user/user.service';
 import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
 import { RefreshTokenService } from '../../modules/auth/services/refresh-token.service'; // Import RefreshTokenService
 import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
+import { UserService } from '../../modules/user/user.service';
+import { RedisService } from '../../shared/redis/redis.service';
+import {
+  LTI_CLAIMS,
+  LTI_MESSAGE_TYPES,
+  LTI_VERSIONS,
+} from './constants/lti.constants';
+import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
+import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
+import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
 
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { Course } from '../course/entities/course.entity';
 import { RoleEnum } from '../user/enums/role.enum';
-import { JwtPayload } from '../auth/interfaces/jwt.interface';
+
+export const LTI_STATE_TTL_SECONDS = 300;
 
 @Injectable()
 export class LtiService {
@@ -225,8 +225,12 @@ export class LtiService {
 
   private getRedirectFrontendUrl(roles: RoleEnum[]): string {
     if (roles.includes(RoleEnum.INSTRUCTOR)) {
-      return FRONTEND_AUTH_CALLBACK_URL.INSTRUCTOR;
+      return this.configService.get<string>(
+        'lti.frontendCallbackUrl.instructor',
+      ) as string;
     }
-    return FRONTEND_AUTH_CALLBACK_URL.STUDENT;
+    return this.configService.get<string>(
+      'lti.frontendCallbackUrl.student',
+    ) as string;
   }
 }

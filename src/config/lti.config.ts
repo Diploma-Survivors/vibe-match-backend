@@ -23,4 +23,12 @@ export const ltiConfig = registerAs('lti', () => ({
   toolRedirectionUri:
     process.env.LTI_TOOL_REDIRECTION_URI ||
     'http://host.docker.internal:3000/v1/lti/launch',
+  frontendCallbackUrl: {
+    student:
+      process.env.LTI_FRONTEND_STUDENT_CALLBACK_URL ||
+      'http://localhost:3001/problems',
+    instructor:
+      process.env.LTI_FRONTEND_INSTRUCTOR_CALLBACK_URL ||
+      'http://localhost:3002/create-problem',
+  },
 }));
