@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { UpdateStorageDto } from './dto/update-storage.dto';
 import { PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
 import { FileUploadOptions } from './interfaces/file-update-options.interface';
@@ -42,23 +41,5 @@ export class StoragesService {
   getObjectUrl(bucket: string, key: string) {
     const region = this.configService.get<string>('aws.s3.region');
     return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
-  }
-
-  findAll() {
-    return `This action returns all storages`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} storage`;
-  }
-
-  update(id: number, updateStorageDto: UpdateStorageDto) {
-    return `This action updates a #${id} storage, with data: ${JSON.stringify(
-      updateStorageDto,
-    )}`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} storage`;
   }
 }
