@@ -9,11 +9,11 @@ export class StoragesService {
   private readonly client: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    const accessKeyId = this.configService.get<string>('awsS3.accessKeyId');
+    const accessKeyId = this.configService.get<string>('aws.s3.accessKeyId');
     const secretAccessKey = this.configService.get<string>(
-      'awsS3.secretAccessKey',
+      'aws.s3.secretAccessKey',
     );
-    const region = this.configService.get<string>('awsS3.region');
+    const region = this.configService.get<string>('aws.s3.region');
 
     const clientConfig: S3ClientConfig = {
       region,
@@ -40,7 +40,7 @@ export class StoragesService {
   }
 
   getObjectUrl(bucket: string, key: string) {
-    const region = this.configService.get<string>('awsS3.region');
+    const region = this.configService.get<string>('aws.s3.region');
     return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
   }
 

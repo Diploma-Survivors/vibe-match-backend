@@ -20,7 +20,7 @@ import { RedisModule } from './shared/redis/redis.module';
 import { CourseModule } from './modules/course/course.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { ProblemsModule } from './modules/problems/problems.module';
-import { awsS3Config } from './config/aws-s3.config';
+import { awsConfig } from './config/aws.config';
 
 @Module({
   imports: [
@@ -32,7 +32,7 @@ import { awsS3Config } from './config/aws-s3.config';
         redisConfig,
         ltiConfig,
         authConfig,
-        awsS3Config,
+        awsConfig,
       ],
       validationSchema: environmentValidationSchema,
       isGlobal: true,

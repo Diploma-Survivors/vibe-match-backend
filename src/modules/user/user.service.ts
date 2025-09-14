@@ -147,7 +147,7 @@ export class UserService {
       //         internalRoles.push(RoleEnum.LEARNER);
       //       }
       //       break;
-      //     // TODO: Add more roles
+      //     // Add more roles
       //     default:
       //       this.logger.warn(`Unknown LTI role: ${roleName}. Skipping.`);
       //       break;
