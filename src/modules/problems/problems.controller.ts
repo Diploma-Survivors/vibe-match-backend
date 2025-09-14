@@ -49,9 +49,7 @@ export class ProblemsController {
     @CurrentUser() user: JwtPayload,
   ) {
     const problem = await this.problemsService.create(createProblemDto, user);
-    return plainToInstance(CreateProblemResponseDto, problem, {
-      excludeExtraneousValues: true,
-    });
+    return plainToInstance(CreateProblemResponseDto, problem);
   }
 
   @Get()
