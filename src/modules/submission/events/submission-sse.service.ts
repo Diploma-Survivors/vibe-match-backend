@@ -18,19 +18,16 @@ import {
 @Injectable()
 export class SubmissionsSseService implements OnModuleInit {
   private readonly logger = new Logger(SubmissionsSseService.name);
+  private sub: Redis;
 
   private readonly streams = new Map<string, ReplaySubject<MessageEvent>>();
   // fallback to cleanup if client disconnects wrongly (no proper SSE close - currently we not support Fastify onClose, only Express)
   private readonly cleanupTimers = new Map<string, NodeJS.Timeout>();
   private readonly cleanupMs = SUBMISSION_CLEANUP_STREAM_TIME;
 
-  private pub: Redis;
-  private sub: Redis;
-
   constructor(@Inject(REDIS) private readonly redis: Redis) {}
 
-  async onModuleInit() {
-    this.pub = this.redis.duplicate();
+  async onModuleInit(): Promise<void> {
     this.sub = this.redis.duplicate();
 
     await this.sub.subscribe(SUBMISSION_EVENT_REDIS_CHANNEL);
@@ -66,15 +63,7 @@ export class SubmissionsSseService implements OnModuleInit {
     return stream.asObservable();
   }
 
-  async publishFinalize<T = any>(submissionId: string, payload: T) {
-    await this.pub.publish(
-      SUBMISSION_EVENT_REDIS_CHANNEL,
-      JSON.stringify({ submissionId, payload }),
-    );
-    this.logger.log(`Published finalize for ${submissionId}`);
-  }
-
-  private forwardEvent(submissionId: string, data: object) {
+  forwardEvent(submissionId: string, data: object) {
     let stream = this.streams.get(submissionId);
     if (!stream) {
       stream = new ReplaySubject<MessageEvent>(
@@ -87,7 +76,6 @@ export class SubmissionsSseService implements OnModuleInit {
       type: SUBMISSION_RESULT_EVENT,
       data: data,
     };
-
     stream.next(event);
 
     if (!this.cleanupTimers.has(submissionId)) {

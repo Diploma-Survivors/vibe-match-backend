@@ -15,9 +15,8 @@ describe('SubmissionController (e2e)', () => {
   let moduleFixture: TestingModule;
   let dataSource: DataSource;
   const apiVersion: string = process.env.API_VERSION!;
-  let server: any;
-  let address: any;
-  let port: any;
+  const appUrl: string = process.env.APP_URL!;
+  const port: string = process.env.PORT!;
 
   beforeAll(async () => {
     moduleFixture = await Test.createTestingModule({
@@ -29,12 +28,9 @@ describe('SubmissionController (e2e)', () => {
     await app.init();
 
     // Start app on an ephemeral port to allow EventSource to connect via HTTP URL
-    await app.listen(3000);
+    await app.listen(port);
 
     dataSource = app.get(DataSource);
-    server = app.getHttpServer();
-    address = server.address();
-    port = typeof address === 'string' ? address : address.port;
   });
 
   afterAll(async () => {
@@ -106,7 +102,7 @@ print(a + b)
     // 4) Connect to SSE stream
     const finalResultPromise: Promise<SubmissionResultDto> = new Promise(
       (resolve, reject) => {
-        const url = `http://127.0.0.1:${port}/${apiVersion}/submissions/${submissionId}/stream`;
+        const url = `${appUrl}/${apiVersion}/submissions/${submissionId}/stream`;
 
         console.log(`Connecting to SSE stream at: ${url}`);
         const es = new EventSource(url);

@@ -1,14 +1,14 @@
 // submissions/submission-callback.service.ts
-import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { RedisKeys } from './redis-keys.helper';
 import { Judge0Response } from '../../judge0/judge0.interface';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SubmissionService } from '../submission.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
-import { SubmissionsSseService } from '../events/submission-sse.service';
 import Redis from 'ioredis';
 import { REDIS } from '../../../shared/redis/redis.module';
+import { SUBMISSION_EVENT_REDIS_CHANNEL } from '../../../common/constants/submission.constant';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -49,13 +49,14 @@ export class CallbackProcessor implements OnModuleInit {
   private readonly logger = new Logger(CallbackProcessor.name);
   private luaShaAddResult: string;
 
+  private pub: Redis;
+
   constructor(
     @Inject(REDIS)
     private readonly redis: Redis,
     private readonly redisKeys: RedisKeys,
     @InjectQueue('submission-finalize') private readonly finalizeQueue: Queue,
     private readonly submissionService: SubmissionService,
-    private readonly submissionSseService: SubmissionsSseService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -63,6 +64,8 @@ export class CallbackProcessor implements OnModuleInit {
     this.luaShaAddResult = await (<Promise<string>>(
       this.redis.script('LOAD', LUA_ADD_RESULT_BY_INDEX)
     ));
+
+    this.pub = this.redis.duplicate();
   }
 
   public async handleCallback(
@@ -126,7 +129,7 @@ export class CallbackProcessor implements OnModuleInit {
     );
 
     // emit event using sse to notify frontend
-    await this.submissionSseService.publishFinalize(submissionId, finalResult);
+    await this.publishFinalize(submissionId, finalResult);
   }
 
   /**
@@ -223,5 +226,13 @@ export class CallbackProcessor implements OnModuleInit {
       );
       return { added: false, received: 0, total: 0 };
     }
+  }
+
+  async publishFinalize<T = any>(submissionId: string, payload: T) {
+    await this.pub.publish(
+      SUBMISSION_EVENT_REDIS_CHANNEL,
+      JSON.stringify({ submissionId, payload }),
+    );
+    this.logger.log(`Published finalize for ${submissionId}`);
   }
 }
