@@ -2,25 +2,30 @@ import {
   Body,
   ClassSerializerInterceptor,
   Controller,
-  Get,
   HttpCode,
   Param,
   Post,
   Put,
   Query,
+  Res,
   Sse,
   UseInterceptors,
+  MessageEvent,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { SubmissionService } from './submission.service';
-import { Observable } from 'rxjs';
 import * as judge0Interface from '../judge0/judge0.interface';
 import { CallbackProcessor } from './helpers/callback.processor';
+import { interval, map, merge, Observable } from 'rxjs';
 import {
-  SseEvent,
-  SubmissionsSseService,
-} from './events/submission-events.gateway';
+  SUBMISSION_PING_DATA,
+  SUBMISSION_PING_EVENT,
+  SUBMISSION_PING_TIME,
+} from '../../common/constants/submission.constant';
+import { SubmissionsSseService } from './events/submission-sse.service';
+import { ServerResponse } from 'node:http';
+import { SkipDataResponse } from '../../common/interceptors/skip-data-response.interceptor';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -68,12 +73,32 @@ export class SubmissionController {
 
   @Sse(':id/stream')
   @ApiOperation({ summary: 'Stream submission results' })
-  streamResults(@Param('id') submissionId: string): Observable<SseEvent> {
-    return this.submissionsSseService.connect(submissionId);
-  }
+  @SkipDataResponse()
+  streamResults(
+    @Param('id') submissionId: string,
+    @Res() res: Response,
+  ): Observable<MessageEvent> {
+    // heartbeat ping
+    const ping$: Observable<MessageEvent> = interval(SUBMISSION_PING_TIME).pipe(
+      map(() => ({
+        type: SUBMISSION_PING_EVENT,
+        data: SUBMISSION_PING_DATA,
+      })),
+    );
 
-  @Get()
-  hello(): string {
-    return 'hello0';
+    const rawRes = res as unknown as ServerResponse; // workaround for Fastify
+
+    // Setup cleanup on connection close
+    const onClose = () => {
+      this.submissionsSseService.cleanup(submissionId);
+      rawRes.removeListener('close', onClose);
+    };
+
+    rawRes.on('close', onClose);
+
+    // connect returns Observable that forwards events (ReplaySubject backed)
+    const data$ = this.submissionsSseService.connect(submissionId);
+
+    return merge(data$, ping$);
   }
 }

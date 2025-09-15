@@ -19,17 +19,14 @@ export class SubmissionFinalizeProcessor extends WorkerHost {
 
   // BullMQ pattern: single entrypoint for all jobs in this queue
   async process(job: Job<{ submissionId: string }>): Promise<void> {
-    switch (job.name) {
-      case 'finalize': {
-        const { submissionId } = job.data;
-        this.logger.log(`Finalizing submission ${submissionId}...`);
-        await this.callbackProcessor.finalizer(submissionId);
-        this.logger.log(`Finalized submission ${submissionId}.`);
-        return;
-      }
-      default:
-        // Make unknown job types fail loudly (so you can spot misrouted jobs)
-        throw new Error(`Unsupported job type: ${job.name}`);
+    if (job.name === 'finalize') {
+      const { submissionId } = job.data;
+      this.logger.log(`Finalizing submission ${submissionId}...`);
+      await this.callbackProcessor.finalizer(submissionId);
+      this.logger.log(`Finalized submission ${submissionId}.`);
+    } else {
+      // Make unknown job types fail loudly (so you can spot misrouted jobs)
+      throw new Error(`Unsupported job type: ${job.name}`);
     }
   }
 }

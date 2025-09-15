@@ -1,19 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { EventSource } from 'eventsource';
 import { AppModule } from '../../../src/app.module';
 import { SubmissionResultDto } from '../../../src/modules/submission/dto/submission.response.dto';
 import { TestcaseSample } from '../../../src/modules/problems/testcases/entities/testcase-sample.entity';
 import { Problem } from '../../../src/modules/problems/entities/problem.entity';
 import { DifficultyLevel } from '../../../src/modules/problems/enums/difficulty-level.enum';
 import { DataSource } from 'typeorm';
-import { EventSource } from 'eventsource';
+import * as process from 'node:process';
 
 describe('SubmissionController (e2e)', () => {
   let app: INestApplication;
   let moduleFixture: TestingModule;
-  let baseUrl: string;
   let dataSource: DataSource;
+  const apiVersion: string = process.env.API_VERSION!;
+  let server: any;
+  let address: any;
+  let port: any;
 
   beforeAll(async () => {
     moduleFixture = await Test.createTestingModule({
@@ -21,13 +25,16 @@ describe('SubmissionController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix(apiVersion);
     await app.init();
 
     // Start app on an ephemeral port to allow EventSource to connect via HTTP URL
-    await app.listen(0);
-    baseUrl = await app.getUrl();
+    await app.listen(3000);
 
     dataSource = app.get(DataSource);
+    server = app.getHttpServer();
+    address = server.address();
+    port = typeof address === 'string' ? address : address.port;
   });
 
   afterAll(async () => {
@@ -81,7 +88,7 @@ print(a + b)
 
     // 3) Initiate submission to your API (no mocks)
     const createRes = await request(app.getHttpServer())
-      .post('/submissions/run')
+      .post(`/${apiVersion}/submissions/run`)
       .send({
         languageId,
         sourceCode,
@@ -96,48 +103,39 @@ print(a + b)
     const { submissionId } = createRes.body.data;
     expect(submissionId).toBeDefined();
 
-    // 4) Connect to SSE stream (your service should poll Judge0 and emit "result")
+    // 4) Connect to SSE stream
     const finalResultPromise: Promise<SubmissionResultDto> = new Promise(
       (resolve, reject) => {
-        const es = new EventSource(
-          `${baseUrl}/submissions/${submissionId}/stream`,
-        );
+        const url = `http://127.0.0.1:${port}/${apiVersion}/submissions/${submissionId}/stream`;
 
-        const closeWith = (fn: (arg?: any) => void, arg?: any) => {
-          try {
-            es.close();
-          } catch {}
-          fn(arg);
-        };
+        console.log(`Connecting to SSE stream at: ${url}`);
+        const es = new EventSource(url);
 
-        es.addEventListener('result', (event: MessageEvent) => {
+        es.addEventListener('result', (event) => {
+          es.close();
           try {
-            const payload = JSON.parse(event.data);
-            closeWith(resolve, payload);
+            const data = JSON.parse(event.data);
+            resolve(data);
           } catch (e) {
-            closeWith(reject, e);
+            reject(e);
           }
         });
 
-        es.onerror = (err) => {
-          closeWith(reject, err);
+        es.onerror = (error) => {
+          es.close();
+          reject(new Error('SSE stream connection failed.'));
         };
       },
     );
 
-    // 5) Await final SSE result from your system (should be Accepted)
+    // 5) Await final SSE result
     const finalResult = await finalResultPromise;
+    console.log(finalResult);
 
     // 6) Assert final status
     expect(finalResult).toBeDefined();
+    expect(finalResult.status).toBe('ACCEPTED');
     expect(finalResult.totalTests).toBe(2);
-
-    // If your aggregation emits "Accepted" only when all pass:
-    expect(finalResult.status).toMatch(/Accepted/i);
-
-    // Optional if your payload contains counts:
-    if (typeof finalResult.passedTests === 'number') {
-      expect(finalResult.passedTests).toBe(2);
-    }
-  }, 60000); // Real end-to-end with Judge0 can take time; budget 60s
+    expect(finalResult.passedTests).toBe(2);
+  }, 60000);
 });

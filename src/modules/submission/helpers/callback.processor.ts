@@ -6,7 +6,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SubmissionService } from '../submission.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
-import { SubmissionsSseService } from '../events/submission-events.gateway';
+import { SubmissionsSseService } from '../events/submission-sse.service';
 import Redis from 'ioredis';
 import { REDIS } from '../../../shared/redis/redis.module';
 
@@ -126,7 +126,7 @@ export class CallbackProcessor implements OnModuleInit {
     );
 
     // emit event using sse to notify frontend
-    this.submissionSseService.emitFinal(submissionId, finalResult);
+    await this.submissionSseService.publishFinalize(submissionId, finalResult);
   }
 
   /**

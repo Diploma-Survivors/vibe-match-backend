@@ -8,9 +8,9 @@ import { Problem } from '../problems/entities/problem.entity';
 import { Judge0Module } from '../judge0/judge0.module';
 import { RedisKeys } from './helpers/redis-keys.helper';
 import { CallbackProcessor } from './helpers/callback.processor';
-import { SubmissionFinalizeProcessor } from './events/submission-finalizer.controller';
+import { SubmissionFinalizeProcessor } from './events/submission-finalizer.processor';
 import { SubmissionService } from './submission.service';
-import { SubmissionsSseService } from './events/submission-events.gateway';
+import { SubmissionsSseService } from './events/submission-sse.service';
 import { ConfigService } from '@nestjs/config';
 import { Language } from './language/language.entity';
 
