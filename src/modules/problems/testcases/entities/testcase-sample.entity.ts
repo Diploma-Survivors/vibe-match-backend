@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   Generated,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
@@ -19,8 +20,9 @@ export class TestcaseSample {
   @Generated('uuid')
   id: string;
 
-  @ManyToOne(() => Problem, (problem) => problem.id)
+  @ManyToOne(() => Problem, (problem) => problem.testcaseSamples)
   @JoinColumn({ name: 'problem_id' })
+  @Index()
   problem: Problem;
 
   @Column('text')

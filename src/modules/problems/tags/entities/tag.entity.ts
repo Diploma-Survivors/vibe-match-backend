@@ -3,9 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Generated,
+  OneToMany,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ProblemTag } from '../../entities/problem-tag.entity';
 
 @Entity({ name: 'tags' })
 export class Tag {
@@ -21,4 +23,7 @@ export class Tag {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => ProblemTag, (problemTag) => problemTag.tag)
+  problemTags: ProblemTag[];
 }
