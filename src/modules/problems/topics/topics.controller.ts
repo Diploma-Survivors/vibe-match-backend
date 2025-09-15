@@ -1,28 +1,29 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  ClassSerializerInterceptor,
+  Controller,
   Delete,
-  UseGuards,
+  Get,
   HttpStatus,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { TopicsService } from './topics.service';
-import { CreateTopicDto } from './dto/create-topic.dto';
-import { UpdateTopicDto } from './dto/update-topic.dto';
 import {
   ApiCookieAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
-import { plainToInstance } from 'class-transformer';
 import { CreateTopicResponseDto } from './dto/create-topic-response.dto';
+import { CreateTopicDto } from './dto/create-topic.dto';
+import { UpdateTopicDto } from './dto/update-topic.dto';
+import { TopicsService } from './topics.service';
 
 @ApiTags('Topics')
 @ApiCookieAuth('access_token')
@@ -39,11 +40,11 @@ export class TopicsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
   async create(@Body() createTopicDto: CreateTopicDto) {
     const topic = await this.topicsService.create(createTopicDto);
-
-    return plainToInstance(CreateTopicResponseDto, topic);
+    return new CreateTopicResponseDto(topic);
   }
 
   @Get()
