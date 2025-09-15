@@ -24,4 +24,8 @@ export class CreateTagResponseDto {
     example: '2025-10-01T12:34:56.789Z',
   })
   updatedAt: Date;
+
+  constructor(partial: Partial<CreateTagResponseDto>) {
+    Object.assign(this, partial);
+  }
 }

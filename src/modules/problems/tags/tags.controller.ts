@@ -1,30 +1,29 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  ClassSerializerInterceptor,
+  Controller,
   Delete,
+  Get,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
   UseGuards,
   UseInterceptors,
-  ClassSerializerInterceptor,
-  HttpStatus,
 } from '@nestjs/common';
-import { TagsService } from './tags.service';
-import { CreateTagDto } from './dto/create-tag.dto';
-import { UpdateTagDto } from './dto/update-tag.dto';
 import {
   ApiCookieAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
-import { plainToInstance } from 'class-transformer';
 import { CreateTagResponseDto } from './dto/create-tag-response.dto';
+import { CreateTagDto } from './dto/create-tag.dto';
+import { UpdateTagDto } from './dto/update-tag.dto';
+import { TagsService } from './tags.service';
 
 @ApiTags('Tags')
 @ApiCookieAuth('access_token')
@@ -41,11 +40,11 @@ export class TagsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.INSTRUCTOR)
   @UseInterceptors(ClassSerializerInterceptor)
+  @Roles(RoleEnum.INSTRUCTOR)
   async create(@Body() createTagDto: CreateTagDto) {
     const tag = await this.tagsService.create(createTagDto);
-    return plainToInstance(CreateTagResponseDto, tag);
+    return new CreateTagResponseDto(tag);
   }
 
   @Get()
