@@ -19,7 +19,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { plainToInstance } from 'class-transformer';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -31,8 +30,8 @@ import {
   TESTCASE_MAX_FILE_SIZE,
 } from './constants/testcases.constant';
 import { CreateTestcaseResponseDto } from './dto/create-testcase-response.dto';
-import { TestcasesService } from './testcases.service';
 import { CreateTestcaseDto } from './dto/create-testcase.dto';
+import { TestcasesService } from './testcases.service';
 
 @ApiTags('Testcases')
 @ApiCookieAuth('access_token')
@@ -59,7 +58,7 @@ export class TestcasesController {
     FileInterceptor(TESTCASE_FIELD_NAME),
     ClassSerializerInterceptor,
   )
-  create(
+  async create(
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -71,7 +70,7 @@ export class TestcasesController {
     file: Express.Multer.File,
     @CurrentUser() user: JwtPayload,
   ) {
-    const testcase = this.testcasesService.create(file, user);
-    return plainToInstance(CreateTestcaseResponseDto, testcase);
+    const testcase = await this.testcasesService.create(file, user);
+    return new CreateTestcaseResponseDto(testcase);
   }
 }
