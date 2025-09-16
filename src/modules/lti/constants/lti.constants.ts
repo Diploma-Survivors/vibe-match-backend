@@ -19,11 +19,21 @@ export const LTI_CLAIMS = {
     'https://purl.imsglobal.org/spec/lti/claim/role_scope_mentor',
   TOOL_PLATFORM: 'https://purl.imsglobal.org/spec/lti/claim/tool_platform',
   SESSION: 'https://purl.imsglobal.org/spec/lti/claim/session',
+  DEEP_LINKING_DATA: 'https://purl.imsglobal.org/spec/lti-dl/claim/data',
+  DEEP_LINKING_CONTENT_ITEMS:
+    'https://purl.imsglobal.org/spec/lti-dl/claim/content_items',
+  DEEP_LINKING_MESSAGE: 'https://purl.imsglobal.org/spec/lti-dl/claim/msg',
+  DEEP_LINKING_LOG: 'https://purl.imsglobal.org/spec/lti-dl/claim/log',
+  DEEP_LINKING_ERROR_MSG:
+    'https://purl.imsglobal.org/spec/lti-dl/claim/errormsg',
+  DEEP_LINKING_ERROR_LOG:
+    'https://purl.imsglobal.org/spec/lti-dl/claim/errorlog',
 };
 
 export const LTI_MESSAGE_TYPES = {
   LTI_RESOURCE_LINK_REQUEST: 'LtiResourceLinkRequest',
   LTI_DEEP_LINKING_REQUEST: 'LtiDeepLinkingRequest',
+  LTI_DEEP_LINKING_RESPONSE: 'LtiDeepLinkingResponse',
 };
 
 export const LTI_VERSIONS = {
