@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { Course } from 'src/modules/course/entities/course.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { ProblemTag } from '../entities/problem-tag.entity';
+import { ProblemTopic } from '../entities/problem-topic.entity';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
-import { Tag } from '../tags/entities/tag.entity';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
-import { Topic } from '../topics/entities/topic.entity';
 
 export class CreateProblemResponseDto {
   @ApiProperty({
@@ -67,49 +67,55 @@ export class CreateProblemResponseDto {
     description: 'The ID of the course the problem belongs to',
     example: 'course-123',
   })
-  @Transform(({ obj }: { obj: { course: Course } }) => obj.course?.id)
-  courseId: string;
+  @Transform(({ value }: { value: Course }) => value?.id)
+  @Expose({ name: 'courseId' })
+  course: Course;
 
   @ApiProperty({
     description: 'The ID of the author who created the problem',
     example: 'user-456',
   })
-  @Transform(({ obj }: { obj: { author: User } }) => obj.author?.id)
-  authorId: string;
+  @Transform(({ value }: { value: User }) => value?.id)
+  @Expose({ name: 'authorId' })
+  author: User;
 
   @ApiProperty({
     description: 'List of tag IDs associated with the problem',
     example: ['tag1', 'tag2'],
   })
-  @Transform(({ obj }: { obj: { tags: Tag[] } }) =>
-    obj.tags.map((tag) => tag?.id),
+  @Transform(({ value }: { value: ProblemTag[] }) =>
+    value?.map((problemTag) => problemTag?.tag?.id),
   )
-  tags: string[];
+  @Expose({ name: 'tagIds' })
+  problemTags: ProblemTag[];
 
   @ApiProperty({
     description: 'List of topic IDs associated with the problem',
     example: ['topic1', 'topic2'],
   })
-  @Transform(({ obj }: { obj: { topics: Topic[] } }) =>
-    obj.topics.map((topic) => topic?.id),
+  @Transform(({ value }: { value: ProblemTopic[] }) =>
+    value?.map((problemTopic) => problemTopic?.topic?.id),
   )
-  topics: string[];
+  @Expose({ name: 'topicIds' })
+  problemTopics: ProblemTopic[];
 
   @ApiProperty({
     description: 'The ID of the testcase associated with the problem',
     example: 'testcase-789',
   })
-  @Transform(({ obj }: { obj: { testcase: Testcase } }) => obj.testcase?.id)
-  testcase: string;
+  @Transform(({ value }: { value: Testcase }) => value?.id)
+  @Expose({ name: 'testcaseId' })
+  testcase: Testcase;
 
   @ApiProperty({
     description: 'List of testcase sample IDs associated with the problem',
     example: ['sample1', 'sample2'],
   })
-  @Transform(({ obj }: { obj: { testcaseSamples: TestcaseSample[] } }) =>
-    obj.testcaseSamples.map((sample) => sample?.id),
+  @Transform(({ value }: { value: TestcaseSample[] }) =>
+    value?.map((sample) => sample?.id),
   )
-  testcaseSamples: string[];
+  @Expose({ name: 'testcaseSampleIds' })
+  testcaseSamples: TestcaseSample[];
 
   @ApiProperty({
     description: 'The creation timestamp of the problem',
@@ -122,4 +128,8 @@ export class CreateProblemResponseDto {
     example: '2025-10-01T12:00:00Z',
   })
   updatedAt: Date;
+
+  constructor(partial: Partial<CreateProblemResponseDto>) {
+    Object.assign(this, partial);
+  }
 }

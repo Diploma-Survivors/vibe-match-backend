@@ -3,9 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Generated,
+  OneToMany,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ProblemTopic } from '../../entities/problem-topic.entity';
 
 @Entity({ name: 'topics' })
 export class Topic {
@@ -24,4 +26,7 @@ export class Topic {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => ProblemTopic, (problemTopic) => problemTopic.topic)
+  problemTopics: ProblemTopic[];
 }

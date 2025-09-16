@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose, Transform, Type } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -7,15 +7,13 @@ import {
   IsNotEmptyObject,
   IsPositive,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
-import { TagDto } from './tag.dto';
-import { TestcaseDto } from './testcase.dto';
-import { TopicDto } from './topic.dto';
 
 export class CreateProblemDto {
   @ApiProperty({
@@ -112,11 +110,9 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
   })
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TagDto)
-  @Transform(({ value }: { value: string[] }) => value.map((id) => ({ id })))
+  @IsUUID('all', { each: true })
   @Expose({ name: 'tagIds' })
-  tags: TagDto[];
+  tags: string[];
 
   @ApiProperty({
     description: 'The IDs of the topics associated with the problem',
@@ -124,23 +120,19 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
   })
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TopicDto)
-  @Transform(({ value }: { value: string[] }) => value.map((id) => ({ id })))
+  @IsUUID('all', { each: true })
   @Expose({ name: 'topicIds' })
-  topics: TopicDto[];
+  topics: string[];
 
   @ApiProperty({
     description: 'The ID of the test case associated with the problem',
     type: 'string',
     format: 'uuid',
   })
-  @IsNotEmptyObject()
-  @ValidateNested()
-  @Type(() => TestcaseDto)
-  @Transform(({ value }: { value: string }) => ({ id: value }))
+  @IsNotEmpty()
+  @IsUUID()
   @Expose({ name: 'testcaseId' })
-  testcase: TestcaseDto;
+  testcase: string;
 
   @ApiProperty({
     description: 'The IDs of the sample test cases associated with the problem',
@@ -148,6 +140,7 @@ export class CreateProblemDto {
   })
   @IsArray()
   @Type(() => CreateTestcaseSampleDto)
+  @IsNotEmptyObject({ nullable: false }, { each: true })
   @ValidateNested({ each: true })
   testcaseSamples: CreateTestcaseSampleDto[];
 }

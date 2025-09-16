@@ -3,9 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Generated,
+  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Problem } from '../../entities/problem.entity';
 
 @Entity({ name: 'testcases' })
 export class Testcase {
@@ -24,4 +26,7 @@ export class Testcase {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToOne(() => Problem, (problem) => problem.testcase)
+  problem: Problem;
 }

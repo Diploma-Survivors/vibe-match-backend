@@ -1,11 +1,12 @@
+import { Course } from 'src/modules/course/entities/course.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
   Generated,
+  Index,
   JoinColumn,
-  JoinTable,
-  ManyToMany,
   ManyToOne,
   OneToMany,
   OneToOne,
@@ -13,12 +14,10 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
-import { User } from 'src/modules/user/entities/user.entity';
-import { Tag } from '../tags/entities/tag.entity';
-import { Topic } from '../topics/entities/topic.entity';
-import { Testcase } from '../testcases/entities/testcase.entity';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
-import { Course } from 'src/modules/course/entities/course.entity';
+import { Testcase } from '../testcases/entities/testcase.entity';
+import { ProblemTag } from './problem-tag.entity';
+import { ProblemTopic } from './problem-topic.entity';
 
 @Entity({
   name: 'problems',
@@ -28,6 +27,7 @@ export class Problem {
   @Generated('uuid')
   id: string;
 
+  @Index({ unique: false, fulltext: true })
   @Column('varchar')
   title: string;
 
@@ -56,27 +56,32 @@ export class Problem {
   })
   difficulty: DifficultyLevel;
 
-  @ManyToOne(() => Course, (course) => course.id)
+  @Index()
+  @ManyToOne(() => Course)
   @JoinColumn({ name: 'course_id' })
   course: Course;
 
-  @ManyToOne(() => User, (user) => user.id)
+  @Index()
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'author_id' })
   author: User;
 
-  @ManyToMany(() => Tag, (tag) => tag.id)
-  @JoinTable({ name: 'problem_tags' })
-  tags: Tag[];
+  @OneToMany(() => ProblemTag, (problemTag) => problemTag.problem, {
+    cascade: true,
+  })
+  problemTags: ProblemTag[];
 
-  @ManyToMany(() => Topic, (topic) => topic.id)
-  @JoinTable({ name: 'problem_topics' })
-  topics: Topic[];
+  @OneToMany(() => ProblemTopic, (problemTopic) => problemTopic.problem, {
+    cascade: true,
+  })
+  problemTopics: ProblemTopic[];
 
-  @OneToOne(() => Testcase, (testcase) => testcase.id)
+  @Index()
+  @OneToOne(() => Testcase, (testcase) => testcase.problem, { cascade: true })
   @JoinColumn({ name: 'testcase_id' })
   testcase: Testcase;
 
-  @OneToMany(() => TestcaseSample, (testcaseSample) => testcaseSample.id, {
+  @OneToMany(() => TestcaseSample, (testcaseSample) => testcaseSample.problem, {
     cascade: true,
   })
   testcaseSamples: TestcaseSample[];

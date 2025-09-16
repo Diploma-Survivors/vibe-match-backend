@@ -31,4 +31,8 @@ export class CreateTopicResponseDto {
     example: '2025-01-01T00:00:00Z',
   })
   updatedAt: Date;
+
+  constructor(partial: Partial<CreateTopicResponseDto>) {
+    Object.assign(this, partial);
+  }
 }

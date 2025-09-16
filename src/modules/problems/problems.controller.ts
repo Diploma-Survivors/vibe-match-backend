@@ -17,7 +17,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { plainToInstance } from 'class-transformer';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -43,14 +42,14 @@ export class ProblemsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.INSTRUCTOR)
   @UseInterceptors(ClassSerializerInterceptor)
+  @Roles(RoleEnum.INSTRUCTOR)
   async create(
     @Body() createProblemDto: CreateProblemDto,
     @CurrentUser() user: JwtPayload,
   ) {
     const problem = await this.problemsService.create(createProblemDto, user);
-    return plainToInstance(CreateProblemResponseDto, problem);
+    return new CreateProblemResponseDto(problem);
   }
 
   @Get()
