@@ -2,6 +2,8 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import * as jose from 'jose';
+import { LtiDeepLinkingJwtPayloadDto } from './dto/lti-deep-linking-response.dto';
+import { instanceToPlain } from 'class-transformer';
 
 @Injectable()
 export class KeysService implements OnModuleInit {
@@ -65,5 +67,28 @@ export class KeysService implements OnModuleInit {
 
   public getPublicKey(): string {
     return this.publicKey;
+  }
+
+  public async generateDeepLinkingJwt(
+    params: LtiDeepLinkingJwtPayloadDto,
+  ): Promise<string> {
+    const payload = instanceToPlain(params);
+
+    const privateKey = await jose.importPKCS8(this.privateKey, 'RS256');
+
+    const header = {
+      alg: 'RS256',
+      kid: this.jwk.kid,
+    };
+
+    const jwt = await new jose.SignJWT({
+      ...payload,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 5 * 60,
+    })
+      .setProtectedHeader(header)
+      .sign(privateKey);
+
+    return jwt;
   }
 }
