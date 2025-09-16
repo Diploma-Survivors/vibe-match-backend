@@ -33,7 +33,7 @@ export class TopicsController {
   @Post()
   @ApiOperation({ summary: 'Create a topic' })
   @ApiResponse({
-    type: CreateTopicResponseDto,
+    type: () => CreateTopicResponseDto,
     status: HttpStatus.CREATED,
     description: 'The topic has been created.',
   })
@@ -49,7 +49,7 @@ export class TopicsController {
   @Get()
   @ApiOperation({ summary: 'Get all topics' })
   @ApiResponse({
-    type: [CreateTopicResponseDto],
+    type: () => [CreateTopicResponseDto],
     status: HttpStatus.OK,
     description: 'List of topics.',
   })
@@ -62,7 +62,7 @@ export class TopicsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a topic by ID' })
   @ApiResponse({
-    type: CreateTopicResponseDto,
+    type: () => CreateTopicResponseDto,
     status: HttpStatus.OK,
     description: 'The topic has been found.',
   })
@@ -79,7 +79,7 @@ export class TopicsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a topic' })
   @ApiResponse({
-    type: CreateTopicResponseDto,
+    type: () => CreateTopicResponseDto,
     status: HttpStatus.OK,
     description: 'The topic has been updated.',
   })

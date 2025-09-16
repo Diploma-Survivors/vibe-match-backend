@@ -37,7 +37,7 @@ export class ProblemsController {
   @Post()
   @ApiOperation({ summary: 'Create a problem (Instructor only)' })
   @ApiResponse({
-    type: CreateProblemResponseDto,
+    type: () => CreateProblemResponseDto,
     status: HttpStatus.CREATED,
     description: 'The problem has been created.',
   })
@@ -56,7 +56,7 @@ export class ProblemsController {
   @Get()
   @ApiOperation({ summary: 'Get all problems' })
   @ApiResponse({
-    type: [CreateProblemResponseDto],
+    type: () => [CreateProblemResponseDto],
     status: HttpStatus.OK,
     description: 'List of problems.',
   })
@@ -69,7 +69,7 @@ export class ProblemsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a problem by ID' })
   @ApiResponse({
-    type: CreateProblemResponseDto,
+    type: () => CreateProblemResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been found.',
   })
@@ -86,7 +86,7 @@ export class ProblemsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a problem (Instructor only)' })
   @ApiResponse({
-    type: CreateProblemResponseDto,
+    type: () => CreateProblemResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been updated.',
   })

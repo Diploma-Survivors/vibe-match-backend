@@ -35,7 +35,7 @@ export class TagsController {
   @Post()
   @ApiOperation({ summary: 'Create a new tag' })
   @ApiResponse({
-    type: CreateTagResponseDto,
+    type: () => CreateTagResponseDto,
     status: HttpStatus.CREATED,
     description: 'The tag has been successfully created.',
   })
@@ -51,7 +51,7 @@ export class TagsController {
   @Get()
   @ApiOperation({ summary: 'Get all tags' })
   @ApiResponse({
-    type: [CreateTagResponseDto],
+    type: () => [CreateTagResponseDto],
     status: HttpStatus.OK,
     description: 'List of tags retrieved successfully.',
   })

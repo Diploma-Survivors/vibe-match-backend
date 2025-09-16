@@ -79,7 +79,6 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: refreshTokenTtl * 1000,
-      path: '/auth',
     });
 
     res.redirect(302, redirect);
@@ -138,7 +137,6 @@ export class AuthController {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: refreshTokenTtl * 1000,
-        path: '/auth',
       });
 
       res.status(200).send({ message: 'Tokens refreshed successfully' });
