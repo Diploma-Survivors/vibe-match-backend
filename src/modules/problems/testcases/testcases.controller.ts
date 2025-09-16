@@ -44,11 +44,11 @@ export class TestcasesController {
   @ApiOperation({ summary: 'Create a testcase by uploading a text file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    type: CreateTestcaseDto,
+    type: () => CreateTestcaseDto,
     description: 'Upload a text file containing the testcase data',
   })
   @ApiResponse({
-    type: CreateTestcaseResponseDto,
+    type: () => CreateTestcaseResponseDto,
     status: HttpStatus.CREATED,
     description: 'The testcase has been created.',
   })
