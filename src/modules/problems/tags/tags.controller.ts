@@ -55,7 +55,6 @@ export class TagsController {
     description: 'List of tags retrieved successfully.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @UseGuards(JwtAuthGuard)
   async findAll() {
     return await this.tagsService.findAll();
   }
