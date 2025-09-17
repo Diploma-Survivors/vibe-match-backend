@@ -10,6 +10,14 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  // CORS Configuration
+  app.enableCors({
+    origin: 'http://localhost:3001',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  });
+
   // Global prefix
   const apiVersion =
     (configService.get('appConfig.apiVersion') as string) || 'v1';

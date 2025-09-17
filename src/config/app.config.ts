@@ -17,5 +17,7 @@ export default registerAs('appConfig', function () {
     smtpUsername: process.env.SMTP_USERNAME,
     smtpPassword: process.env.SMTP_PASSWORD,
     url: process.env.APP_URL,
+    postRedirectUrl:
+      process.env.POST_REDIRECT_URL || 'http://localhost:3001/api/proxy/signin',
   };
 });

@@ -82,12 +82,9 @@ export class AuthController {
   })
   public async refreshTokens(
     @Req() req: Request,
+    @Body('refreshToken') currentRefreshToken: string,
     @Res() res: Response,
   ): Promise<void> {
-    const currentRefreshToken = (
-      req.cookies as Record<string, string | undefined>
-    )?.refresh_token;
-
     if (!currentRefreshToken) {
       this.clearTokens(res);
       throw new UnauthorizedException('Refresh token not found');
@@ -123,21 +120,11 @@ export class AuthController {
         throw new UnauthorizedException('Server configuration error');
       }
 
-      const accessTokenTtl = jwtConfig.accessTokenTtl;
-      const refreshTokenTtl = jwtConfig.refreshTokenTtl;
-
-      res.cookie('access_token', newAccessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: accessTokenTtl * 1000,
-      });
-
-      res.cookie('refresh_token', newRefreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: refreshTokenTtl * 1000,
+      // Return tokens in response body
+      res.status(200).send({
+        message: 'Tokens refreshed successfully',
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
       });
 
       res.status(200).send({ message: 'Tokens refreshed successfully' });
