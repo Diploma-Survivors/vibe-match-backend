@@ -55,7 +55,6 @@ export class TopicsController {
     description: 'List of topics.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @UseGuards(JwtAuthGuard)
   findAll() {
     return this.topicsService.findAll();
   }
