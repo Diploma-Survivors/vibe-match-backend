@@ -1,10 +1,8 @@
 import {
+  BadRequestException,
   ClassSerializerInterceptor,
   Controller,
-  FileTypeValidator,
   HttpStatus,
-  MaxFileSizeValidator,
-  ParseFilePipe,
   Post,
   UploadedFile,
   UseGuards,
@@ -26,7 +24,6 @@ import type { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
 import {
   TESTCASE_FIELD_NAME,
-  TESTCASE_FILE_MIME_TYPE,
   TESTCASE_MAX_FILE_SIZE,
 } from './constants/testcases.constant';
 import { CreateTestcaseResponseDto } from './dto/create-testcase-response.dto';
@@ -55,18 +52,28 @@ export class TestcasesController {
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   @UseInterceptors(
-    FileInterceptor(TESTCASE_FIELD_NAME),
+    FileInterceptor(TESTCASE_FIELD_NAME, {
+      limits: { fileSize: TESTCASE_MAX_FILE_SIZE },
+      fileFilter: (_req, file, cb) => {
+        if (
+          file.mimetype === 'text/plain' ||
+          file.mimetype === 'text/plain; charset=utf-8'
+        ) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              'Invalid file type. Only plain text files are allowed.',
+            ),
+            false,
+          );
+        }
+      },
+    }),
     ClassSerializerInterceptor,
   )
   async create(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: TESTCASE_MAX_FILE_SIZE }),
-          new FileTypeValidator({ fileType: TESTCASE_FILE_MIME_TYPE }),
-        ],
-      }),
-    )
+    @UploadedFile()
     file: Express.Multer.File,
     @CurrentUser() user: JwtPayload,
   ) {
