@@ -20,6 +20,7 @@ import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
 import { LtiLaunchResponse } from './interfaces/lti.interface';
 import { KeysService } from './keys.service';
 import { LtiService } from './lti.service';
+import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 
 @Controller()
 export class LtiController {
@@ -32,6 +33,7 @@ export class LtiController {
   ) {}
 
   @Get('.well-known/jwks.json')
+  @SkipTransform()
   public getJwks(): object {
     return this.keysService.getJwks();
   }
@@ -127,7 +129,7 @@ export class LtiController {
   @Roles(RoleEnum.INSTRUCTOR)
   public async handleDeepLinkingResponse(
     @Body() ltiDeepLinkingResponse: LtiResourceLinkDto,
-    @Cookies('deviceId') deviceId: string,
+    @Cookies('device_id') deviceId: string,
     @Res() res: Response,
   ) {
     const { jwt, deepLinkReturnUrl } =
@@ -149,7 +151,7 @@ export class LtiController {
       </head>
       <body>
           <form id="postRedirectForm" action="${deepLinkReturnUrl}" method="POST">
-              <input type="hidden" name="JWT" value="${jwt}" /> <!-- Changed name to accessToken -->
+              <input type="hidden" name="JWT" value="${jwt}" />
           </form>
           <script type="text/javascript">
               document.getElementById('postRedirectForm').submit();

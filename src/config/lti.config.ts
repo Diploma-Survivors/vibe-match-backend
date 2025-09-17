@@ -29,6 +29,9 @@ export const ltiConfig = registerAs('lti', () => ({
       'http://localhost:3001/problems',
     instructor:
       process.env.LTI_FRONTEND_INSTRUCTOR_CALLBACK_URL ||
+      'http://localhost:3002/problems',
+    deepLinking:
+      process.env.LTI_FRONTEND_DEEP_LINKING_URL ||
       'http://localhost:3002/create-problem',
   },
 }));

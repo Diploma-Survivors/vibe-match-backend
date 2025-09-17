@@ -1,19 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
-  Equals,
-  IsArray,
-  IsDate,
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsNotEmptyObject,
-  IsOptional,
-  IsString,
-  IsUrl,
-  ValidateNested,
-} from 'class-validator';
-import {
   LTI_CLAIMS,
   LTI_ROLES,
   LTI_VERSIONS,
@@ -29,10 +16,6 @@ export class IdTokenPayloadDto {
     description: 'Issuer identifier',
     example: 'https://lms.example.com',
   })
-  @IsNotEmpty()
-  @IsUrl({
-    require_tld: process.env.NODE_ENV === 'production',
-  })
   iss: string;
 
   @ApiProperty({
@@ -42,16 +25,12 @@ export class IdTokenPayloadDto {
   @Transform(({ value }: { value: string | string[] }) =>
     typeof value === 'string' ? [value] : value,
   )
-  @IsArray()
-  @IsString({ each: true })
   aud: string[];
 
   @ApiProperty({
     description: 'LTI user ID',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsNotEmpty()
-  @IsString()
   sub: string;
 
   @ApiProperty({
@@ -59,8 +38,6 @@ export class IdTokenPayloadDto {
     example: 1735689599,
   })
   @Transform(({ value }: { value: number }) => new Date(value * 1000))
-  @IsNotEmpty()
-  @IsDate()
   exp: Date;
 
   @ApiProperty({
@@ -68,16 +45,12 @@ export class IdTokenPayloadDto {
     example: 1704153599,
   })
   @Transform(({ value }: { value: number }) => new Date(value * 1000))
-  @IsNotEmpty()
-  @IsDate()
   iat: Date;
 
   @ApiProperty({
     description: 'Nonce to associate a client session with the ID token',
     example: 'n-0S6_WzA2Mj',
   })
-  @IsNotEmpty()
-  @IsString()
   nonce: string;
 
   @ApiProperty({
@@ -86,8 +59,6 @@ export class IdTokenPayloadDto {
     example: 'client_id_12345',
     required: false,
   })
-  @IsOptional()
-  @IsString()
   azp: string;
 
   @ApiProperty({
@@ -95,18 +66,12 @@ export class IdTokenPayloadDto {
     example: 'John Doe',
     required: false,
   })
-  @IsOptional()
-  @IsString()
   name: string;
 
   @ApiProperty({
     description: 'Picture URL of the user',
     example: 'https://example.com/profile.jpg',
     required: false,
-  })
-  @IsOptional()
-  @IsUrl({
-    require_tld: process.env.NODE_ENV === 'production',
   })
   picture: string;
 
@@ -115,16 +80,12 @@ export class IdTokenPayloadDto {
     example: 'john.doe@example.com',
     required: false,
   })
-  @IsOptional()
-  @IsEmail()
   email: string;
 
   @ApiProperty({
     description: 'LTI message type',
     enum: LtiMessageType,
   })
-  @IsNotEmpty()
-  @IsEnum(LtiMessageType, { message: 'Invalid LTI message type' })
   @Expose({ name: LTI_CLAIMS.MESSAGE_TYPE })
   messageType: LtiMessageType;
 
@@ -132,8 +93,6 @@ export class IdTokenPayloadDto {
     description: 'LTI deployment ID',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsNotEmpty()
-  @IsString()
   @Expose({ name: LTI_CLAIMS.DEPLOYMENT_ID })
   deploymentId: string;
 
@@ -141,9 +100,7 @@ export class IdTokenPayloadDto {
     description: 'Deep linking settings claim',
     type: () => LtiDeepLinkingSettingsClaimDto,
   })
-  @IsNotEmptyObject()
   @Type(() => LtiDeepLinkingSettingsClaimDto)
-  @ValidateNested()
   @Expose({ name: LTI_CLAIMS.DEEP_LINKING_SETTINGS })
   deepLinkingSettings: LtiDeepLinkingSettingsClaimDto;
 
@@ -152,9 +109,7 @@ export class IdTokenPayloadDto {
     type: () => LtiLaunchPresentationDto,
     required: false,
   })
-  @IsOptional()
   @Type(() => LtiLaunchPresentationDto)
-  @ValidateNested()
   @Expose({ name: LTI_CLAIMS.LAUNCH_PRESENTATION })
   launchPresentation?: LtiLaunchPresentationDto;
 
@@ -163,9 +118,7 @@ export class IdTokenPayloadDto {
     type: () => LtiToolPlatformDto,
     required: false,
   })
-  @IsOptional()
   @Type(() => LtiToolPlatformDto)
-  @ValidateNested()
   @Expose({ name: LTI_CLAIMS.TOOL_PLATFORM })
   platform: LtiToolPlatformDto;
 
@@ -174,9 +127,7 @@ export class IdTokenPayloadDto {
     type: () => LtiContextDto,
     required: false,
   })
-  @IsOptional()
   @Type(() => LtiContextDto)
-  @ValidateNested()
   @Expose({ name: LTI_CLAIMS.CONTEXT })
   context: LtiContextDto;
 
@@ -186,9 +137,6 @@ export class IdTokenPayloadDto {
     example: [LTI_ROLES.STUDENT, LTI_ROLES.INSTRUCTOR],
     required: false,
   })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
   @Expose({ name: LTI_CLAIMS.ROLES })
   roles: string[];
 
@@ -198,9 +146,6 @@ export class IdTokenPayloadDto {
     example: ['123fds23-123e4567-e89b-12d3-a456'],
     required: false,
   })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
   @Expose({ name: LTI_CLAIMS.ROLE_SCOPE_MENTOR })
   roleScopeMentor: string[];
 
@@ -208,9 +153,6 @@ export class IdTokenPayloadDto {
     description: 'LTI version',
     example: LTI_VERSIONS.V1_3,
   })
-  @IsNotEmpty()
-  @IsString()
-  @Equals(LTI_VERSIONS.V1_3, { message: 'Unsupported LTI version' })
   @Expose({ name: LTI_CLAIMS.VERSION })
   version: string;
 
@@ -225,7 +167,6 @@ export class IdTokenPayloadDto {
     },
     required: false,
   })
-  @IsOptional()
   @Expose({ name: LTI_CLAIMS.CUSTOM })
   customClaims: Record<string, any>;
 }
