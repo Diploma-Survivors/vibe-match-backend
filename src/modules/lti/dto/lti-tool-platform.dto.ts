@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class LtiToolPlatformDto {
   @ApiProperty({
@@ -8,8 +7,6 @@ export class LtiToolPlatformDto {
     example: 'support@example.com',
     required: false,
   })
-  @IsOptional()
-  @IsEmail()
   @Expose({ name: 'contact_email' })
   contactEmail?: string;
 
@@ -18,8 +15,6 @@ export class LtiToolPlatformDto {
     example: 'Example Platform',
     required: false,
   })
-  @IsOptional()
-  @IsString()
   description?: string;
 
   @ApiProperty({
@@ -27,18 +22,12 @@ export class LtiToolPlatformDto {
     example: 'Example Platform',
     required: false,
   })
-  @IsOptional()
-  @IsString()
   name?: string;
 
   @ApiProperty({
     description: 'URL of the platform',
     example: 'https://example.org',
     required: false,
-  })
-  @IsOptional()
-  @IsUrl({
-    require_tld: process.env.NODE_ENV === 'production',
   })
   url?: string;
 
@@ -47,8 +36,6 @@ export class LtiToolPlatformDto {
     example: 'example.org',
     required: false,
   })
-  @IsOptional()
-  @IsString()
   @Expose({ name: 'product_family_code' })
   productFamilyCode?: string;
 
@@ -57,7 +44,5 @@ export class LtiToolPlatformDto {
     example: '1.0.0',
     required: false,
   })
-  @IsOptional()
-  @IsString()
   version: string;
 }
