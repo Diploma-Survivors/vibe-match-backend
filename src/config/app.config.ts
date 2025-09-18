@@ -19,5 +19,8 @@ export default registerAs('appConfig', function () {
     url: process.env.APP_URL,
     postRedirectUrl:
       process.env.POST_REDIRECT_URL || 'http://localhost:3001/api/proxy/signin',
+    corsOrigins: process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',')
+      : ['http://localhost:3001'],
   };
 });

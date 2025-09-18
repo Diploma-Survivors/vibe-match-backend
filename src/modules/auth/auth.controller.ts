@@ -120,14 +120,11 @@ export class AuthController {
         throw new UnauthorizedException('Server configuration error');
       }
 
-      // Return tokens in response body
       res.status(200).send({
         message: 'Tokens refreshed successfully',
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       });
-
-      res.status(200).send({ message: 'Tokens refreshed successfully' });
     } catch (error) {
       this.clearTokens(res);
       this.logger.error(`Error refreshing tokens: ${(error as Error).message}`);

@@ -25,7 +25,8 @@ import { UserCourseService } from '../../modules/user-course/services/user-cours
 import { Course } from '../course/entities/course.entity';
 
 const LTI_STATE_TTL_SECONDS = 300;
-const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems/001';
+// const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems';
+const FRONTEND_AUTH_CALLBACK_URL_TEST = 'http://localhost:3001/problems/001';
 
 @Injectable()
 export class LtiService {
@@ -215,7 +216,7 @@ export class LtiService {
     return JSON.stringify({
       accessToken: accessToken,
       refreshToken: refreshToken,
-      redirectPath: FRONTEND_AUTH_CALLBACK_URL,
+      redirectPath: FRONTEND_AUTH_CALLBACK_URL_TEST,
     });
   }
 }
