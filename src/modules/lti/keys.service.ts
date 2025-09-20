@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import * as jose from 'jose';
 import { LtiDeepLinkingJwtPayloadDto } from './dto/lti-deep-linking-response.dto';
 import { instanceToPlain } from 'class-transformer';
+import { v4 as uuidV4 } from 'uuid';
 
 @Injectable()
 export class KeysService implements OnModuleInit {
@@ -42,7 +43,12 @@ export class KeysService implements OnModuleInit {
     writeFileSync(privateKeyPath, pkcs8);
     writeFileSync(
       resolve(__dirname, '../../../public.json'),
-      JSON.stringify(jwk),
+      JSON.stringify({
+        ...jwk,
+        kid: uuidV4(),
+        alg: 'RS256',
+        use: 'sig',
+      }),
     );
   }
 
