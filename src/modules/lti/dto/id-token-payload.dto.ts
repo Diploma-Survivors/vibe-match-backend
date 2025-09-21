@@ -1,172 +1,152 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
-import {
-  LTI_CLAIMS,
-  LTI_ROLES,
-  LTI_VERSIONS,
-} from '../constants/lti.constants';
+import { LTI_CLAIMS } from '../constants/lti.constants';
+import { ContentItemType } from '../enums/content-item-type.enum';
+import { LtiContextType } from '../enums/lti-context-type.enum';
 import { LtiMessageType } from '../enums/lti-message-type.enum';
-import { LtiContextDto } from './lti-context.dto';
-import { LtiDeepLinkingSettingsClaimDto } from './lti-deep-linking-settings-claim.dto';
-import { LtiLaunchPresentationDto } from './lti-launch-presentation.dto';
-import { LtiToolPlatformDto } from './lti-tool-platform.dto';
+import { PresentationTargetDocument } from '../enums/presentation-target-document.enum';
+
+export class DeepLinkingSettingsClaim {
+  @Expose({ name: 'deep_link_return_url' })
+  deepLinkReturnUrl: string;
+
+  @Expose({ name: 'accept_types' })
+  acceptTypes: ContentItemType[];
+
+  @Expose({ name: 'accept_presentation_document_targets' })
+  acceptPresentationDocumentTargets?: PresentationTargetDocument[];
+
+  @Expose({ name: 'accept_media_types' })
+  acceptMediaTypes?: string[];
+
+  @Expose({ name: 'accept_multiple' })
+  acceptMultiple?: boolean;
+
+  @Expose({ name: 'accept_line_item' })
+  acceptLineItem?: boolean;
+
+  @Expose({ name: 'auto_create' })
+  autoCreate?: boolean;
+
+  title?: string;
+
+  text?: string;
+
+  data?: string;
+}
+
+export class LaunchPresentationClaim {
+  @Expose({ name: 'document_target' })
+  documentTarget: PresentationTargetDocument;
+
+  height: number;
+
+  width: number;
+}
+
+export class ToolPlatformClaim {
+  @Expose({ name: 'contact_email' })
+  contactEmail?: string;
+
+  description?: string;
+
+  name?: string;
+
+  url?: string;
+
+  @Expose({ name: 'product_family_code' })
+  productFamilyCode?: string;
+
+  version: string;
+}
+
+export class ContextClaim {
+  id: string;
+
+  label: string;
+
+  title: string;
+
+  type: LtiContextType[];
+}
+
+export class ResourceLinkClaim {
+  id: string;
+
+  description?: string;
+
+  title?: string;
+}
 
 export class IdTokenPayloadDto {
-  @ApiProperty({
-    description: 'Issuer identifier',
-    example: 'https://lms.example.com',
-  })
   iss: string;
 
-  @ApiProperty({
-    description: 'Audience(s) that this ID token is intended for',
-    example: ['client_id_12345', 'client_id_67890'],
-  })
   @Transform(({ value }: { value: string | string[] }) =>
     typeof value === 'string' ? [value] : value,
   )
   aud: string[];
 
-  @ApiProperty({
-    description: 'LTI user ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
   sub: string;
 
-  @ApiProperty({
-    description: 'Expiration time of the ID token (as a Date object)',
-    example: 1735689599,
-  })
   @Transform(({ value }: { value: number }) => new Date(value * 1000))
   exp: Date;
 
-  @ApiProperty({
-    description: 'Issued at time of the ID token (as a Date object)',
-    example: 1704153599,
-  })
   @Transform(({ value }: { value: number }) => new Date(value * 1000))
   iat: Date;
 
-  @ApiProperty({
-    description: 'Nonce to associate a client session with the ID token',
-    example: 'n-0S6_WzA2Mj',
-  })
   nonce: string;
 
-  @ApiProperty({
-    description:
-      'Authorized party - the party to which the ID token was issued',
-    example: 'client_id_12345',
-    required: false,
-  })
   azp: string;
 
-  @ApiProperty({
-    description: 'Name of the user',
-    example: 'John Doe',
-    required: false,
-  })
   name: string;
 
-  @ApiProperty({
-    description: 'Picture URL of the user',
-    example: 'https://example.com/profile.jpg',
-    required: false,
-  })
+  @Expose({ name: 'given_name' })
+  givenName: string;
+
+  @Expose({ name: 'family_name' })
+  familyName: string;
+
   picture: string;
 
-  @ApiProperty({
-    description: 'Email of the user',
-    example: 'john.doe@example.com',
-    required: false,
-  })
   email: string;
 
-  @ApiProperty({
-    description: 'LTI message type',
-    enum: LtiMessageType,
-  })
   @Expose({ name: LTI_CLAIMS.MESSAGE_TYPE })
   messageType: LtiMessageType;
 
-  @ApiProperty({
-    description: 'LTI deployment ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
   @Expose({ name: LTI_CLAIMS.DEPLOYMENT_ID })
   deploymentId: string;
 
-  @ApiProperty({
-    description: 'Deep linking settings claim',
-    type: () => LtiDeepLinkingSettingsClaimDto,
-  })
-  @Type(() => LtiDeepLinkingSettingsClaimDto)
+  @Type(() => DeepLinkingSettingsClaim)
   @Expose({ name: LTI_CLAIMS.DEEP_LINKING_SETTINGS })
-  deepLinkingSettings: LtiDeepLinkingSettingsClaimDto;
+  deepLinkingSettings: DeepLinkingSettingsClaim;
 
-  @ApiProperty({
-    description: 'LTI launch presentation',
-    type: () => LtiLaunchPresentationDto,
-    required: false,
-  })
-  @Type(() => LtiLaunchPresentationDto)
+  @Type(() => LaunchPresentationClaim)
   @Expose({ name: LTI_CLAIMS.LAUNCH_PRESENTATION })
-  launchPresentation?: LtiLaunchPresentationDto;
+  launchPresentation?: LaunchPresentationClaim;
 
-  @ApiProperty({
-    description: 'LTI tool platform information',
-    type: () => LtiToolPlatformDto,
-    required: false,
-  })
-  @Type(() => LtiToolPlatformDto)
+  @Expose({ name: LTI_CLAIMS.TARGET_LINK_URI })
+  targetLinkUri: string;
+
+  @Type(() => ToolPlatformClaim)
   @Expose({ name: LTI_CLAIMS.TOOL_PLATFORM })
-  platform: LtiToolPlatformDto;
+  platform: ToolPlatformClaim;
 
-  @ApiProperty({
-    description: 'LTI context information',
-    type: () => LtiContextDto,
-    required: false,
-  })
-  @Type(() => LtiContextDto)
+  @Type(() => ContextClaim)
   @Expose({ name: LTI_CLAIMS.CONTEXT })
-  context: LtiContextDto;
+  context: ContextClaim;
 
-  @ApiProperty({
-    description: 'Roles of the user in the LTI context',
-    type: [String],
-    example: [LTI_ROLES.STUDENT, LTI_ROLES.INSTRUCTOR],
-    required: false,
-  })
+  @Type(() => ResourceLinkClaim)
+  @Expose({ name: LTI_CLAIMS.RESOURCE_LINK })
+  resourceLink: ResourceLinkClaim;
+
   @Expose({ name: LTI_CLAIMS.ROLES })
   roles: string[];
 
-  @ApiProperty({
-    description: 'User Ids of the mentors in the LTI context',
-    type: [String],
-    example: ['123fds23-123e4567-e89b-12d3-a456'],
-    required: false,
-  })
   @Expose({ name: LTI_CLAIMS.ROLE_SCOPE_MENTOR })
   roleScopeMentor: string[];
 
-  @ApiProperty({
-    description: 'LTI version',
-    example: LTI_VERSIONS.V1_3,
-  })
   @Expose({ name: LTI_CLAIMS.VERSION })
   version: string;
 
-  @ApiProperty({
-    description: 'Custom claims',
-    type: Object,
-    additionalProperties: true,
-    example: {
-      custom_key1: 'value1',
-      custom_key2: 123,
-      custom_key3: true,
-    },
-    required: false,
-  })
   @Expose({ name: LTI_CLAIMS.CUSTOM })
   customClaims: Record<string, any>;
 }

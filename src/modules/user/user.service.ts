@@ -1,17 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from './entities/user.entity';
-import { LtiClaims } from '../../modules/lti/interfaces/lti.interface';
-import { AuthTypeEnum } from './enums/auth-type.enum';
-import { RoleEnum } from './enums/role.enum';
 import {
-  LTI_CLAIMS,
   LTI_ROLES,
   LTI_ROLES_ARRAY,
 } from '../../modules/lti/constants/lti.constants';
+import { IdTokenPayloadDto } from '../lti/dto/id-token-payload.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { User } from './entities/user.entity';
+import { AuthTypeEnum } from './enums/auth-type.enum';
+import { RoleEnum } from './enums/role.enum';
 
 @Injectable()
 export class UserService {
@@ -43,10 +42,12 @@ export class UserService {
     return this.userRepository.delete(id);
   }
 
-  public async findOrCreateByLtiClaims(claims: LtiClaims): Promise<User> {
+  public async findOrCreateByLtiClaims(
+    claims: IdTokenPayloadDto,
+  ): Promise<User> {
     const ltiSubjectId = claims.sub;
     const ltiPlatformId = claims.iss;
-    const ltiRoles = (claims[LTI_CLAIMS.ROLES] as string[]) || [];
+    const ltiRoles = claims.roles || [];
     const internalRoles = this.mapLtiRolesToInternalRoles(ltiRoles);
 
     let user = await this.userRepository.findOne({
@@ -56,8 +57,8 @@ export class UserService {
       },
     });
 
-    const firstName = claims.given_name || null;
-    const lastName = claims.family_name || null;
+    const firstName = claims.givenName || null;
+    const lastName = claims.familyName || null;
     const email = claims.email || null;
 
     if (!user) {
@@ -121,39 +122,6 @@ export class UserService {
       })
       .filter((role) => role !== null);
 
-    /* deprecated (check and remove if everything works fine)
-      // for (const ltiRoleUrl of ltiRoles) {
-      // const lastHashIndex = ltiRoleUrl.lastIndexOf('#');
-      // if (lastHashIndex !== -1) {
-      //   const roleName = ltiRoleUrl.substring(lastHashIndex + 1).toUpperCase();
-      //   switch (roleName) {
-      //     case 'ADMINISTRATOR':
-      //       if (!internalRoles.includes(RoleEnum.ADMIN)) {
-      //         internalRoles.push(RoleEnum.ADMIN);
-      //       }
-      //       break;
-      //     case 'INSTRUCTOR':
-      //       if (!internalRoles.includes(RoleEnum.INSTRUCTOR)) {
-      //         internalRoles.push(RoleEnum.INSTRUCTOR);
-      //       }
-      //       break;
-      //     case 'STUDENT':
-      //       if (!internalRoles.includes(RoleEnum.STUDENT)) {
-      //         internalRoles.push(RoleEnum.STUDENT);
-      //       }
-      //       break;
-      //     case 'LEARNER':
-      //       if (!internalRoles.includes(RoleEnum.LEARNER)) {
-      //         internalRoles.push(RoleEnum.LEARNER);
-      //       }
-      //       break;
-      //     // Add more roles
-      //     default:
-      //       this.logger.warn(`Unknown LTI role: ${roleName}. Skipping.`);
-      //       break;
-      //   }
-      // }
-      // */
     return [...new Set(internalRoles)].toSorted((a, b) => a.localeCompare(b));
   }
 }

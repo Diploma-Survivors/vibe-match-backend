@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { LtiMessageType } from '../enums/lti-message-type.enum';
-import { LtiResourceLinkDto } from './lti-resource-link.dto';
 import { Expose } from 'class-transformer';
 import { LTI_CLAIMS } from '../constants/lti.constants';
+import { LtiMessageType } from '../enums/lti-message-type.enum';
+import { LtiResourceLinkDto } from './lti-resource-link.dto';
 
 export class LtiDeepLinkingResponseDto {
   jwt: string;
