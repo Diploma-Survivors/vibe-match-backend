@@ -34,4 +34,12 @@ export const ltiConfig = registerAs('lti', () => ({
       process.env.LTI_FRONTEND_DEEP_LINKING_URL ||
       'http://localhost:3002/create-problem',
   },
+  frontendSetCookiesUrl: {
+    student:
+      process.env.LTI_FRONTEND_STUDENT_SET_COOKIES_URL ||
+      'http://localhost:3001/api/proxy/signin',
+    instructor:
+      process.env.LTI_FRONTEND_INSTRUCTOR_SET_COOKIES_URL ||
+      'http://localhost:3002/api/proxy/signin',
+  },
 }));
