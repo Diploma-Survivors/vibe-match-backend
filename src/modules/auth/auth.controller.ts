@@ -14,7 +14,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { Cookies } from 'src/common/decorators/cookies.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtRefreshGuard } from 'src/common/guards/jwt-refresh.guard';
 import { JwtConfig } from '../../config/auth.config';
@@ -34,57 +33,6 @@ export class AuthController {
     private readonly jwtAuthService: JwtAuthService,
   ) {}
 
-  @Post('set-cookies-and-redirect')
-  @ApiOperation({
-    summary:
-      'Sets HTTP-Only cookies (access and refresh) and redirects to frontend',
-  })
-  @ApiResponse({ status: 302, description: 'Redirects to frontend' })
-  public setCookiesAndRedirect(
-    @Body('accessToken') accessToken: string,
-    @Body('refreshToken') refreshToken: string,
-    @Body('deviceId') deviceId: string,
-    @Body('redirect') redirect: string,
-    @Res() res: Response,
-  ): void {
-    const jwtConfig = this.configService.get<{
-      jwt: JwtConfig;
-    }>('auth')?.jwt;
-
-    if (!jwtConfig) {
-      this.logger.error('JWT configuration not found.');
-      throw new UnauthorizedException('Server configuration error');
-    }
-
-    const accessTokenTtl = jwtConfig.accessTokenTtl;
-    const refreshTokenTtl = jwtConfig.refreshTokenTtl;
-
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: accessTokenTtl * 1000,
-    });
-
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: refreshTokenTtl * 1000,
-      path: '/auth',
-    });
-
-    res.cookie('device_id', deviceId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: refreshTokenTtl * 1000,
-      path: '/auth',
-    });
-
-    res.redirect(302, redirect);
-  }
-
   @Post('refresh')
   @ApiOperation({ summary: 'Refreshes access and refresh tokens' })
   @ApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
@@ -95,9 +43,9 @@ export class AuthController {
   @UseGuards(JwtRefreshGuard)
   public async refreshTokens(
     @Res() res: Response,
-    @Cookies('device_id') deviceId: string,
+    @Body('deviceId') deviceId: string,
     @CurrentUser() jwtPayload: JwtPayload,
-  ): Promise<void> {
+  ) {
     try {
       const newAccessToken =
         this.jwtAuthService.generateAccessToken(jwtPayload);
@@ -115,34 +63,12 @@ export class AuthController {
         throw new UnauthorizedException('Server configuration error');
       }
 
-      const accessTokenTtl = jwtConfig.accessTokenTtl;
-      const refreshTokenTtl = jwtConfig.refreshTokenTtl;
-
-      res.cookie('access_token', newAccessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: accessTokenTtl * 1000,
+      res.status(200).send({
+        message: 'Tokens refreshed successfully',
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
       });
-
-      res.cookie('refresh_token', newRefreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: refreshTokenTtl * 1000,
-        path: '/auth',
-      });
-
-      res.cookie('device_id', deviceId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: refreshTokenTtl * 1000,
-      });
-
-      res.status(200).send({ message: 'Tokens refreshed successfully' });
     } catch (error) {
-      this.clearTokens(res);
       this.logger.error(`Error refreshing tokens: ${(error as Error).message}`);
       if (error instanceof UnauthorizedException) {
         throw error;
@@ -159,14 +85,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   @UseGuards(JwtRefreshGuard)
   public logout(@Res() res: Response) {
-    this.clearTokens(res);
     res.status(200).send({ message: 'Logged out successfully' });
-  }
-
-  private clearTokens(@Res({ passthrough: true }) res: Response): void {
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token');
-    res.clearCookie('device_id');
   }
 
   @Post()
