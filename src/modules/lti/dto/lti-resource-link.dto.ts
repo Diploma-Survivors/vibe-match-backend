@@ -169,7 +169,6 @@ class LtiDurationDto {
 }
 
 export class LtiResourceLinkDto {
-  @IsOptional()
   type?: ContentItemType;
 
   @ApiProperty({

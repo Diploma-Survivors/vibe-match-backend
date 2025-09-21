@@ -1,16 +1,7 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Logger,
-  Post,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { Cookies } from 'src/common/decorators/cookies.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { SkipTransformResponse } from 'src/common/decorators/skip-transform.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RoleEnum } from '../user/enums/role.enum';
 import { LtiDeepLinkingRequestDto } from './dto/lti-deep-linking-request.dto';
@@ -20,20 +11,16 @@ import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
 import { LtiLaunchResponse } from './interfaces/lti.interface';
 import { KeysService } from './keys.service';
 import { LtiService } from './lti.service';
-import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 
 @Controller()
 export class LtiController {
-  private readonly logger = new Logger(LtiController.name);
-
   constructor(
     private readonly ltiService: LtiService,
     private readonly keysService: KeysService,
-    private readonly configService: ConfigService,
   ) {}
 
   @Get('.well-known/jwks.json')
-  @SkipTransform()
+  @SkipTransformResponse()
   public getJwks(): object {
     return this.keysService.getJwks();
   }
@@ -54,37 +41,8 @@ export class LtiController {
     @Body() ltiLaunchRequestDto: LtiLaunchRequestDto,
     @Res() res: Response,
   ): Promise<void> {
-    const { accessToken, refreshToken, redirectPath, deviceId } = JSON.parse(
-      await this.ltiService.handleLtiLaunch(ltiLaunchRequestDto),
-    ) as LtiLaunchResponse;
-
-    const backendBaseUrl =
-      this.configService.get<string>('appConfig.url') ||
-      'http://localhost:3000';
-    const postRedirectUrl = `${backendBaseUrl}/v1/auth/set-cookies-and-redirect`;
-
-    res.setHeader('Content-Type', 'text/html');
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Redirecting...</title>
-      </head>
-      <body>
-          <form id="postRedirectForm" action="${postRedirectUrl}" method="POST">
-              <input type="hidden" name="accessToken" value="${accessToken}" /> <!-- Changed name to accessToken -->
-              <input type="hidden" name="refreshToken" value="${refreshToken}" /> <!-- Added refreshToken -->
-              <input type="hidden" name="deviceId" value="${deviceId}" /> <!-- Added deviceId -->
-              <input type="hidden" name="redirect" value="${redirectPath}" />
-          </form>
-          <script type="text/javascript">
-              document.getElementById('postRedirectForm').submit();
-          </script>
-      </body>
-      </html>
-    `);
+    const formData = await this.ltiService.handleLtiLaunch(ltiLaunchRequestDto);
+    this.sendPostRedirectForm(res, formData);
   }
 
   @Post('lti/dl/request')
@@ -92,36 +50,9 @@ export class LtiController {
     @Body() ltiDeepLinkingDto: LtiDeepLinkingRequestDto,
     @Res() res: Response,
   ) {
-    const { accessToken, refreshToken, redirectPath, deviceId } =
+    const formData =
       await this.ltiService.handleDeepLinkingRequest(ltiDeepLinkingDto);
-
-    const backendBaseUrl =
-      this.configService.get<string>('appConfig.url') ||
-      'http://localhost:3000';
-    const postRedirectUrl = `${backendBaseUrl}/v1/auth/set-cookies-and-redirect`;
-
-    res.setHeader('Content-Type', 'text/html');
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Redirecting...</title>
-      </head>
-      <body>
-          <form id="postRedirectForm" action="${postRedirectUrl}" method="POST">
-              <input type="hidden" name="accessToken" value="${accessToken}" /> <!-- Changed name to accessToken -->
-              <input type="hidden" name="refreshToken" value="${refreshToken}" /> <!-- Added refreshToken -->
-              <input type="hidden" name="deviceId" value="${deviceId}" /> <!-- Added deviceId -->
-              <input type="hidden" name="redirect" value="${redirectPath}" />
-          </form>
-          <script type="text/javascript">
-              document.getElementById('postRedirectForm').submit();
-          </script>
-      </body>
-      </html>
-    `);
+    this.sendPostRedirectForm(res, formData);
   }
 
   @Post('lti/dl/response')
@@ -129,7 +60,7 @@ export class LtiController {
   @Roles(RoleEnum.INSTRUCTOR)
   public async handleDeepLinkingResponse(
     @Body() ltiDeepLinkingResponse: LtiResourceLinkDto,
-    @Cookies('device_id') deviceId: string,
+    @Body('deviceId') deviceId: string,
     @Res() res: Response,
   ) {
     const { jwt, deepLinkReturnUrl } =
@@ -158,6 +89,41 @@ export class LtiController {
           </script>
       </body>
       </html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(htmlResponse);
+  }
+
+  private sendPostRedirectForm(res: Response, formData: LtiLaunchResponse) {
+    const {
+      accessToken,
+      refreshToken,
+      deviceId,
+      redirectPath,
+      postRedirectUrl,
+    } = formData;
+
+    const htmlResponse = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Redirecting...</title>
+      </head>
+      <body>
+          <form id="postRedirectForm" action="${postRedirectUrl}" method="POST">
+              <input type="hidden" name="accessToken" value="${accessToken}" /> <!-- Changed name to accessToken -->
+              <input type="hidden" name="refreshToken" value="${refreshToken}" /> <!-- Added refreshToken -->
+              <input type="hidden" name="deviceId" value="${deviceId}" /> <!-- Added deviceId -->
+              <input type="hidden" name="redirect" value="${redirectPath}" />
+          </form>
+          <script type="text/javascript">
+              document.getElementById('postRedirectForm').submit();
+          </script>
+      </body>
+      </html>
+    `;
 
     res.setHeader('Content-Type', 'text/html');
     res.send(htmlResponse);
