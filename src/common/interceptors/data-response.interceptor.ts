@@ -8,7 +8,7 @@ import { Observable, map } from 'rxjs';
 
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { SKIP_TRANSFORM } from '../decorators/skip-transform.decorator';
+import { SKIP_TRANSFORM_RESPONSE } from '../decorators/skip-transform.decorator';
 
 @Injectable()
 export class DataResponseInterceptor implements NestInterceptor {
@@ -18,10 +18,10 @@ export class DataResponseInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const skip = this.reflector.getAllAndOverride<boolean>(SKIP_TRANSFORM, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const skip = this.reflector.getAllAndOverride<boolean>(
+      SKIP_TRANSFORM_RESPONSE,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (skip) {
       return next.handle();
