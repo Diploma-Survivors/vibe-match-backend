@@ -12,7 +12,7 @@ import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
 import { UserService } from '../../modules/user/user.service';
 import { RedisService } from '../../shared/redis/redis.service';
-import { LTI_VERSIONS } from './constants/lti.constants';
+import { LTI_ROLES, LTI_VERSIONS } from './constants/lti.constants';
 import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
 import {
@@ -154,6 +154,12 @@ export class LtiService {
       throw new UnauthorizedException('Invalid authorized party (azp) claim');
     }
 
+    if (!claims.roleScopeMentor.includes(LTI_ROLES.INSTRUCTOR)) {
+      throw new UnauthorizedException(
+        'User does not have instructor role required for deep linking',
+      );
+    }
+
     const user = await this.upsertUserFromClaims(claims);
 
     const course = await this.processCourseAndEnrollUser(claims, user);
@@ -205,7 +211,7 @@ export class LtiService {
     ) as string;
 
     const postRedirectUrl = this.configService.get<string>(
-      'lti.frontendSetCookiesUrl.student',
+      'lti.frontendSetCookiesUrl.instructor',
     ) as string;
 
     return {
