@@ -154,7 +154,7 @@ export class LtiService {
       throw new UnauthorizedException('Invalid authorized party (azp) claim');
     }
 
-    if (!claims.roleScopeMentor.includes(LTI_ROLES.INSTRUCTOR)) {
+    if (!claims.roles.includes(LTI_ROLES.INSTRUCTOR)) {
       throw new UnauthorizedException(
         'User does not have instructor role required for deep linking',
       );
