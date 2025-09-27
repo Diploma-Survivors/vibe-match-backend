@@ -21,6 +21,7 @@ import { CourseModule } from './modules/course/course.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { ProblemsModule } from './modules/problems/problems.module';
 import { awsConfig } from './config/aws.config';
+import { ContestsModule } from './modules/contests/contests.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { awsConfig } from './config/aws.config';
     CourseModule,
     UserCourseModule,
     ProblemsModule,
+    ContestsModule,
   ],
   controllers: [AppController],
   providers: [
