@@ -1,13 +1,13 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, FindOptionsSelect, In, Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { Problem } from './entities/problem.entity';
 import { Tag } from './tags/entities/tag.entity';
-import { Topic } from './topics/entities/topic.entity';
 import { Testcase } from './testcases/entities/testcase.entity';
+import { Topic } from './topics/entities/topic.entity';
 
 @Injectable()
 export class ProblemsService {
@@ -50,8 +50,8 @@ export class ProblemsService {
       const problem = queryRunner.manager.create(Problem, {
         ...createProblemDto,
         author: { id: user.userId },
-        course: { id: user.courseId },
         testcase,
+        courseProblems: [{ course: { id: user.courseId } }],
         problemTags: tags.map((tag) => ({ tag })),
         problemTopics: topics.map((topic) => ({ topic })),
       });
@@ -72,8 +72,8 @@ export class ProblemsService {
     return await this.problemsRepository.find();
   }
 
-  async findOne(id: string) {
-    return await this.problemsRepository.findOne({ where: { id } });
+  async findById(id: string, select?: FindOptionsSelect<Problem>) {
+    return await this.problemsRepository.findOne({ where: { id }, select });
   }
 
   async update(id: string, updateProblemDto: UpdateProblemDto) {

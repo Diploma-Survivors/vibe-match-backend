@@ -1,4 +1,4 @@
-import { Course } from 'src/modules/course/entities/course.entity';
+import { ContestProblem } from 'src/modules/contests/entities/contest-problem.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import {
   Column,
@@ -14,8 +14,10 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
+import { ProblemType } from '../enums/problem-type.enum';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
+import { CourseProblem } from './course-problem.entity';
 import { ProblemTag } from './problem-tag.entity';
 import { ProblemTopic } from './problem-topic.entity';
 
@@ -56,10 +58,17 @@ export class Problem {
   })
   difficulty: DifficultyLevel;
 
-  @Index()
-  @ManyToOne(() => Course)
-  @JoinColumn({ name: 'course_id' })
-  course: Course;
+  @Column('enum', {
+    name: 'type',
+    default: ProblemType.STANDALONE,
+    enum: ProblemType,
+  })
+  type: ProblemType;
+
+  @OneToMany(() => CourseProblem, (courseProblem) => courseProblem.problem, {
+    cascade: true,
+  })
+  courseProblems: CourseProblem[];
 
   @Index()
   @ManyToOne(() => User)
@@ -85,6 +94,11 @@ export class Problem {
     cascade: true,
   })
   testcaseSamples: TestcaseSample[];
+
+  @OneToMany(() => ContestProblem, (contestProblem) => contestProblem.problem, {
+    nullable: true,
+  })
+  contestProblems: ContestProblem[] | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

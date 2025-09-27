@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
+import { ProblemType } from '../enums/problem-type.enum';
 
 export class CreateProblemDto {
   @ApiProperty({
@@ -103,6 +104,14 @@ export class CreateProblemDto {
     message: 'Difficulty level must be a valid enum value',
   })
   difficulty: DifficultyLevel;
+
+  @ApiProperty({
+    description: 'The type of the problem',
+    example: ProblemType.STANDALONE,
+    enum: [ProblemType.STANDALONE, ProblemType.CONTEST],
+  })
+  @IsEnum([ProblemType.STANDALONE, ProblemType.CONTEST])
+  type: Exclude<ProblemType, ProblemType.HYBRID>;
 
   @ApiProperty({
     description: 'The IDs of the tags associated with the problem',

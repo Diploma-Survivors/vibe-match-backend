@@ -44,7 +44,7 @@ export class ProblemsController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
-  async create(
+  async createProblemStandalone(
     @Body() createProblemDto: CreateProblemDto,
     @CurrentUser() user: JwtPayload,
   ) {
@@ -79,7 +79,7 @@ export class ProblemsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
-    return await this.problemsService.findOne(id);
+    return await this.problemsService.findById(id);
   }
 
   @Patch(':id')
