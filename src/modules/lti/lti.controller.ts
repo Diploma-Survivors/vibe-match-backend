@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { SkipTransformResponse } from 'src/common/decorators/skip-transform.decorator';
@@ -11,9 +19,13 @@ import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
 import { LtiLaunchResponse } from './interfaces/lti.interface';
 import { KeysService } from './keys.service';
 import { LtiService } from './lti.service';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @Controller()
 export class LtiController {
+  private readonly logger = new Logger(LtiController.name);
+
   constructor(
     private readonly ltiService: LtiService,
     private readonly keysService: KeysService,
@@ -61,11 +73,13 @@ export class LtiController {
   public async handleDeepLinkingResponse(
     @Body() ltiDeepLinkingResponse: LtiResourceLinkDto,
     @Body('deviceId') deviceId: string,
+    @CurrentUser() user: JwtPayload,
     @Res() res: Response,
   ) {
     const { jwt, deepLinkReturnUrl } =
       (await this.ltiService.handleDeepLinkingResponse(
         deviceId,
+        user.courseId as string,
         ltiDeepLinkingResponse,
       )) as {
         jwt: string;
@@ -102,6 +116,10 @@ export class LtiController {
       redirectPath,
       postRedirectUrl,
     } = formData;
+
+    this.logger.debug(
+      `Redirecting to ${postRedirectUrl} with Tokens and redirectPath with: ${JSON.stringify(formData)}`,
+    );
 
     const htmlResponse = `
       <!DOCTYPE html>
