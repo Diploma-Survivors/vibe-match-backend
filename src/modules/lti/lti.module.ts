@@ -8,6 +8,8 @@ import { RedisModule } from '../../shared/redis/redis.module';
 import { UserCourseModule } from '../user-course/user-course.module';
 import { CourseModule } from '../course/course.module';
 import { RefreshTokenModule } from '../../modules/auth/refresh-token.module';
+import { ContestsModule } from '../contests/contests.module';
+import { ProblemsModule } from '../problems/problems.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { RefreshTokenModule } from '../../modules/auth/refresh-token.module';
     CourseModule,
     UserCourseModule,
     RefreshTokenModule,
+    ProblemsModule,
+    ContestsModule,
   ],
   controllers: [LtiController],
   providers: [LtiService, KeysService],
