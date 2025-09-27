@@ -5,6 +5,7 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { ProblemTag } from '../entities/problem-tag.entity';
 import { ProblemTopic } from '../entities/problem-topic.entity';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
+import { ProblemType } from '../enums/problem-type.enum';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
 
@@ -60,8 +61,16 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'The difficulty level of the problem',
     example: DifficultyLevel.EASY,
+    enum: DifficultyLevel,
   })
   difficulty: DifficultyLevel;
+
+  @ApiProperty({
+    description: 'The type of the problem',
+    example: ProblemType.STANDALONE,
+    enum: ProblemType,
+  })
+  type: ProblemType;
 
   @ApiProperty({
     description: 'The ID of the course the problem belongs to',
