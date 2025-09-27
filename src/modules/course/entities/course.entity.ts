@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { CourseProblem } from 'src/modules/problems/entities/course-problem.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
@@ -39,6 +41,17 @@ export class Course {
   })
   @Column({ type: 'varchar', nullable: true })
   title: string | null;
+
+  @ApiProperty({
+    description: 'Course description',
+    example: 'An in-depth course on data structures and algorithms.',
+    nullable: true,
+  })
+  @OneToMany(() => CourseProblem, (courseProblem) => courseProblem.course, {
+    cascade: true,
+    nullable: true,
+  })
+  courseProblems: CourseProblem[];
 
   @ApiProperty({
     description: 'Course creation timestamp',
