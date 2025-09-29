@@ -3,8 +3,8 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  ValidateNested,
   IsUUID,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
@@ -42,20 +42,6 @@ export class CreateSubmissionDto {
   @IsUUID()
   @IsNotEmpty()
   readonly problemId: string;
-
-  @ApiPropertyOptional({
-    description: 'LTI Context ID',
-  })
-  @IsString()
-  @IsOptional()
-  readonly ltiContextId?: string;
-
-  @ApiPropertyOptional({
-    description: 'LTI Resource Link ID',
-  })
-  @IsString()
-  @IsOptional()
-  readonly resourceLinkId?: string;
 
   @Transform(({ value }) => {
     let parsed: unknown = value;

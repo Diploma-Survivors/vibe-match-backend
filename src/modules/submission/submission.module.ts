@@ -13,10 +13,12 @@ import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { ConfigService } from '@nestjs/config';
 import { Language } from './language/language.entity';
+import { User } from '../user/entities/user.entity';
+import { StoragesService } from '../storages/storages.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Submission, Problem, Language]),
+    TypeOrmModule.forFeature([Submission, Problem, Language, User]),
     Judge0Module,
     RedisModule,
     BullModule.forRootAsync({
@@ -50,6 +52,7 @@ import { Language } from './language/language.entity';
     CallbackProcessor,
     SubmissionService,
     SubmissionsSseService,
+    StoragesService,
   ],
 })
 export class SubmissionModule {}

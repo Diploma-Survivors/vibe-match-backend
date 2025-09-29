@@ -29,9 +29,6 @@ export class Submission {
   @JoinColumn({ name: 'problem_id' })
   problem: Problem;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  score: number;
-
   @Column({
     type: 'enum',
     enum: SubmissionStatus,
@@ -39,27 +36,27 @@ export class Submission {
   })
   status: SubmissionStatus;
 
-  @Column('jsonb', { nullable: true })
-  results: any[];
-
-  @Column({ nullable: true })
-  ltiContextId: string;
-
-  @Column({ nullable: true })
-  resourceLinkId: string;
-
-  @Column({ type: 'float', nullable: true })
-  runtime: number;
-
-  @Column({ nullable: true })
-  memoryUsed: number;
-
   @CreateDateColumn()
   submittedAt: Date;
 
   @OneToOne(() => Language, (language) => language.id)
   language: Language;
 
-  @Column()
-  fileUrl: string;
+  @Column({ type: 'varchar', nullable: true })
+  fileUrl: string | null;
+
+  @Column('int')
+  totalTests: number;
+
+  @Column('int')
+  passedTests: number;
+
+  @Column('float')
+  score: number;
+
+  @Column({ type: 'float', nullable: true })
+  runtime: number;
+
+  @Column({ nullable: true })
+  memoryUsed: number;
 }

@@ -23,111 +23,313 @@ import { RedisKeys } from './helpers/redis-keys.helper';
 import Redis from 'ioredis';
 import { InjectRepository } from '@nestjs/typeorm';
 import { REDIS } from '../../shared/redis/redis.module';
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { User } from '../user/entities/user.entity';
+import { Language } from './language/language.entity';
+import { ConfigService } from '@nestjs/config';
+import { StoragesService } from '../storages/storages.service';
+import { SUBMISSION_FILE_EXTENSION } from '../../common/constants/submission.constant';
 
 @Injectable()
 export class SubmissionService {
-  private readonly logger = new Logger(SubmissionService.name);
   private static readonly REDIS_TTL_SECONDS = 3600; // 1 hour
-  private static readonly SUBMISSION_TIMEOUT_MS = 60_000; // 60s
+  private readonly logger = new Logger(SubmissionService.name);
 
   constructor(
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
     @InjectRepository(Problem)
     private readonly problemRepository: Repository<Problem>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Language) // FIX: inject Language repo
+    private readonly languageRepository: Repository<Language>,
+    private readonly configService: ConfigService,
+    private readonly storagesService: StoragesService,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
     @Inject(REDIS)
     private readonly redis: Redis,
   ) {}
 
+  // --------------------------
+  // Public APIs
+  // --------------------------
+
   async run(
     dto: CreateSubmissionDto,
     file?: Express.Multer.File,
   ): Promise<{ submissionId: string }> {
-    const problem = await this.problemRepository.findOne({
-      where: { id: dto.problemId },
-    });
-    if (!problem) {
-      throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
+    const problem = await this.findProblemOrFail(dto.problemId);
+    const submissionId = uuidv4();
+    return this.submitBatch(submissionId, dto, problem, false, file);
+  }
+
+  async submit(
+    dto: CreateSubmissionDto,
+    user: JwtPayload,
+    file?: Express.Multer.File,
+  ): Promise<{ submissionId: string }> {
+    const problem = await this.findProblemOrFail(dto.problemId);
+    const savedUser = await this.findUserOrFail(user.userId);
+    const language = await this.findLanguageOrFail(dto.languageId);
+
+    let fileUrl: string | null = null;
+    const isMultiFile = dto.languageId === 89;
+    if (isMultiFile) {
+      fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
     }
 
-    return this.submitBatch(dto, problem, file);
+    const submission = await this.submissionRepository.save(
+      this.submissionRepository.create({
+        sourceCode: dto.sourceCode,
+        user: savedUser,
+        problem,
+        language,
+        fileUrl,
+      }),
+    );
+
+    return this.submitBatch(submission.id, dto, problem, true, file);
   }
 
   async submitBatch(
+    submissionId: string,
     dto: CreateSubmissionDto,
     problem: Problem,
+    isSubmit: boolean,
     file?: Express.Multer.File,
   ): Promise<{ submissionId: string }> {
-    if (!dto?.testCases?.length) {
-      throw new Error('submitBatch: testCases must be a non-empty array.');
+    // validate (for run mode we must have DTO testcases; for submit mode testcases come from problem file)
+    if (!isSubmit && (!dto?.testCases || dto.testCases.length === 0)) {
+      throw new Error(
+        'submitBatch: testCases must be a non-empty array when not using testcase file.',
+      );
     }
 
-    const submissionId = uuidv4();
-
-    // === Precompute invariants ===
+    // Prepare common encodings (source/additional files) and constants
     const isMultiFile = dto.languageId === 89;
-    const cpuSeconds = this.judge0Service.msToSeconds(problem.timeLimitMs);
-
-    // Encode source/additional files
     const sourceBase64 =
       !isMultiFile && dto.sourceCode
         ? this.judge0Service.encodeBase64(dto.sourceCode)
         : undefined;
-
     const additionalFilesBase64 =
       isMultiFile && file?.buffer ? file.buffer.toString('base64') : undefined;
 
-    const tcCount = dto.testCases.length;
+    // Build items
+    const items: Judge0SubmissionPayload[] = isSubmit
+      ? await this.buildItemsFromProblemFile(
+          submissionId,
+          dto,
+          problem,
+          sourceBase64,
+          additionalFilesBase64,
+        )
+      : this.buildItemsFromDto(
+          submissionId,
+          dto,
+          problem,
+          sourceBase64,
+          additionalFilesBase64,
+        );
 
-    // Build Judge0 batch items
-    const items: Judge0SubmissionPayload[] = await Promise.all(
-      dto.testCases.map((testCase, i) => {
-        const input = testCase.input;
-        return {
-          language_id: dto.languageId,
-          source_code: sourceBase64,
-          additional_files: additionalFilesBase64,
-          stdin: input ? this.judge0Service.encodeBase64(input) : undefined,
-          redirect_stderr_to_stdout: true,
-          cpu_time_limit: cpuSeconds,
-          memory_limit: problem.memoryLimitKb,
-          callback_url: this.judge0Service.getCallbackUrl(
-            submissionId,
-            String(i),
-          ),
-        };
-      }),
-    );
+    if (items.length === 0) {
+      throw new Error('No testcases found for submission.');
+    }
 
-    // === Submit to Judge0 ===
+    // Submit to Judge0
     const judge0BatchResponse: Judge0BatchResponse =
       await this.judge0Service.createSubmissionBatch(items);
 
-    if (judge0BatchResponse.length !== tcCount) {
+    // Compare against items length (correct for both run and submit)
+    if (judge0BatchResponse.length !== items.length) {
       throw new Error(
-        `Judge0 returned ${judge0BatchResponse.length} tokens, expected ${tcCount}. submissionId=${submissionId}`,
+        `Judge0 returned ${judge0BatchResponse.length} tokens, expected ${items.length}. submissionId=${submissionId}`,
       );
     }
 
-    // === Redis keys ===
+    // Initialize Redis keys
+    await this.initRedis(submissionId, items.length, problem.id);
+
+    return { submissionId };
+  }
+
+  private async findProblemOrFail(problemId: string): Promise<Problem> {
+    const problem = await this.problemRepository.findOne({
+      where: { id: problemId },
+    });
+    if (!problem)
+      throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
+    return problem;
+  }
+
+  private async findUserOrFail(userId: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    return user;
+  }
+
+  private async findLanguageOrFail(languageId: number): Promise<Language> {
+    const lang = await this.languageRepository.findOne({
+      where: { id: languageId },
+    });
+    if (!lang)
+      throw new HttpException('Language not found', HttpStatus.NOT_FOUND);
+    return lang;
+  }
+
+  private async saveSubmitFile(
+    userId: string,
+    problemId: number | string,
+    file?: Express.Multer.File,
+  ): Promise<string> {
+    if (!file?.buffer) {
+      throw new HttpException(
+        'File is required for multi-file submissions',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const seed = uuidv4();
+    const key = `submissions/${userId}/${problemId}/${seed}${SUBMISSION_FILE_EXTENSION}`;
+    const bucket = this.configService.get<string>(
+      'aws.s3.bucketName',
+    ) as string;
+    await this.storagesService.upload({ bucket, key, file: file.buffer });
+    return this.storagesService.getObjectUrl(bucket, key);
+  }
+
+  private buildJudge0Payload(
+    dto: CreateSubmissionDto,
+    problem: Problem,
+    submissionId: string,
+    index: number,
+    stdinRaw: string | undefined,
+    expectedOutput: string | undefined,
+    isSubmit: boolean,
+    sourceBase64?: string,
+    additionalFilesBase64?: string,
+  ): Judge0SubmissionPayload {
+    return {
+      language_id: dto.languageId,
+      source_code: sourceBase64,
+      additional_files: additionalFilesBase64,
+      stdin: stdinRaw ? this.judge0Service.encodeBase64(stdinRaw) : undefined,
+      expected_output: expectedOutput
+        ? this.judge0Service.encodeBase64(expectedOutput)
+        : undefined,
+      redirect_stderr_to_stdout: true,
+      cpu_time_limit: this.judge0Service.msToSeconds(problem.timeLimitMs),
+      memory_limit: problem.memoryLimitKb,
+      callback_url: this.judge0Service.getCallbackUrl(
+        submissionId,
+        String(index),
+        isSubmit,
+      ),
+    };
+  }
+
+  private async buildItemsFromProblemFile(
+    submissionId: string,
+    dto: CreateSubmissionDto,
+    problem: Problem,
+    sourceBase64?: string,
+    additionalFilesBase64?: string,
+  ): Promise<Judge0SubmissionPayload[]> {
+    const url = new URL(String(problem.testcase.fileUrl));
+    const bucket = url.hostname.split('.')[0];
+    const key = url.pathname.substring(1);
+
+    const items: Judge0SubmissionPayload[] = [];
+    let i = 0;
+    let stage: 'header' | 'index' | 'input' | 'output' = 'header';
+    let input = '';
+    let output = '';
+
+    for await (const line of this.storagesService.streamLines(bucket, key)) {
+      if (stage === 'header') {
+        // First line is totalTest → skip or validate
+        stage = 'index';
+        continue;
+      }
+
+      if (stage === 'index') {
+        // line = testcase number (ignore, we use i++)
+        stage = 'input';
+        continue;
+      }
+
+      if (stage === 'input') {
+        input = line;
+        stage = 'output';
+        continue;
+      }
+
+      if (stage === 'output') {
+        output = line;
+
+        items.push(
+          this.buildJudge0Payload(
+            dto,
+            problem,
+            submissionId,
+            i,
+            input,
+            output,
+            true,
+            sourceBase64,
+            additionalFilesBase64,
+          ),
+        );
+
+        i++;
+        stage = 'index'; // reset for next testcase
+      }
+    }
+
+    return items;
+  }
+
+  private buildItemsFromDto(
+    submissionId: string,
+    dto: CreateSubmissionDto,
+    problem: Problem,
+    sourceBase64?: string,
+    additionalFilesBase64?: string,
+  ): Judge0SubmissionPayload[] {
+    const items: Judge0SubmissionPayload[] = dto.testCases.map((testCase, i) =>
+      this.buildJudge0Payload(
+        dto,
+        problem,
+        submissionId,
+        i,
+        testCase.input,
+        testCase.output,
+        false,
+        sourceBase64,
+        additionalFilesBase64,
+      ),
+    );
+    return items;
+  }
+
+  private async initRedis(
+    submissionId: string,
+    tcCount: number,
+    problemId: number | string,
+  ) {
     const metaKey = this.redisKeys.meta(submissionId);
     const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
     const seenKey = this.redisKeys.seen(submissionId);
 
-    // === Initialize Redis atomically via MULTI/EXEC ===
     const ttlSec = SubmissionService.REDIS_TTL_SECONDS;
     const tx = this.redis.multi();
 
-    // Meta
     tx.hset(metaKey, {
       total: String(tcCount),
       received: '0',
-      problemId: String(problem.id),
+      problemId: String(problemId),
     });
 
-    // TTL
     tx.expire(metaKey, ttlSec);
     tx.expire(resultsIKey, ttlSec);
     tx.expire(seenKey, ttlSec);
@@ -141,21 +343,21 @@ export class SubmissionService {
       );
       throw err;
     }
-
-    return { submissionId };
   }
 
-  public buildTestResult(judge0Response: Judge0Response): TestResultDto {
-    const stdout = this.judge0Service.decodeBase64(judge0Response.stdout) || '';
+  buildTestResult(judge0Response: Judge0Response): TestResultDto {
+    const stdout = this.judge0Service.decodeBase64(judge0Response.stdout);
 
     return {
       stdout: stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0Response.status,
-      stderr:
-        this.judge0Service.decodeBase64(judge0Response.stderr) || undefined,
+      stderr: this.judge0Service.decodeBase64(judge0Response.stderr),
       token: judge0Response.token,
+      expectedOutput: this.judge0Service.decodeBase64(
+        judge0Response.expected_output,
+      ),
     };
   }
 

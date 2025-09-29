@@ -2,12 +2,11 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { CallbackProcessor } from '../helpers/callback.processor';
+import {
+  QUEUE_FINALIZE_RUN_JOB,
+  QUEUE_FINALIZE_SUBMIT_JOB,
+} from '../../../common/constants/submission.constant';
 
-/**
- * Processor for finalizing submissions after all test cases have been processed.
- * This class listens to the 'submission-finalize' queue and processes jobs to
- * aggregate results and send final updates to clients.
- */
 @Processor('submission-finalize')
 @Injectable()
 export class SubmissionFinalizeProcessor extends WorkerHost {
@@ -19,10 +18,13 @@ export class SubmissionFinalizeProcessor extends WorkerHost {
 
   // BullMQ pattern: single entrypoint for all jobs in this queue
   async process(job: Job<{ submissionId: string }>): Promise<void> {
-    if (job.name === 'finalize') {
+    if (job.name === QUEUE_FINALIZE_RUN_JOB) {
       const { submissionId } = job.data;
-      this.logger.log(`Finalizing submission ${submissionId}...`);
-      await this.callbackProcessor.finalizer(submissionId);
+      await this.callbackProcessor.finalizer(submissionId, false);
+      this.logger.log(`Finalized submission ${submissionId}.`);
+    } else if (job.name === QUEUE_FINALIZE_SUBMIT_JOB) {
+      const { submissionId } = job.data;
+      await this.callbackProcessor.finalizer(submissionId, true);
       this.logger.log(`Finalized submission ${submissionId}.`);
     } else {
       // Make unknown job types fail loudly (so you can spot misrouted jobs)

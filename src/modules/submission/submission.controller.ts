@@ -3,29 +3,33 @@ import {
   ClassSerializerInterceptor,
   Controller,
   HttpCode,
+  MessageEvent,
   Param,
   Post,
   Put,
   Query,
-  Res,
   Sse,
+  UploadedFile,
   UseInterceptors,
-  MessageEvent,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { finalize, interval, merge, Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ApiTags } from '@nestjs/swagger';
 import { SubmissionService } from './submission.service';
-import * as judge0Interface from '../judge0/judge0.interface';
+import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
-import { interval, map, merge, Observable } from 'rxjs';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SkipDataResponse } from '../../common/interceptors/skip-data-response.interceptor';
 import {
   SUBMISSION_PING_DATA,
   SUBMISSION_PING_EVENT,
   SUBMISSION_PING_TIME,
 } from '../../common/constants/submission.constant';
-import { SubmissionsSseService } from './events/submission-sse.service';
-import { ServerResponse } from 'node:http';
-import { SkipDataResponse } from '../../common/interceptors/skip-data-response.interceptor';
+import * as judge0Interface from '../judge0/judge0.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -37,68 +41,62 @@ export class SubmissionController {
     private readonly submissionCallbackProcessor: CallbackProcessor,
   ) {}
 
-  @Post('/run')
-  @ApiOperation({ summary: 'Submit code for execution' })
-  @ApiResponse({
-    status: 201,
-    description: 'Code submitted successfully',
-    type: String,
-  })
+  @Post('run')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async run(
     @Body() dto: CreateSubmissionDto,
-  ): Promise<{ submissionId: string }> {
-    return this.submissionService.run(dto);
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.submissionService.run(dto, file);
   }
 
-  // Called by Redis to get final result
-  @Put('judge0/callback')
-  @ApiOperation({ summary: 'Judge0 callback endpoint' })
-  @ApiResponse({
-    status: 204,
-    description: 'Returned callback endpoint successfully',
-  })
+  @Post('submit')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async submit(
+    @Body() dto: CreateSubmissionDto,
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.submissionService.submit(dto, user, file);
+  }
+
+  @Put('judge0/callback/run')
   @HttpCode(204)
-  handleCallback(
+  handleRunCallback(
     @Query('sid') submissionId: string,
-    @Query('tcid') testCaseId: number,
+    @Query('tcid') tcid: number,
     @Body() result: judge0Interface.Judge0Response,
   ) {
-    // fire and forget
-    this.submissionCallbackProcessor.handleCallback(
-      submissionId,
-      testCaseId,
-      result,
-    );
+    // fire-and-forget - controller should return 204 immediately
+    this.submissionCallbackProcessor
+      .handleCallback(submissionId, Number(tcid), result, false)
+      .catch(() => {
+        /* processor logs errors */
+      });
+  }
+
+  @Put('judge0/callback/submit')
+  @HttpCode(204)
+  handleSubmitCallback(
+    @Query('sid') submissionId: string,
+    @Query('tcid') tcid: number,
+    @Body() result: judge0Interface.Judge0Response,
+  ) {
+    this.submissionCallbackProcessor
+      .handleCallback(submissionId, Number(tcid), result, true)
+      .catch(() => {});
   }
 
   @Sse(':id/stream')
-  @ApiOperation({ summary: 'Stream submission results' })
   @SkipDataResponse()
-  streamResults(
-    @Param('id') submissionId: string,
-    @Res() res: Response,
-  ): Observable<MessageEvent> {
-    // heartbeat ping
-    const ping$: Observable<MessageEvent> = interval(SUBMISSION_PING_TIME).pipe(
-      map(() => ({
-        type: SUBMISSION_PING_EVENT,
-        data: SUBMISSION_PING_DATA,
-      })),
+  @Sse(':id/stream')
+  streamResults(@Param('id') submissionId: string): Observable<MessageEvent> {
+    const ping$ = interval(SUBMISSION_PING_TIME).pipe(
+      map(() => ({ type: SUBMISSION_PING_EVENT, data: SUBMISSION_PING_DATA })),
     );
 
-    const rawRes = res as unknown as ServerResponse; // workaround for Fastify
-
-    // Setup cleanup on connection close
-    const onClose = () => {
-      this.submissionsSseService.cleanup(submissionId);
-      rawRes.removeListener('close', onClose);
-    };
-
-    rawRes.on('close', onClose);
-
-    // connect returns Observable that forwards events (ReplaySubject backed)
-    const data$ = this.submissionsSseService.connect(submissionId);
-
-    return merge(data$, ping$);
+    return merge(this.submissionsSseService.connect(submissionId), ping$).pipe(
+      finalize(() => this.submissionsSseService.cleanup(submissionId)),
+    );
   }
 }

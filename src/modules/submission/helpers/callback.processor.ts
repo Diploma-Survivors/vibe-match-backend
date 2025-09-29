@@ -8,7 +8,19 @@ import { SubmissionService } from '../submission.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 import Redis from 'ioredis';
 import { REDIS } from '../../../shared/redis/redis.module';
-import { SUBMISSION_EVENT_REDIS_CHANNEL } from '../../../common/constants/submission.constant';
+import {
+  JOB_ATTEMPTS,
+  JOB_BACKOFF,
+  JOB_REMOVE_ON_COMPLETE,
+  JOB_REMOVE_ON_FAIL,
+  QUEUE_FINALIZE_RUN_JOB,
+  QUEUE_FINALIZE_SUBMIT_JOB,
+  SUBMISSION_EVENT_REDIS_CHANNEL,
+} from '../../../common/constants/submission.constant';
+import { Submission } from '../entities/submission.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SubmissionResultDto } from '../dto/submission.response.dto';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -43,28 +55,26 @@ local received = redis.call('HINCRBY', meta, 'received', 1)
 local total    = redis.call('HGET', meta, 'total') or '0'
 return {1, tostring(received), total}
 `;
-
 @Injectable()
 export class CallbackProcessor implements OnModuleInit {
   private readonly logger = new Logger(CallbackProcessor.name);
   private luaShaAddResult: string;
-
   private pub: Redis;
 
   constructor(
-    @Inject(REDIS)
-    private readonly redis: Redis,
+    @Inject(REDIS) private readonly redis: Redis,
     private readonly redisKeys: RedisKeys,
     @InjectQueue('submission-finalize') private readonly finalizeQueue: Queue,
     private readonly submissionService: SubmissionService,
+    @InjectRepository(Submission)
+    private readonly submissionRepository: Repository<Submission>,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Load Lua script once at startup
-    this.luaShaAddResult = await (<Promise<string>>(
-      this.redis.script('LOAD', LUA_ADD_RESULT_BY_INDEX)
-    ));
-
+    this.luaShaAddResult = (await this.redis.script(
+      'LOAD',
+      LUA_ADD_RESULT_BY_INDEX,
+    )) as string;
     this.pub = this.redis.duplicate();
   }
 
@@ -72,6 +82,7 @@ export class CallbackProcessor implements OnModuleInit {
     submissionId: string,
     index: number,
     payload: Judge0Response,
+    isSubmit: boolean,
   ): Promise<void> {
     const { added, received, total } = await this.handleCallbackInternal(
       submissionId,
@@ -80,26 +91,14 @@ export class CallbackProcessor implements OnModuleInit {
     );
 
     if (added && received >= total) {
-      const lockKey = this.redisKeys.doneLock(submissionId);
-      const lock = await this.redis.set(lockKey, '1', 'EX', 600, 'NX'); // 10m lock
-      if (lock === 'OK') {
-        await this.finalizeQueue.add(
-          'finalize',
-          { submissionId },
-          {
-            jobId: submissionId, // de-dupe per submission
-            attempts: 5, // retry on transient failures
-            backoff: { type: 'exponential', delay: 1000 },
-            removeOnComplete: true,
-            removeOnFail: 50,
-          },
-        );
-      }
+      await this.tryLockAndScheduleFinalize(submissionId, isSubmit);
     }
   }
 
-  // Aggregate results for sending to client via sse
-  public async finalizer(submissionId: string) {
+  public async finalizer(
+    submissionId: string,
+    isSubmit: boolean,
+  ): Promise<void> {
     const metaKey = this.redisKeys.meta(submissionId);
     const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
     const seenKey = this.redisKeys.seen(submissionId);
@@ -107,34 +106,88 @@ export class CallbackProcessor implements OnModuleInit {
     const meta = await this.redis.hgetall(metaKey);
     const results = await this.redis.hgetall(resultsIKey);
 
-    // Clean up Redis keys
-    await Promise.all([
-      this.redis.del(metaKey),
-      this.redis.del(resultsIKey),
-      this.redis.del(seenKey),
-      this.redis.del(this.redisKeys.doneLock(submissionId)),
-    ]);
+    await this.cleanupRedisKeys(submissionId, [metaKey, resultsIKey, seenKey]);
 
-    // aggregate results
-    const testResults: TestResultDto[] = Object.values(results).map(
-      (r: string) => {
-        const testResult: Judge0Response = JSON.parse(r) as Judge0Response;
-        return this.submissionService.buildTestResult(testResult);
-      },
-    );
-
+    const testResults = this.aggregateTestResults(results);
     const finalResult = await this.submissionService.buildSubmissionResult(
       testResults,
       meta.problemId,
     );
 
-    // emit event using sse to notify frontend
+    if (isSubmit) {
+      await this.updateSubmissionEntity(submissionId, finalResult);
+    }
+
     await this.publishFinalize(submissionId, finalResult);
   }
 
-  /**
-   * Safely eval Lua (handle NOSCRIPT after Redis restart)
-   */
+  // -------------------------
+  // 🔹 Private helpers
+  // -------------------------
+
+  private async tryLockAndScheduleFinalize(
+    submissionId: string,
+    isSubmit: boolean,
+  ) {
+    const lockKey = this.redisKeys.doneLock(submissionId);
+    const lock = await this.redis.set(lockKey, '1', 'EX', 600, 'NX');
+    if (lock === 'OK') {
+      await this.scheduleFinalizeJob(submissionId, isSubmit);
+    }
+  }
+
+  private async scheduleFinalizeJob(submissionId: string, isSubmit: boolean) {
+    const jobName = isSubmit
+      ? QUEUE_FINALIZE_SUBMIT_JOB
+      : QUEUE_FINALIZE_RUN_JOB;
+    await this.finalizeQueue.add(
+      jobName,
+      { submissionId },
+      {
+        jobId: submissionId,
+        attempts: JOB_ATTEMPTS,
+        backoff: JOB_BACKOFF,
+        removeOnComplete: JOB_REMOVE_ON_COMPLETE,
+        removeOnFail: JOB_REMOVE_ON_FAIL,
+      },
+    );
+  }
+
+  private aggregateTestResults(
+    results: Record<string, string>,
+  ): TestResultDto[] {
+    return Object.values(results).map((r) => {
+      const testResult: Judge0Response = JSON.parse(r) as Judge0Response;
+      return this.submissionService.buildTestResult(testResult);
+    });
+  }
+
+  private async updateSubmissionEntity(
+    submissionId: string,
+    finalResult: SubmissionResultDto,
+  ) {
+    const savedSubmission = await this.submissionRepository.findOne({
+      where: { id: submissionId },
+    });
+    if (!savedSubmission) return;
+
+    savedSubmission.status = finalResult.status;
+    savedSubmission.score = finalResult.score;
+    savedSubmission.totalTests = finalResult.totalTests;
+    savedSubmission.passedTests = finalResult.passedTests;
+    savedSubmission.runtime = finalResult.runtime;
+    savedSubmission.memoryUsed = finalResult.memory;
+
+    await this.submissionRepository.save(savedSubmission);
+  }
+
+  private async cleanupRedisKeys(submissionId: string, keys: string[]) {
+    await Promise.all([
+      ...keys.map((k) => this.redis.del(k)),
+      this.redis.del(this.redisKeys.doneLock(submissionId)),
+    ]);
+  }
+
   private async evalAddResult(
     resultsIKey: string,
     metaKey: string,
@@ -146,46 +199,36 @@ export class CallbackProcessor implements OnModuleInit {
     const argv = [token, String(index), json];
 
     try {
-      const res = await (<Promise<string>>(
-        this.redis.evalsha(
-          this.luaShaAddResult,
+      const res = (await this.redis.evalsha(
+        this.luaShaAddResult,
+        3,
+        resultsIKey,
+        metaKey,
+        seenKey,
+        ...argv,
+      )) as string;
+      return [Number(res[0] ?? 0), Number(res[1] ?? 0), Number(res[2] ?? 0)];
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('NOSCRIPT')) {
+        const res = (await this.redis.eval(
+          LUA_ADD_RESULT_BY_INDEX,
           3,
           resultsIKey,
           metaKey,
           seenKey,
           ...argv,
-        )
-      ));
-
-      return [Number(res[0] ?? 0), Number(res[1] ?? 0), Number(res[2] ?? 0)];
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // Fall back to EVAL on NOSCRIPT
-      if (msg.includes('NOSCRIPT')) {
-        const res = await (<Promise<string>>(
-          this.redis.eval(
-            LUA_ADD_RESULT_BY_INDEX,
-            3,
-            resultsIKey,
-            metaKey,
-            seenKey,
-            ...argv,
-          )
-        ));
-        // Reload to restore sha
-        this.luaShaAddResult = await (<Promise<string>>(
-          this.redis.script('LOAD', LUA_ADD_RESULT_BY_INDEX)
-        ));
+        )) as string;
+        this.luaShaAddResult = (await this.redis.script(
+          'LOAD',
+          LUA_ADD_RESULT_BY_INDEX,
+        )) as string;
         return [Number(res[0] ?? 0), Number(res[1] ?? 0), Number(res[2] ?? 0)];
       }
       throw e;
     }
   }
 
-  /**
-   * Handle one Judge0 callback
-   * Always let controller return 204 so Judge0 won't retry.
-   */
   private async handleCallbackInternal(
     submissionId: string,
     index: number,
@@ -195,7 +238,6 @@ export class CallbackProcessor implements OnModuleInit {
     const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
     const seenKey = this.redisKeys.seen(submissionId);
 
-    // Keep the stored result compact. Add/remove fields as needed.
     const toStore = {
       index,
       token: payload.token,
@@ -217,7 +259,6 @@ export class CallbackProcessor implements OnModuleInit {
         index,
         JSON.stringify(toStore),
       );
-
       return { added: added === 1, received, total };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

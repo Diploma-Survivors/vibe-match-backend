@@ -7,7 +7,7 @@ export class TestResultDto {
     description: 'Program output',
     example: '8',
   })
-  stdout: string;
+  stdout?: string;
 
   @ApiProperty({
     description: 'Error output if any',
@@ -19,13 +19,13 @@ export class TestResultDto {
     description: 'Execution time in milliseconds',
     example: '0.123',
   })
-  time?: number;
+  time: number;
 
   @ApiProperty({
     description: 'Memory usage in MB',
     example: 128,
   })
-  memory?: number;
+  memory: number;
 
   @ApiProperty({
     description: 'Submission token in judge0 container',
@@ -38,4 +38,10 @@ export class TestResultDto {
     example: SubmissionStatus.ACCEPTED,
   })
   status: judge0Interface_1.Judge0Status;
+
+  @ApiProperty({
+    description: 'Expected output',
+    example: '3\n',
+  })
+  expectedOutput?: string;
 }

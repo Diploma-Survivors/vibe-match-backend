@@ -58,16 +58,19 @@ export class Judge0Service {
     return Buffer.from(data).toString('base64');
   }
 
-  decodeBase64(data?: string): string {
-    if (!data) return '';
+  decodeBase64(data?: string): string | undefined {
+    if (!data) return undefined;
     return Buffer.from(data, 'base64').toString('utf-8');
   }
 
-  getCallbackUrl(submissionId: string, testcaseId: string): string {
-    return `${this.publicUrl}/${this.apiVersion}/submissions/judge0/callback?sid=${submissionId}&tcid=${testcaseId}`;
-  }
-
-  normalizeOutput(output: string = ''): string {
-    return output.replace(/\r\n/g, '\n').replace(/\s+$/g, '');
+  getCallbackUrl(
+    submissionId: string,
+    testcaseId: string,
+    isSubmit: boolean,
+  ): string {
+    if (isSubmit) {
+      return `${this.publicUrl}/${this.apiVersion}/submissions/judge0/callback/submit?sid=${submissionId}&tcid=${testcaseId}`;
+    }
+    return `${this.publicUrl}/${this.apiVersion}/submissions/judge0/callback/run?sid=${submissionId}&tcid=${testcaseId}`;
   }
 }

@@ -2,8 +2,8 @@ import {
   Inject,
   Injectable,
   Logger,
-  OnModuleInit,
   MessageEvent,
+  OnModuleInit,
 } from '@nestjs/common';
 import { Observable, ReplaySubject } from 'rxjs';
 import { Redis } from 'ioredis';
@@ -21,7 +21,7 @@ export class SubmissionsSseService implements OnModuleInit {
   private sub: Redis;
 
   private readonly streams = new Map<string, ReplaySubject<MessageEvent>>();
-  // fallback to cleanup if client disconnects wrongly (no proper SSE close - currently we not support Fastify onClose, only Express)
+
   private readonly cleanupTimers = new Map<string, NodeJS.Timeout>();
   private readonly cleanupMs = SUBMISSION_CLEANUP_STREAM_TIME;
 

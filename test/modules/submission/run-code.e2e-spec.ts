@@ -9,6 +9,8 @@ import { Problem } from '../../../src/modules/problems/entities/problem.entity';
 import { DifficultyLevel } from '../../../src/modules/problems/enums/difficulty-level.enum';
 import { DataSource } from 'typeorm';
 import * as process from 'node:process';
+import { SUBMISSION_RESULT_EVENT } from '../../../src/common/constants/submission.constant';
+import { SubmissionStatus } from '../../../src/modules/submission/enums/submission.enum';
 
 describe('SubmissionController (e2e)', () => {
   let app: INestApplication;
@@ -48,11 +50,11 @@ describe('SubmissionController (e2e)', () => {
 
     const sample1 = Object.assign(new TestcaseSample(), {
       input: '1 2',
-      output: '3',
+      output: '3\n',
     });
     const sample2 = Object.assign(new TestcaseSample(), {
       input: '42 58',
-      output: '100',
+      output: '100\n',
     });
 
     const problem = problemRepo.create({
@@ -107,7 +109,7 @@ print(a + b)
         console.log(`Connecting to SSE stream at: ${url}`);
         const es = new EventSource(url);
 
-        es.addEventListener('result', (event) => {
+        es.addEventListener(SUBMISSION_RESULT_EVENT, (event) => {
           es.close();
           try {
             const data = JSON.parse(event.data);
@@ -126,12 +128,14 @@ print(a + b)
 
     // 5) Await final SSE result
     const finalResult = await finalResultPromise;
-    console.log(finalResult);
+    console.log(JSON.stringify(finalResult, null, 2));
 
     // 6) Assert final status
     expect(finalResult).toBeDefined();
-    expect(finalResult.status).toBe('ACCEPTED');
+    expect(finalResult.status).toBe(SubmissionStatus.ACCEPTED);
     expect(finalResult.totalTests).toBe(2);
     expect(finalResult.passedTests).toBe(2);
+
+    // delay(50000); // for sse browser testing -> click on the URL output in the console when debugging
   }, 60000);
 });

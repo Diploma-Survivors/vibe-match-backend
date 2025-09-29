@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class RedisKeys {
-  private prefix = 'judge:sub';
+  private readonly prefix = 'judge:sub';
 
   meta(submissionId: string) {
     return `${this.prefix}:{${submissionId}}:meta`;
