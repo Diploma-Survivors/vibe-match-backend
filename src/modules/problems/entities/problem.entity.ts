@@ -24,6 +24,8 @@ import { ProblemTopic } from './problem-topic.entity';
 @Entity({
   name: 'problems',
 })
+@Index('idx_problem_created_at', ['createdAt', 'id'])
+@Index('idx_problem_title', ['title', 'id'])
 export class Problem {
   @PrimaryColumn('uuid', { nullable: false, name: 'problem_id' })
   @Generated('uuid')
@@ -70,7 +72,7 @@ export class Problem {
   })
   courseProblems: CourseProblem[];
 
-  @Index()
+  @Index({ unique: false })
   @ManyToOne(() => User)
   @JoinColumn({ name: 'author_id' })
   author: User;
@@ -100,9 +102,17 @@ export class Problem {
   })
   contestProblems: ContestProblem[] | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamp with time zone',
+    precision: 3,
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamp with time zone',
+    precision: 3,
+  })
   updatedAt: Date;
 }
