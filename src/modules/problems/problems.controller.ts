@@ -18,12 +18,17 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { Environment } from 'src/common/enums/environment.enum';
+import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
+import { CreateProblemBulkDto } from './dto/create-problem-bulk.dto';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
+import { QueryProblemsDto } from './dto/query-problems.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { ProblemsService } from './problems.service';
 
@@ -36,7 +41,6 @@ export class ProblemsController {
   @Post()
   @ApiOperation({ summary: 'Create a problem (Instructor only)' })
   @ApiResponse({
-    type: () => CreateProblemResponseDto,
     status: HttpStatus.CREATED,
     description: 'The problem has been created.',
   })
@@ -53,7 +57,7 @@ export class ProblemsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all problems' })
+  @ApiOperation({ summary: 'Get list problems' })
   @ApiResponse({
     type: () => [CreateProblemResponseDto],
     status: HttpStatus.OK,
@@ -61,8 +65,8 @@ export class ProblemsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
-  async findAll() {
-    return await this.problemsService.findAll();
+  async find(@Body() query: QueryProblemsDto) {
+    return await this.problemsService.find(query);
   }
 
   @Get(':id')
@@ -79,7 +83,43 @@ export class ProblemsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
-    return await this.problemsService.findById(id);
+    return await this.problemsService.findById(id, {
+      id: true,
+      title: true,
+      description: true,
+      inputDescription: true,
+      outputDescription: true,
+      maxScore: true,
+      timeLimitMs: true,
+      memoryLimitKb: true,
+      difficulty: true,
+      type: true,
+      createdAt: true,
+      updatedAt: true,
+    });
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Create multiple problems (Instructor only)' })
+  @ApiResponse({
+    type: () => [CreateProblemResponseDto],
+    status: HttpStatus.CREATED,
+    description: 'The problems have been created.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard, EnvironmentGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
+  @Roles(RoleEnum.INSTRUCTOR)
+  @EnvGuard(Environment.DEVELOPMENT)
+  async createBulk(
+    @Body() createProblemBulkDto: CreateProblemBulkDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const problems = await this.problemsService.createBulk(
+      createProblemBulkDto.problems,
+      user,
+    );
+    return problems.map((problem) => new CreateProblemResponseDto(problem));
   }
 
   @Patch(':id')

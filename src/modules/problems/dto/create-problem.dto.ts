@@ -48,7 +48,7 @@ export class CreateProblemDto {
   })
   @IsString()
   @IsNotEmpty({ message: 'Input description is required' })
-  @MinLength(8, {
+  @MinLength(3, {
     message: 'Input description must be at least 8 characters long',
   })
   @MaxLength(512, {
@@ -63,8 +63,8 @@ export class CreateProblemDto {
   })
   @IsString()
   @IsNotEmpty({ message: 'Output description is required' })
-  @MinLength(3, {
-    message: 'Output description must be at least 3 characters long',
+  @MinLength(1, {
+    message: 'Output description must be at least 1 characters long',
   })
   @MaxLength(512, {
     message: 'Output description must be at most 512 characters long',
