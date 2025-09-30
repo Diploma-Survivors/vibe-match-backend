@@ -18,6 +18,11 @@ export class TagsService {
     return await this.tagsRepository.save(tag);
   }
 
+  async createBulk(createTagDtos: CreateTagDto[]) {
+    const tags = this.tagsRepository.create(createTagDtos);
+    return await this.tagsRepository.save(tags);
+  }
+
   async findAll() {
     return await this.tagsRepository.find();
   }

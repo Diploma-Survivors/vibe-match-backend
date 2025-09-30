@@ -24,6 +24,10 @@ import { CreateTagResponseDto } from './dto/create-tag-response.dto';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { TagsService } from './tags.service';
+import { CreateTagBulkDto } from './dto/create-tag-bulk.dto';
+import { EnvironmentGuard } from 'src/common/guards/environment.guard';
+import { EnvGuard } from 'src/common/decorators/env.decorator';
+import { Environment } from 'src/common/enums/environment.enum';
 
 @ApiTags('Tags')
 @ApiCookieAuth('access_token')
@@ -45,6 +49,23 @@ export class TagsController {
   async create(@Body() createTagDto: CreateTagDto) {
     const tag = await this.tagsService.create(createTagDto);
     return new CreateTagResponseDto(tag);
+  }
+
+  @Post('bulk')
+  @ApiOperation({
+    summary: 'Create multiple tags in bulk ',
+  })
+  @ApiResponse({
+    type: () => [CreateTagResponseDto],
+    status: HttpStatus.CREATED,
+    description: 'The tags have been successfully created.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard, EnvironmentGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  @EnvGuard(Environment.DEVELOPMENT)
+  async createBulk(@Body() createTagBulkDto: CreateTagBulkDto) {
+    return this.tagsService.createBulk(createTagBulkDto.tags);
   }
 
   @Get()
