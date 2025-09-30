@@ -41,7 +41,7 @@ export class RefreshToken {
     description: 'Refresh token expiration timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp with time zone' })
   expiresAt: Date;
 
   @ApiProperty({
@@ -49,14 +49,17 @@ export class RefreshToken {
     example: '2024-01-01T00:00:00.000Z',
     nullable: true,
   })
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp with time zone', nullable: true })
   revokedAt: Date | null;
 
   @ApiProperty({
     description: 'Refresh token creation timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
   @ApiProperty({
@@ -64,7 +67,7 @@ export class RefreshToken {
     example: '2024-01-01T00:00:00.000Z',
   })
   @Column({
-    type: 'timestamp',
+    type: 'timestamp with time zone',
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })

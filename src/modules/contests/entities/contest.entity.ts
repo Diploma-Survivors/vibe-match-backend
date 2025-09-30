@@ -2,12 +2,14 @@ import { Course } from 'src/modules/course/entities/course.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { ContestStatus } from '../enums/contest-status.enum';
 import { ContestProblem } from './contest-problem.entity';
@@ -40,12 +42,12 @@ export class Contest {
   })
   status: ContestStatus;
 
-  @Index()
+  @Index({ unique: false })
   @ManyToOne(() => Course)
   @JoinColumn({ name: 'course_id' })
   course: Course;
 
-  @Index()
+  @Index({ unique: false })
   @ManyToOne(() => User)
   @JoinColumn({ name: 'author_id' })
   author: User;
@@ -54,4 +56,10 @@ export class Contest {
     cascade: true,
   })
   contestProblems: ContestProblem[];
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
+  updatedAt: Date;
 }
