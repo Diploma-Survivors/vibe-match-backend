@@ -40,11 +40,13 @@ export const LTI_VERSIONS = {
   V1_3: '1.3.0',
 };
 
+/* NOSONAR */
 export const LTI_ROLES = {
   STUDENT: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Learner',
   INSTRUCTOR: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor',
   TEACHING_ASSISTANT:
     'http://purl.imsglobal.org/vocab/lis/v2/membership#TeachingAssistant',
 };
+/* NOSONAR */
 
 export const LTI_ROLES_ARRAY = Object.values(LTI_ROLES);
