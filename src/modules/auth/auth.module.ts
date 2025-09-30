@@ -8,6 +8,10 @@ import { Auth } from './entities/auth.entity';
 import { JwtAuthService } from './jwt-auth.service';
 import { UserModule } from '../user/user.module';
 import { RefreshTokenModule } from './refresh-token.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtAuthStrategy } from './strategies/jwt-auth.strategy';
+import { RedisModule } from 'src/shared/redis/redis.module';
+import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 
 @Module({
   imports: [
@@ -29,9 +33,17 @@ import { RefreshTokenModule } from './refresh-token.module';
       }),
       inject: [ConfigService],
     }),
+    PassportModule,
+    RedisModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthService, Logger],
-  exports: [AuthService, JwtAuthService],
+  providers: [
+    AuthService,
+    JwtAuthService,
+    Logger,
+    JwtAuthStrategy,
+    JwtRefreshStrategy,
+  ],
+  exports: [AuthService, JwtAuthService, JwtAuthStrategy, JwtRefreshStrategy],
 })
 export class AuthModule {}

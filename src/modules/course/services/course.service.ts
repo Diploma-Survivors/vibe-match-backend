@@ -1,12 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { IdTokenPayloadDto } from 'src/modules/lti/dto/id-token-payload.dto';
 import { Repository } from 'typeorm';
 import { Course } from '../entities/course.entity';
-import {
-  LtiClaims,
-  LtiContextClaim,
-} from '../../../modules/lti/interfaces/lti.interface';
-import { LTI_CLAIMS } from '../../../modules/lti/constants/lti.constants';
 
 @Injectable()
 export class CourseService {
@@ -18,9 +14,9 @@ export class CourseService {
   ) {}
 
   public async findOrCreateByLtiContextClaims(
-    claims: LtiClaims,
+    claims: IdTokenPayloadDto,
   ): Promise<Course> {
-    const ltiContextClaim = claims[LTI_CLAIMS.CONTEXT] as LtiContextClaim;
+    const ltiContextClaim = claims.context;
     const ltiPlatformId = claims.iss;
     const ltiCourseId = ltiContextClaim.id;
 

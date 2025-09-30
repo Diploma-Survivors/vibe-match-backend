@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   Unique,
+  CreateDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { Course } from '../../course/entities/course.entity';
@@ -16,24 +17,24 @@ import { RoleEnum } from '../../user/enums/role.enum';
 export class UserCourse {
   @ApiProperty({
     description: 'UserCourse unique identifier',
-    example: 1,
+    example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid', { name: 'user_course_id' })
+  id: string;
 
   @ApiProperty({
     description: 'User ID',
-    example: 1,
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @Column()
-  userId: number;
+  userId: string;
 
   @ApiProperty({
     description: 'Course ID',
-    example: 1,
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @Column()
-  courseId: number;
+  courseId: string;
 
   @ApiProperty({
     description: 'Roles of the user in this course',
@@ -56,6 +57,6 @@ export class UserCourse {
     description: 'Enrollment timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   enrolledAt: Date;
 }

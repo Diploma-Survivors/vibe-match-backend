@@ -1,31 +1,42 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
-  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
-import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
-import {
-  LTI_CLAIMS,
-  LTI_MESSAGE_TYPES,
-  LTI_VERSIONS,
-} from './constants/lti.constants';
-import { LtiClaims, LtiContextClaim } from './interfaces/lti.interface';
-import { RedisService } from '../../shared/redis/redis.service';
-import { UserService } from '../../modules/user/user.service';
 import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
-import { RefreshTokenService } from '../../modules/auth/services/refresh-token.service'; // Import RefreshTokenService
 import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
+import { UserService } from '../../modules/user/user.service';
+import { RedisService } from '../../shared/redis/redis.service';
+import { LTI_VERSIONS } from './constants/lti.constants';
+import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
+import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
+import {
+  LtiClaims,
+  LtiLaunchResponse,
+  LtiStatePayload,
+  TokenResponse,
+} from './interfaces/lti.interface';
 
+import { plainToInstance } from 'class-transformer';
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { Course } from '../course/entities/course.entity';
+import { User } from '../user/entities/user.entity';
+import { RoleEnum } from '../user/enums/role.enum';
+import { IdTokenPayloadDto } from './dto/id-token-payload.dto';
+import { LtiDeepLinkingRequestDto } from './dto/lti-deep-linking-request.dto';
+import { LtiDeepLinkingJwtPayloadDto } from './dto/lti-deep-linking-response.dto';
+import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
+import { ContentItemType } from './enums/content-item-type.enum';
+import { LtiMessageType } from './enums/lti-message-type.enum';
+import { KeysService } from './keys.service';
 
 const LTI_STATE_TTL_SECONDS = 300;
-const FRONTEND_AUTH_CALLBACK_URL = 'http://localhost:3001/problems';
+const LTI_DEEP_LINKING_TIMEOUT_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class LtiService {
@@ -36,9 +47,9 @@ export class LtiService {
     private readonly redisService: RedisService,
     private readonly userService: UserService,
     private readonly jwtAuthService: JwtAuthService,
-    private readonly refreshTokenService: RefreshTokenService,
     private readonly courseService: CourseService,
     private readonly userCourseService: UserCourseService,
+    private readonly keysService: KeysService,
   ) {}
 
   public async handleLoginInitiation(
@@ -59,13 +70,15 @@ export class LtiService {
 
     const stateData = {
       nonce,
-      target_link_uri: targetLinkUri,
-      lti_message_hint: ltiMessageHint,
-    };
+      targetLinkUri,
+      ltiMessageHint,
+    } as LtiStatePayload;
+    const key = this.getStateRedisKey(state);
+
     await this.redisService.set(
-      `lti:state:${state}`,
+      key,
       JSON.stringify(stateData),
-      LTI_STATE_TTL_SECONDS,
+      LTI_STATE_TTL_SECONDS * 1000,
     );
     this.logger.log(
       `Stored state '${state}' in Redis: ${JSON.stringify(stateData)}`,
@@ -75,15 +88,12 @@ export class LtiService {
       'lti.authenticationRequestUrl',
     ) as string;
     const clientId = this.configService.get<string>('lti.clientId') as string;
-    const toolRedirectionUri = this.configService.get<string>(
-      'lti.toolRedirectionUri',
-    ) as string;
 
     const redirectUrl = new URL(authenticationRequestUrl);
     redirectUrl.searchParams.append('scope', 'openid');
     redirectUrl.searchParams.append('response_type', 'id_token');
     redirectUrl.searchParams.append('client_id', clientId);
-    redirectUrl.searchParams.append('redirect_uri', toolRedirectionUri);
+    redirectUrl.searchParams.append('redirect_uri', targetLinkUri);
     redirectUrl.searchParams.append('lti_message_hint', ltiMessageHint || '');
     redirectUrl.searchParams.append('state', state);
     redirectUrl.searchParams.append('response_mode', 'form_post');
@@ -91,37 +101,337 @@ export class LtiService {
     redirectUrl.searchParams.append('prompt', 'none');
     redirectUrl.searchParams.append('login_hint', loginHint);
 
-    this.logger.log(
-      `Redirecting to Moodle with URL: ${redirectUrl.toString()}`,
-    );
+    this.logger.log(`Redirecting to LMS with URL: ${redirectUrl.toString()}`);
     return redirectUrl.toString();
   }
 
   public async handleLtiLaunch(
     ltiLaunchRequestDto: LtiLaunchRequestDto,
-  ): Promise<string> {
-    const { idToken, state } = ltiLaunchRequestDto;
+  ): Promise<LtiLaunchResponse> {
+    const nonce = await this.validateAndGetNonceFromState(
+      ltiLaunchRequestDto.state,
+    );
 
-    // Verify state
+    const claims = await this.getAndValidateClaims(
+      ltiLaunchRequestDto.idToken,
+      LtiMessageType.LTI_RESOURCE_LINK_REQUEST,
+      nonce,
+    );
+
+    const problemId = claims.customClaims?.['problemId'] as string;
+    if (!problemId) {
+      throw new BadRequestException('Missing required custom claim: problemId');
+    }
+
+    const user = await this.upsertUserFromClaims(claims);
+
+    const course = await this.processCourseAndEnrollUser(claims, user);
+
+    const tokens = await this.issueTokens(user, claims, course);
+
+    return {
+      ...tokens,
+      ...this.getRedirectTargetForFrontend(user.roles, problemId),
+    };
+  }
+
+  public async handleDeepLinkingRequest(
+    ltiDeepLinkingDto: LtiDeepLinkingRequestDto,
+  ): Promise<LtiLaunchResponse> {
+    const nonce = await this.validateAndGetNonceFromState(
+      ltiDeepLinkingDto.state,
+    );
+
+    const claims = await this.getAndValidateClaims(
+      ltiDeepLinkingDto.idToken,
+      LtiMessageType.LTI_DEEP_LINKING_REQUEST,
+      nonce,
+    );
+
+    const clientId = this.configService.get<string>('lti.clientId');
+
+    if (claims.azp && claims.azp !== clientId) {
+      throw new UnauthorizedException('Invalid authorized party (azp) claim');
+    }
+
+    const user = await this.upsertUserFromClaims(claims);
+
+    const course = await this.processCourseAndEnrollUser(claims, user);
+
+    const tokens = await this.issueTokens(user, claims, course);
+
+    const deepLinkingSettings = claims.deepLinkingSettings;
+    const isAcceptLtiResourceLink = deepLinkingSettings.acceptTypes?.includes(
+      ContentItemType.LTI_RESOURCE_LINK,
+    );
+    if (!isAcceptLtiResourceLink) {
+      throw new BadRequestException(
+        'LTI platform does not accept LTI Resource Link content items',
+      );
+    }
+
+    const deepLinkingData = {
+      deepLinkReturnUrl: deepLinkingSettings.deepLinkReturnUrl,
+      data: deepLinkingSettings?.data,
+      nonce,
+      azp: claims?.azp,
+    };
+    this.logger.log(
+      `Storing deep linking data for deviceId ${tokens.deviceId}: ${JSON.stringify(
+        deepLinkingData,
+      )}`,
+    );
+
+    const keyRedis = this.getKeyRedisForDeepLinking(tokens.deviceId);
+    await this.redisService.set(keyRedis, JSON.stringify(deepLinkingData));
+
+    setTimeout(() => {
+      (async () => {
+        const deepLinkingData = await this.redisService.get(keyRedis);
+        if (deepLinkingData) {
+          await this.redisService.del(keyRedis);
+
+          await this.handleDeepLinkingResponse(tokens.deviceId);
+        }
+      })().catch((error) => {
+        this.logger.error(
+          `Deep linking timeout handler failed: ${(error as Error).message}`,
+        );
+      });
+    }, LTI_DEEP_LINKING_TIMEOUT_MS);
+
+    const redirectPath = this.configService.get<string>(
+      'lti.frontendCallbackUrl.deepLinking',
+    ) as string;
+
+    const postRedirectUrl = this.configService.get<string>(
+      'lti.frontendSetCookiesUrl.student',
+    ) as string;
+
+    return {
+      ...tokens,
+      redirectPath,
+      postRedirectUrl,
+    };
+  }
+
+  public async handleDeepLinkingResponse(
+    deviceId: string,
+    ltiResourceLinkDto?: LtiResourceLinkDto,
+  ) {
+    const url = this.configService.get<string>('lti.toolRedirectionUri');
+    const ltiResourceLinks = ltiResourceLinkDto
+      ? [
+          new LtiResourceLinkDto({
+            ...ltiResourceLinkDto,
+            type: ContentItemType.LTI_RESOURCE_LINK,
+            url,
+          }),
+        ]
+      : [];
+
+    const keyRedis = this.getKeyRedisForDeepLinking(deviceId);
+    const deepLinkingDataString = await this.redisService.get(keyRedis);
+    if (!deepLinkingDataString) {
+      throw new BadRequestException(
+        'Deep linking session not found or expired',
+      );
+    }
+    await this.redisService.del(keyRedis);
+
+    const deepLinkingData = JSON.parse(deepLinkingDataString) as {
+      deepLinkReturnUrl: string;
+      data?: string;
+      nonce: string;
+      azp?: string;
+    };
+    const clientId = this.configService.get<string>('lti.clientId');
+    const platformId = this.configService.get<string>('lti.platformId');
+    const deploymentId = this.configService.get<string>('lti.deploymentId');
+
+    const jwtPayload = new LtiDeepLinkingJwtPayloadDto({
+      iss: clientId,
+      aud: platformId,
+      nonce: deepLinkingData.nonce,
+      azp: deepLinkingData?.azp,
+      messageType: LtiMessageType.LTI_DEEP_LINKING_RESPONSE,
+      version: LTI_VERSIONS.V1_3,
+      deploymentId,
+      data: deepLinkingData?.data,
+      contentItems: ltiResourceLinks,
+    });
+
+    const jwt = await this.keysService.generateDeepLinkingJwt(jwtPayload);
+
+    return {
+      jwt,
+      deepLinkReturnUrl: deepLinkingData.deepLinkReturnUrl,
+    };
+  }
+
+  private issueTokens(
+    user: User,
+    claims: IdTokenPayloadDto,
+    course?: Course | null,
+  ) {
+    return this.generateTokensForUser({
+      userId: user.id,
+      courseId: course?.id || undefined,
+      email: user.email || undefined,
+      firstName: user.firstName || undefined,
+      lastName: user.lastName || undefined,
+      roles: user.roles,
+      sub: claims.sub,
+      iss: claims.iss,
+    });
+  }
+
+  private async processCourseAndEnrollUser(
+    claims: IdTokenPayloadDto,
+    user: User,
+  ): Promise<Course | null> {
+    if (!claims.context) {
+      return null;
+    }
+
+    try {
+      const course =
+        await this.courseService.findOrCreateByLtiContextClaims(claims);
+      this.logger.log(
+        `LTI Launch: Course processed in DB: ID ${course.id}, Title ${course.title}`,
+      );
+
+      await this.userCourseService.enrollUserInCourse(user, course, user.roles);
+      this.logger.log(
+        `LTI Launch: User ${user.id} enrolled in course ${course.id} with roles: ${user.roles.join(', ')}`,
+      );
+
+      return course;
+    } catch (error) {
+      this.logger.error(
+        `Failed to process LTI course or enroll user: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
+  private async upsertUserFromClaims(claims: IdTokenPayloadDto): Promise<User> {
+    const user = await this.userService.findOrCreateByLtiClaims(claims);
+    this.logger.log(
+      `LTI Launch: User processed in DB: ID ${user.id}, Email ${user.email}`,
+    );
+    return user;
+  }
+
+  private async getAndValidateClaims(
+    idToken: string,
+    expectedMessageType: LtiMessageType,
+    nonce: string,
+  ): Promise<IdTokenPayloadDto> {
+    const decodedJwt = await this.verifyJwtFromPlatform(idToken);
+
+    const claims = this.transformIdTokenPayload(
+      decodedJwt.payload as LtiClaims,
+    );
+
+    if (claims.version !== LTI_VERSIONS.V1_3) {
+      throw new BadRequestException('Unsupported LTI version');
+    }
+
+    if (claims.messageType !== expectedMessageType) {
+      throw new BadRequestException('Unsupported LTI message type');
+    }
+
+    if (claims.nonce !== nonce) {
+      throw new UnauthorizedException('Invalid nonce');
+    }
+
+    return claims;
+  }
+
+  private async validateAndGetNonceFromState(state: string): Promise<string> {
+    const parsedState = await this.getStateFromRedis(state);
+    return parsedState.nonce;
+  }
+
+  private getStateRedisKey(state: string): string {
+    return `lti:state:${state}`;
+  }
+
+  private getRedirectTargetForFrontend(
+    roles: RoleEnum[],
+    problemId: string,
+  ): { redirectPath: string; postRedirectUrl: string } {
+    let baseUrl = '';
+    let postRedirectUrl = '';
+
+    if (roles.includes(RoleEnum.INSTRUCTOR)) {
+      baseUrl = this.configService.get<string>(
+        'lti.frontendCallbackUrl.instructor',
+      ) as string;
+      postRedirectUrl = this.configService.get<string>(
+        'lti.frontendSetCookiesUrl.instructor',
+      ) as string;
+    } else {
+      baseUrl = this.configService.get<string>(
+        'lti.frontendCallbackUrl.student',
+      ) as string;
+      postRedirectUrl = this.configService.get<string>(
+        'lti.frontendSetCookiesUrl.student',
+      ) as string;
+    }
+
+    return { redirectPath: `${baseUrl}/${problemId}`, postRedirectUrl };
+  }
+
+  private getKeyRedisForDeepLinking(deviceId: string): string {
+    return `lti:dl:${deviceId}`;
+  }
+
+  private async generateTokensForUser(
+    payload: JwtPayload,
+  ): Promise<TokenResponse> {
+    const accessToken = await this.jwtAuthService.generateAccessToken(payload);
+    this.logger.log('LTI Launch: Generated Access Token.');
+
+    const deviceId = await this.jwtAuthService.generateDeviceId();
+    const refreshToken = await this.jwtAuthService.generateRefreshToken(
+      payload,
+      deviceId,
+    );
+    this.logger.log('LTI Launch: Generated Refresh Token and stored in DB.');
+
+    return {
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      deviceId: deviceId,
+    };
+  }
+
+  private transformIdTokenPayload(payload: LtiClaims): IdTokenPayloadDto {
+    const claims = plainToInstance(IdTokenPayloadDto, payload);
+    return claims;
+  }
+
+  private async getStateFromRedis(state: string): Promise<LtiStatePayload> {
     const storedStateString = await this.redisService.get(`lti:state:${state}`);
     if (!storedStateString) {
       throw new UnauthorizedException(
         'Invalid or expired state parameter (CSRF protection failed)',
       );
     }
-    const parsedState = JSON.parse(storedStateString) as {
-      nonce: string;
-      target_link_uri: string;
-      lti_message_hint?: string;
-    };
+    const parsedState = JSON.parse(storedStateString) as LtiStatePayload;
     await this.redisService.del(`lti:state:${state}`);
     this.logger.log(
       `Retrieved state '${state}' from Redis: ${JSON.stringify(parsedState)}`,
     );
 
-    const { nonce } = parsedState;
+    return parsedState;
+  }
 
-    // Verify JWT from platform
+  private async verifyJwtFromPlatform(
+    idToken: string,
+  ): Promise<jose.JWTVerifyResult> {
     const platformPublicKeysetUrl = this.configService.get<string>(
       'lti.publicKeysetUrl',
     ) as string;
@@ -138,84 +448,13 @@ export class LtiService {
         issuer: platformId,
         clockTolerance: 5,
       });
+
+      return decodedJwt;
     } catch (error) {
       this.logger.error(`JWT verification failed: ${(error as Error).message}`);
       throw new UnauthorizedException(
         `JWT verification failed: ${(error as Error).message}`,
       );
     }
-
-    const claims = decodedJwt.payload as LtiClaims;
-
-    if (claims[LTI_CLAIMS.VERSION] !== LTI_VERSIONS.V1_3) {
-      throw new BadRequestException('Unsupported LTI version');
-    }
-
-    if (
-      claims[LTI_CLAIMS.MESSAGE_TYPE] !==
-      LTI_MESSAGE_TYPES.LTI_RESOURCE_LINK_REQUEST
-    ) {
-      throw new BadRequestException('Unsupported LTI message type');
-    }
-
-    if (claims.nonce !== nonce) {
-      throw new UnauthorizedException('Invalid nonce');
-    }
-
-    // Upsert user
-    const user = await this.userService.findOrCreateByLtiClaims(claims);
-    this.logger.log(
-      `LTI Launch: User processed in DB: ID ${user.id}, Email ${user.email}`,
-    );
-
-    // Process course
-    const ltiContextClaim = claims[LTI_CLAIMS.CONTEXT] as LtiContextClaim;
-    let course: Course | null = null;
-
-    if (ltiContextClaim) {
-      try {
-        course =
-          await this.courseService.findOrCreateByLtiContextClaims(claims);
-        this.logger.log(
-          `LTI Launch: Course processed in DB: ID ${course.id}, Title ${course.title}`,
-        );
-
-        await this.userCourseService.enrollUserInCourse(
-          user,
-          course,
-          user.roles,
-        );
-        this.logger.log(
-          `LTI Launch: User ${user.id} enrolled in course ${course.id} with roles: ${user.roles.join(', ')}`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Failed to process LTI course or enroll user: ${(error as Error).message}`,
-        );
-      }
-    }
-
-    const internalJwtPayload = {
-      userId: user.id,
-      email: user.email || undefined,
-      firstName: user.firstName || undefined,
-      lastName: user.lastName || undefined,
-      roles: user.roles,
-      sub: claims.sub,
-      iss: claims.iss,
-    };
-    const accessToken =
-      this.jwtAuthService.generateAccessToken(internalJwtPayload);
-    this.logger.log('LTI Launch: Generated Access Token.');
-
-    const refreshToken =
-      await this.refreshTokenService.createRefreshToken(user);
-    this.logger.log('LTI Launch: Generated Refresh Token and stored in DB.');
-
-    return JSON.stringify({
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-      redirectPath: FRONTEND_AUTH_CALLBACK_URL,
-    });
   }
 }

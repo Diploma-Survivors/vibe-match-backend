@@ -34,14 +34,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   ) {
     const status = exception.getStatus();
     const message = exception.message;
-    const errorResponse = exception.getResponse() as Record<string, unknown>;
+    const errorResponse = exception.getResponse() as
+      | string
+      | Record<string, unknown>;
 
     this.logHttpException(exception, request);
 
     response.status(status).json({
       statusCode: status,
       message: message,
-      error: errorResponse?.message || errorResponse,
+      error:
+        typeof errorResponse === 'string'
+          ? errorResponse
+          : errorResponse?.message,
       timestamp: new Date().toISOString(),
       path: request.url,
     });
@@ -71,30 +76,39 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private logHttpException(
     exception: HttpException,
     request: Request,
-    cause?: Error,
     options?: Record<string, unknown>,
   ) {
+    const errorResponse = exception.getResponse();
+    const error =
+      typeof errorResponse === 'string'
+        ? errorResponse
+        : (errorResponse as Error)?.message || errorResponse;
+
     this.logger.error(
-      `HTTP Exception: ${exception.message}`,
-      {
+      `HTTP Exception: ${exception.message}\t
+      STACK: ${(exception as Error).stack}\t
+      INFO: ${JSON.stringify({
         statusCode: exception.getStatus(),
         path: request.url,
         method: request.method,
         userAgent: request.get('User-Agent'),
         ip: request.ip,
+        error,
         ...options,
-      },
-      cause,
+      })}`,
     );
   }
 
   private logSystemException(exception: unknown, request: Request) {
-    this.logger.error(`System Exception: ${(exception as Error).message}`, {
-      path: request.url,
-      method: request.method,
-      userAgent: request.get('User-Agent'),
-      ip: request.ip,
-      stack: (exception as Error).stack,
-    });
+    this.logger.error(
+      `System Exception: ${(exception as Error).message}\t
+      STACK: ${(exception as Error).stack}\t
+      INFO: ${JSON.stringify({
+        path: request.url,
+        method: request.method,
+        userAgent: request.get('User-Agent'),
+        ip: request.ip,
+      })}`,
+    );
   }
 }

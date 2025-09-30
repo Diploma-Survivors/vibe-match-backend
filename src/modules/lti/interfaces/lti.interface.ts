@@ -30,9 +30,11 @@ export interface LtiDeepLinkingSettingsClaim {
   accept_media_types?: string[];
   accept_presentation_document_targets?: string[];
   accept_multiple?: boolean;
+  accept_lineitem?: boolean;
   auto_create?: boolean;
   title?: string;
   text?: string;
+  data?: string;
 }
 
 export interface LtiClaims extends jose.JWTPayload {
@@ -65,4 +67,18 @@ export interface LtiLaunchResponse {
   accessToken: string;
   refreshToken: string;
   redirectPath: string;
+  postRedirectUrl: string;
+  deviceId: string;
+}
+
+export interface LtiStatePayload {
+  nonce: string;
+  targetLinkUri: string;
+  ltiMessageHint?: string;
+}
+
+export interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  deviceId: string;
 }

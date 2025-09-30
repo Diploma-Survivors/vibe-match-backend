@@ -2,6 +2,9 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import * as jose from 'jose';
+import { LtiDeepLinkingJwtPayloadDto } from './dto/lti-deep-linking-response.dto';
+import { instanceToPlain } from 'class-transformer';
+import { v4 as uuidV4 } from 'uuid';
 
 @Injectable()
 export class KeysService implements OnModuleInit {
@@ -28,7 +31,9 @@ export class KeysService implements OnModuleInit {
     privateKeyPath: string,
     publicKeyPath: string,
   ): Promise<void> {
-    const { publicKey, privateKey } = await jose.generateKeyPair('RS256');
+    const { publicKey, privateKey } = await jose.generateKeyPair('RS256', {
+      extractable: true,
+    });
 
     const spki = await jose.exportSPKI(publicKey);
     const pkcs8 = await jose.exportPKCS8(privateKey);
@@ -38,7 +43,12 @@ export class KeysService implements OnModuleInit {
     writeFileSync(privateKeyPath, pkcs8);
     writeFileSync(
       resolve(__dirname, '../../../public.json'),
-      JSON.stringify(jwk),
+      JSON.stringify({
+        ...jwk,
+        kid: uuidV4(),
+        alg: 'RS256',
+        use: 'sig',
+      }),
     );
   }
 
@@ -63,5 +73,28 @@ export class KeysService implements OnModuleInit {
 
   public getPublicKey(): string {
     return this.publicKey;
+  }
+
+  public async generateDeepLinkingJwt(
+    params: LtiDeepLinkingJwtPayloadDto,
+  ): Promise<string> {
+    const payload = instanceToPlain(params);
+
+    const privateKey = await jose.importPKCS8(this.privateKey, 'RS256');
+
+    const header = {
+      alg: 'RS256',
+      kid: this.jwk.kid,
+    };
+
+    const jwt = await new jose.SignJWT({
+      ...payload,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 5 * 60,
+    })
+      .setProtectedHeader(header)
+      .sign(privateKey);
+
+    return jwt;
   }
 }

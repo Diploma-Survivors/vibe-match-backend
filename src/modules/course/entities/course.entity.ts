@@ -1,15 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Unique,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity()
 @Unique(['ltiCourseId', 'ltiPlatformId'])
 export class Course {
   @ApiProperty({
     description: 'Course unique identifier',
-    example: 1,
+    example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid', { name: 'course_id' })
+  id: string;
 
   @ApiProperty({
     description: 'LTI Course ID from the LTI Platform',
@@ -37,17 +44,13 @@ export class Course {
     description: 'Course creation timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   createdAt: Date;
 
   @ApiProperty({
     description: 'Course last update timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @Column({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn()
   updatedAt: Date;
 }
