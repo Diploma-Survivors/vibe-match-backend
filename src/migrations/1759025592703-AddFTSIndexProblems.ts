@@ -5,11 +5,11 @@ export class AddFTSIndexProblems1759025592703 implements MigrationInterface {
     await queryRunner.query('CREATE EXTENSION IF NOT EXISTS unaccent;');
 
     await queryRunner.query(
-      'ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "tsv" tsvector',
+      'ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "tsv" tsvector;',
     );
 
     await queryRunner.query(`
-      CREATE FUNCTION problems_tsv_trigger() RETURNS trigger AS $$
+      CREATE OR REPLACE FUNCTION problems_tsv_trigger() RETURNS trigger AS $$
       BEGIN
         NEW.tsv :=
           to_tsvector(
