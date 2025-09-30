@@ -18,10 +18,10 @@ export class Tag {
   @Column('varchar', { nullable: false, unique: true })
   name: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
   updatedAt: Date;
 
   @OneToMany(() => ProblemTag, (problemTag) => problemTag.tag)
