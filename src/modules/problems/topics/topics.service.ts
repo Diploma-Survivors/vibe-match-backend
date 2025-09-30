@@ -17,6 +17,11 @@ export class TopicsService {
     return this.topicsRepository.save(topic);
   }
 
+  async createBulk(createTopicDtos: CreateTopicDto[]) {
+    const topics = this.topicsRepository.create(createTopicDtos);
+    return this.topicsRepository.save(topics);
+  }
+
   findAll() {
     return this.topicsRepository.find();
   }

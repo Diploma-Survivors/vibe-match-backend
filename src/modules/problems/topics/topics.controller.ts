@@ -24,6 +24,10 @@ import { CreateTopicResponseDto } from './dto/create-topic-response.dto';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { TopicsService } from './topics.service';
+import { CreateTopicBulkDto } from './dto/create-topic-bulk.dto';
+import { EnvironmentGuard } from 'src/common/guards/environment.guard';
+import { EnvGuard } from 'src/common/decorators/env.decorator';
+import { Environment } from 'src/common/enums/environment.enum';
 
 @ApiTags('Topics')
 @ApiCookieAuth('access_token')
@@ -45,6 +49,20 @@ export class TopicsController {
   async create(@Body() createTopicDto: CreateTopicDto) {
     const topic = await this.topicsService.create(createTopicDto);
     return new CreateTopicResponseDto(topic);
+  }
+
+  @Post('bulk')
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'The topics have been created.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @UseGuards(JwtAuthGuard, EnvironmentGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
+  @Roles(RoleEnum.INSTRUCTOR)
+  @EnvGuard(Environment.DEVELOPMENT)
+  async createBulk(@Body() createTopicBulkDto: CreateTopicBulkDto) {
+    return this.topicsService.createBulk(createTopicBulkDto.topics);
   }
 
   @Get()
