@@ -13,6 +13,6 @@ export default registerAs('database', function () {
     logging: process.env.NODE_ENV === 'development',
     entities: ['dist/**/*.entity{.ts,.js}'],
     migrations: ['dist/migrations/*{.ts,.js}'],
-    migrationsRun: true,
+    migrationsRun: process.env.DATABASE_MIGRATIONS_RUN === 'true',
   };
 });
