@@ -75,6 +75,8 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'The ID of the course the problem belongs to',
     example: 'course-123',
+    name: 'courseId',
+    type: 'string',
   })
   @Transform(({ value }: { value: Course }) => value?.id)
   @Expose({ name: 'courseId' })
@@ -83,6 +85,8 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'The ID of the author who created the problem',
     example: 'user-456',
+    name: 'authorId',
+    type: 'string',
   })
   @Transform(({ value }: { value: User }) => value?.id)
   @Expose({ name: 'authorId' })
@@ -91,6 +95,8 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'List of tag IDs associated with the problem',
     example: ['tag1', 'tag2'],
+    name: 'tagIds',
+    type: [String],
   })
   @Transform(({ value }: { value: ProblemTag[] }) =>
     value?.map((problemTag) => problemTag?.tag?.id),
@@ -101,6 +107,8 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'List of topic IDs associated with the problem',
     example: ['topic1', 'topic2'],
+    name: 'topicIds',
+    type: [String],
   })
   @Transform(({ value }: { value: ProblemTopic[] }) =>
     value?.map((problemTopic) => problemTopic?.topic?.id),
@@ -111,6 +119,8 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'The ID of the testcase associated with the problem',
     example: 'testcase-789',
+    name: 'testcaseId',
+    type: String,
   })
   @Transform(({ value }: { value: Testcase }) => value?.id)
   @Expose({ name: 'testcaseId' })
@@ -119,6 +129,8 @@ export class CreateProblemResponseDto {
   @ApiProperty({
     description: 'List of testcase sample IDs associated with the problem',
     example: ['sample1', 'sample2'],
+    name: 'testcaseSampleIds',
+    type: [String],
   })
   @Transform(({ value }: { value: TestcaseSample[] }) =>
     value?.map((sample) => sample?.id),

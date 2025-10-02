@@ -3,18 +3,15 @@ import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
-  IsNotEmpty,
-  IsNotEmptyObject,
   IsPositive,
-  IsString,
   IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
-import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
 import { ProblemType } from '../enums/problem-type.enum';
+import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
 
 export class CreateProblemDto {
   @ApiProperty({
@@ -22,8 +19,6 @@ export class CreateProblemDto {
     minLength: 3,
     maxLength: 128,
   })
-  @IsString()
-  @IsNotEmpty({ message: 'Title is required' })
   @MinLength(3, { message: 'Title must be at least 3 characters long' })
   @MaxLength(128, { message: 'Title must be at most 128 characters long' })
   title: string;
@@ -33,8 +28,6 @@ export class CreateProblemDto {
     minLength: 16,
     maxLength: 512,
   })
-  @IsString()
-  @IsNotEmpty({ message: 'Description is required' })
   @MinLength(16, { message: 'Description must be at least 16 characters long' })
   @MaxLength(512, {
     message: 'Description must be at most 512 characters long',
@@ -43,13 +36,11 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The input description of the problem',
-    minLength: 8,
+    minLength: 3,
     maxLength: 512,
   })
-  @IsString()
-  @IsNotEmpty({ message: 'Input description is required' })
   @MinLength(3, {
-    message: 'Input description must be at least 8 characters long',
+    message: 'Input description must be at least 3 characters long',
   })
   @MaxLength(512, {
     message: 'Input description must be at most 512 characters long',
@@ -58,11 +49,9 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The output description of the problem',
-    minLength: 3,
+    minLength: 1,
     maxLength: 512,
   })
-  @IsString()
-  @IsNotEmpty({ message: 'Output description is required' })
   @MinLength(1, {
     message: 'Output description must be at least 1 characters long',
   })
@@ -75,7 +64,6 @@ export class CreateProblemDto {
     description: 'The maximum score for the problem',
     minimum: 1,
   })
-  @IsNotEmpty()
   @IsPositive({ message: 'Max score must be a positive number' })
   maxScore: number;
 
@@ -83,7 +71,6 @@ export class CreateProblemDto {
     description: 'The time limit for the problem in milliseconds',
     minimum: 1,
   })
-  @IsNotEmpty()
   @IsPositive({ message: 'Time limit must be a positive number' })
   timeLimitMs: number;
 
@@ -91,7 +78,6 @@ export class CreateProblemDto {
     description: 'The memory limit for the problem in kilobytes',
     minimum: 1,
   })
-  @IsNotEmpty()
   @IsPositive({ message: 'Memory limit must be a positive number' })
   memoryLimitKb: number;
 
@@ -99,7 +85,6 @@ export class CreateProblemDto {
     description: 'The difficulty level of the problem',
     enum: DifficultyLevel,
   })
-  @IsNotEmpty()
   @IsEnum(DifficultyLevel, {
     message: 'Difficulty level must be a valid enum value',
   })
@@ -115,8 +100,10 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The IDs of the tags associated with the problem',
+    example: ['550e8400-e29b-41d4-a716-446655440000'],
     type: 'array',
     items: { type: 'string', format: 'uuid' },
+    name: 'tagIds',
   })
   @IsArray()
   @IsUUID('all', { each: true })
@@ -125,8 +112,10 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The IDs of the topics associated with the problem',
+    example: ['550e8400-e29b-41d4-a716-446655440000'],
     type: 'array',
     items: { type: 'string', format: 'uuid' },
+    name: 'topicIds',
   })
   @IsArray()
   @IsUUID('all', { each: true })
@@ -135,10 +124,11 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The ID of the test case associated with the problem',
+    example: '550e8400-e29b-41d4-a716-446655440000',
     type: 'string',
     format: 'uuid',
+    name: 'testcaseId',
   })
-  @IsNotEmpty()
   @IsUUID()
   @Expose({ name: 'testcaseId' })
   testcase: string;
@@ -147,9 +137,8 @@ export class CreateProblemDto {
     description: 'The IDs of the sample test cases associated with the problem',
     type: () => [CreateTestcaseSampleDto],
   })
-  @IsArray()
   @Type(() => CreateTestcaseSampleDto)
-  @IsNotEmptyObject({ nullable: false }, { each: true })
+  @IsArray()
   @ValidateNested({ each: true })
   testcaseSamples: CreateTestcaseSampleDto[];
 }

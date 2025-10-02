@@ -1,12 +1,17 @@
 import { Body, Controller, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { type JwtPayload } from '../auth/interfaces/jwt.interface';
-import { ContestsService } from './contests.service';
-import { CreateContestDto } from './dto/create-contest.dto';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
+import { ContestsService } from './contests.service';
+import { CreateContestDto } from './dto/create-contest.dto';
 
 @Controller('contests')
 @ApiTags('Contests')
@@ -20,11 +25,13 @@ export class ContestsController {
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Contest created successfully',
+    type: CreateContestDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input data',
   })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async createContest(
