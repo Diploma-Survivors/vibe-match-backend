@@ -2,8 +2,9 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
+import { Response } from 'express';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -54,11 +55,23 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup(swaggerEndpoint, app, document);
 
+  const env = configService.get<string>('appConfig.environment');
+  if (env !== 'production') {
+    app
+      .getHttpAdapter()
+      .get(`/${apiVersion}/swagger-json`, (_req, res: Response) => {
+        res.json(document);
+      });
+  }
+
   const port = (configService.get('appConfig.port') as number) || 3000;
   await app.listen(port);
   Logger.log(`Application is running on: http://localhost:${port}`);
   Logger.log(
     `Swagger documentation: http://localhost:${port}/${swaggerEndpoint}`,
+  );
+  Logger.log(
+    `You can use http://localhost:${port}/${apiVersion}/swagger-json to import the swagger document`,
   );
 }
 void bootstrap();
