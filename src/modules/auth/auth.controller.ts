@@ -12,13 +12,21 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtRefreshGuard } from 'src/common/guards/jwt-refresh.guard';
 import { JwtConfig } from '../../config/auth.config';
 import { AuthService } from './auth.service';
 import { CreateAuthDto } from './dto/create-auth.dto';
+import { LogoutResponseDto } from './dto/logout-response.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RefreshTokenResponseDto } from './dto/refresh-token.response.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import type { JwtPayload } from './interfaces/jwt.interface';
 import { JwtAuthService } from './jwt-auth.service';
@@ -34,16 +42,23 @@ export class AuthController {
   ) {}
 
   @Post('refresh')
-  @ApiOperation({ summary: 'Refreshes access and refresh tokens' })
-  @ApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
+  @ApiOperation({
+    summary: 'Refreshes access and refresh tokens',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tokens refreshed successfully',
+    type: () => RefreshTokenResponseDto,
+  })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - Invalid refresh token',
   })
+  @ApiBearerAuth()
   @UseGuards(JwtRefreshGuard)
   public async refreshTokens(
     @Res() res: Response,
-    @Body('deviceId') deviceId: string,
+    @Body() refreshTokenDto: RefreshTokenDto,
     @CurrentUser() jwtPayload: JwtPayload,
   ) {
     try {
@@ -51,7 +66,7 @@ export class AuthController {
         this.jwtAuthService.generateAccessToken(jwtPayload);
       const newRefreshToken = await this.jwtAuthService.generateRefreshToken(
         jwtPayload,
-        deviceId,
+        refreshTokenDto.deviceId,
       );
 
       const jwtConfig = this.configService.get<{
@@ -82,7 +97,12 @@ export class AuthController {
   @ApiOperation({
     summary: 'Logs out the user by revoking refresh token and clearing cookies',
   })
-  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+    type: () => LogoutResponseDto,
+  })
+  @ApiBearerAuth()
   @UseGuards(JwtRefreshGuard)
   public logout(@Res() res: Response) {
     res.status(200).send({ message: 'Logged out successfully' });
