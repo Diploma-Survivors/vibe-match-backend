@@ -12,25 +12,25 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import {
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { Environment } from 'src/common/enums/environment.enum';
+import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
+import { CreateTagBulkDto } from './dto/create-tag-bulk.dto';
 import { CreateTagResponseDto } from './dto/create-tag-response.dto';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { TagsService } from './tags.service';
-import { CreateTagBulkDto } from './dto/create-tag-bulk.dto';
-import { EnvironmentGuard } from 'src/common/guards/environment.guard';
-import { EnvGuard } from 'src/common/decorators/env.decorator';
-import { Environment } from 'src/common/enums/environment.enum';
 
 @ApiTags('Tags')
-@ApiCookieAuth('access_token')
 @Controller('tags')
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
@@ -43,6 +43,7 @@ export class TagsController {
     description: 'The tag has been successfully created.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
@@ -56,11 +57,13 @@ export class TagsController {
     summary: 'Create multiple tags in bulk ',
   })
   @ApiResponse({
-    type: () => [CreateTagResponseDto],
+    type: () => CreateTagResponseDto,
+    isArray: true,
     status: HttpStatus.CREATED,
     description: 'The tags have been successfully created.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, EnvironmentGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   @EnvGuard(Environment.DEVELOPMENT)
@@ -71,7 +74,8 @@ export class TagsController {
   @Get()
   @ApiOperation({ summary: 'Get all tags' })
   @ApiResponse({
-    type: () => [CreateTagResponseDto],
+    type: () => CreateTagResponseDto,
+    isArray: true,
     status: HttpStatus.OK,
     description: 'List of tags retrieved successfully.',
   })
@@ -81,16 +85,45 @@ export class TagsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a tag by ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Tag ID' })
+  @ApiResponse({
+    type: () => CreateTagResponseDto,
+    status: HttpStatus.OK,
+    description: 'The tag has been successfully retrieved.',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Tag not found.' })
   async findOne(@Param('id') id: string) {
     return await this.tagsService.findOne(id);
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a tag by ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Tag ID' })
+  @ApiResponse({
+    type: () => CreateTagResponseDto,
+    status: HttpStatus.OK,
+    description: 'The tag has been successfully updated.',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Tag not found.' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
   async update(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
     return await this.tagsService.update(id, updateTagDto);
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a tag by ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Tag ID' })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The tag has been successfully deleted.',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Tag not found.' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
   async remove(@Param('id') id: string) {
     return await this.tagsService.remove(id);
   }
