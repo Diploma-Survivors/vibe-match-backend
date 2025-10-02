@@ -12,25 +12,25 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import {
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { Environment } from 'src/common/enums/environment.enum';
+import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
+import { CreateTopicBulkDto } from './dto/create-topic-bulk.dto';
 import { CreateTopicResponseDto } from './dto/create-topic-response.dto';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { TopicsService } from './topics.service';
-import { CreateTopicBulkDto } from './dto/create-topic-bulk.dto';
-import { EnvironmentGuard } from 'src/common/guards/environment.guard';
-import { EnvGuard } from 'src/common/decorators/env.decorator';
-import { Environment } from 'src/common/enums/environment.enum';
 
 @ApiTags('Topics')
-@ApiCookieAuth('access_token')
 @Controller('topics')
 export class TopicsController {
   constructor(private readonly topicsService: TopicsService) {}
@@ -43,6 +43,7 @@ export class TopicsController {
     description: 'The topic has been created.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
@@ -52,11 +53,15 @@ export class TopicsController {
   }
 
   @Post('bulk')
+  @ApiOperation({ summary: 'Create topics in bulk (development only)' })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'The topics have been created.',
+    type: () => CreateTopicResponseDto,
+    isArray: true,
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, EnvironmentGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
@@ -68,7 +73,8 @@ export class TopicsController {
   @Get()
   @ApiOperation({ summary: 'Get all topics' })
   @ApiResponse({
-    type: () => [CreateTopicResponseDto],
+    type: () => CreateTopicResponseDto,
+    isArray: true,
     status: HttpStatus.OK,
     description: 'List of topics.',
   })
@@ -79,6 +85,7 @@ export class TopicsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a topic by ID' })
+  @ApiParam({ name: 'id', description: 'Topic ID' })
   @ApiResponse({
     type: () => CreateTopicResponseDto,
     status: HttpStatus.OK,
@@ -88,14 +95,13 @@ export class TopicsController {
     status: HttpStatus.NOT_FOUND,
     description: 'Topic not found.',
   })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @UseGuards(JwtAuthGuard)
   findOne(@Param('id') id: string) {
     return this.topicsService.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a topic' })
+  @ApiParam({ name: 'id', description: 'Topic ID' })
   @ApiResponse({
     type: () => CreateTopicResponseDto,
     status: HttpStatus.OK,
@@ -106,6 +112,7 @@ export class TopicsController {
     description: 'Topic not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.ADMIN)
   update(@Param('id') id: string, @Body() updateTopicDto: UpdateTopicDto) {
@@ -114,6 +121,7 @@ export class TopicsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a topic' })
+  @ApiParam({ name: 'id', description: 'Topic ID' })
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
     description: 'The topic has been deleted.',
@@ -123,6 +131,7 @@ export class TopicsController {
     description: 'Topic not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.ADMIN)
   remove(@Param('id') id: string) {
