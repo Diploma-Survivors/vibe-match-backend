@@ -6,6 +6,7 @@ export class LtiLaunchRequestDto {
   @ApiProperty({
     description: 'The LTI id_token from the platform',
     example: 'eyJhbGciO...',
+    name: 'id_token',
   })
   @IsString()
   @IsNotEmpty()
