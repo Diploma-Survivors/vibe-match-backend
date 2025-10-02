@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsString } from 'class-validator';
 
 export class CreateTestcaseSampleDto {
   @ApiProperty({
@@ -7,7 +7,6 @@ export class CreateTestcaseSampleDto {
     example: '1 2',
   })
   @IsString()
-  @IsNotEmpty()
   input: string;
 
   @ApiProperty({
@@ -15,6 +14,5 @@ export class CreateTestcaseSampleDto {
     example: '3',
   })
   @IsString()
-  @IsNotEmpty()
   output: string;
 }
