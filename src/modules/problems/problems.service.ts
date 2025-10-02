@@ -11,8 +11,8 @@ import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import {
   ProblemCursorFieldsDto,
-  QueryProblemsDto,
-} from './dto/query-problems.dto';
+  ProblemsCursorQueryDto,
+} from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { Problem } from './entities/problem.entity';
 import { Tag } from './tags/entities/tag.entity';
@@ -118,7 +118,7 @@ export class ProblemsService {
     return problem;
   }
 
-  async find(query: QueryProblemsDto) {
+  async find(query: ProblemsCursorQueryDto) {
     const { limit, isBackward } = this.validateAndGetPagination(query);
     const queryBuilder = this.buildBaseQuery();
     this.applyFilters(queryBuilder, query);
@@ -131,7 +131,7 @@ export class ProblemsService {
     return this.buildPaginatedResult(items, limit, isBackward, query);
   }
 
-  private validateAndGetPagination(query: QueryProblemsDto) {
+  private validateAndGetPagination(query: ProblemsCursorQueryDto) {
     const isBackward = !!query?.before && !query?.after;
     const limit = isBackward ? query?.last : query?.first;
 
@@ -153,7 +153,7 @@ export class ProblemsService {
 
   private applyFilters(
     queryBuilder: SelectQueryBuilder<Problem>,
-    query: QueryProblemsDto,
+    query: ProblemsCursorQueryDto,
   ) {
     if (query?.keyword) {
       queryBuilder.where(
@@ -168,9 +168,9 @@ export class ProblemsService {
       });
     }
 
-    if (query?.filters?.topic) {
-      queryBuilder.andWhere('problemTopics.topic = :topicId', {
-        topicId: query.filters.topic,
+    if (query?.filters?.topics) {
+      queryBuilder.andWhere('problemTopics.topic IN (:...topicIds)', {
+        topicIds: query.filters.topics,
       });
     }
 
@@ -183,7 +183,7 @@ export class ProblemsService {
 
   private async applyCursorPagination(
     queryBuilder: SelectQueryBuilder<Problem>,
-    query: QueryProblemsDto,
+    query: ProblemsCursorQueryDto,
     isBackward: boolean,
   ) {
     const sortBy = query?.sortBy;
@@ -239,7 +239,7 @@ export class ProblemsService {
     items: Problem[],
     limit: number,
     isBackward: boolean,
-    query: QueryProblemsDto,
+    query: ProblemsCursorQueryDto,
   ): Promise<CursorPaginated<Problem>> {
     const hasMore = items.length > limit;
     if (hasMore) {
@@ -279,7 +279,7 @@ export class ProblemsService {
   }
 
   private async getTotalCountWithFilters(
-    query: QueryProblemsDto,
+    query: ProblemsCursorQueryDto,
   ): Promise<number> {
     const queryBuilder = this.buildBaseQuery();
     this.applyFilters(queryBuilder, query);
