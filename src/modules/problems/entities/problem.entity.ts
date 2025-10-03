@@ -1,4 +1,3 @@
-import { ContestProblem } from 'src/modules/contests/entities/contest-problem.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import {
   Column,
@@ -96,11 +95,6 @@ export class Problem {
     cascade: true,
   })
   testcaseSamples: TestcaseSample[];
-
-  @OneToMany(() => ContestProblem, (contestProblem) => contestProblem.problem, {
-    nullable: true,
-  })
-  contestProblems: ContestProblem[] | null;
 
   @CreateDateColumn({
     name: 'created_at',

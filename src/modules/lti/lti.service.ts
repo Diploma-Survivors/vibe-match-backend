@@ -24,7 +24,6 @@ import {
 
 import { plainToInstance } from 'class-transformer';
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
-import { ContestsService } from '../contests/contests.service';
 import { Course } from '../course/entities/course.entity';
 import { ProblemType } from '../problems/enums/problem-type.enum';
 import { ProblemsService } from '../problems/problems.service';
@@ -54,7 +53,6 @@ export class LtiService {
     private readonly userCourseService: UserCourseService,
     private readonly keysService: KeysService,
     private readonly problemsService: ProblemsService,
-    private readonly contestService: ContestsService,
   ) {}
 
   public async handleLoginInitiation(
@@ -273,18 +271,7 @@ export class LtiService {
 
       this.logger.debug(`Deep linking selected problem ID: ${problemId}`);
     } else if (contestId) {
-      const contest = await this.contestService.findOne(
-        { id: contestId },
-        {
-          id: true,
-          course: true,
-        },
-      );
-      if (!contest || contest.course.id !== currentCourse) {
-        throw new BadRequestException('Contest not found');
-      }
-
-      this.logger.debug(`Deep linking selected contest ID: ${contestId}`);
+      // TODO: validate contest existence and accessibility
     }
 
     const keyRedis = this.getKeyRedisForDeepLinking(deviceId);
