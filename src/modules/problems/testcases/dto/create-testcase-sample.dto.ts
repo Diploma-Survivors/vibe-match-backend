@@ -1,0 +1,18 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
+
+export class CreateTestcaseSampleDto {
+  @ApiProperty({
+    description: 'The input for the testcase',
+    example: '1 2',
+  })
+  @IsString()
+  input: string;
+
+  @ApiProperty({
+    description: 'The output for the testcase',
+    example: '3',
+  })
+  @IsString()
+  output: string;
+}

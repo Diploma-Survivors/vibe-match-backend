@@ -12,7 +12,7 @@ import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
 import { UserService } from '../../modules/user/user.service';
 import { RedisService } from '../../shared/redis/redis.service';
-import { LTI_VERSIONS } from './constants/lti.constants';
+import { LTI_ROLES, LTI_VERSIONS } from './constants/lti.constants';
 import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
 import {
@@ -23,8 +23,10 @@ import {
 } from './interfaces/lti.interface';
 
 import { plainToInstance } from 'class-transformer';
-import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { Course } from '../course/entities/course.entity';
+import { ProblemType } from '../problems/enums/problem-type.enum';
+import { ProblemsService } from '../problems/problems.service';
 import { User } from '../user/entities/user.entity';
 import { RoleEnum } from '../user/enums/role.enum';
 import { IdTokenPayloadDto } from './dto/id-token-payload.dto';
@@ -50,6 +52,7 @@ export class LtiService {
     private readonly courseService: CourseService,
     private readonly userCourseService: UserCourseService,
     private readonly keysService: KeysService,
+    private readonly problemsService: ProblemsService,
   ) {}
 
   public async handleLoginInitiation(
@@ -119,8 +122,11 @@ export class LtiService {
     );
 
     const problemId = claims.customClaims?.['problemId'] as string;
-    if (!problemId) {
-      throw new BadRequestException('Missing required custom claim: problemId');
+    const contestId = claims.customClaims?.['contestId'] as string;
+    if (!problemId && !contestId) {
+      throw new BadRequestException(
+        'Missing required custom claim: problemId or contestId',
+      );
     }
 
     const user = await this.upsertUserFromClaims(claims);
@@ -152,6 +158,12 @@ export class LtiService {
 
     if (claims.azp && claims.azp !== clientId) {
       throw new UnauthorizedException('Invalid authorized party (azp) claim');
+    }
+
+    if (!claims.roles.includes(LTI_ROLES.INSTRUCTOR)) {
+      throw new UnauthorizedException(
+        'User does not have instructor role required for deep linking',
+      );
     }
 
     const user = await this.upsertUserFromClaims(claims);
@@ -191,7 +203,10 @@ export class LtiService {
         if (deepLinkingData) {
           await this.redisService.del(keyRedis);
 
-          await this.handleDeepLinkingResponse(tokens.deviceId);
+          await this.handleDeepLinkingResponse(
+            tokens.deviceId,
+            course?.id as string,
+          );
         }
       })().catch((error) => {
         this.logger.error(
@@ -205,7 +220,7 @@ export class LtiService {
     ) as string;
 
     const postRedirectUrl = this.configService.get<string>(
-      'lti.frontendSetCookiesUrl.student',
+      'lti.frontendSetCookiesUrl.instructor',
     ) as string;
 
     return {
@@ -217,6 +232,7 @@ export class LtiService {
 
   public async handleDeepLinkingResponse(
     deviceId: string,
+    currentCourse: string,
     ltiResourceLinkDto?: LtiResourceLinkDto,
   ) {
     const url = this.configService.get<string>('lti.toolRedirectionUri');
@@ -229,6 +245,34 @@ export class LtiService {
           }),
         ]
       : [];
+
+    const problemId = ltiResourceLinkDto?.custom?.['problemId'] as string;
+    const contestId = ltiResourceLinkDto?.custom?.['contestId'] as string;
+
+    if (!problemId && !contestId) {
+      throw new BadRequestException(
+        'Missing required custom claim: problemId or contestId',
+      );
+    }
+    if (problemId && contestId) {
+      throw new BadRequestException(
+        'Redundant field of custom claims: provide either problemId or contestId, not both',
+      );
+    }
+
+    if (problemId) {
+      const problem = await this.problemsService.findById(problemId, {
+        id: true,
+        type: true,
+      });
+      if (!problem || problem.type === ProblemType.CONTEST) {
+        throw new BadRequestException('Problem not found or invalid');
+      }
+
+      this.logger.debug(`Deep linking selected problem ID: ${problemId}`);
+    } else if (contestId) {
+      // TODO: validate contest existence and accessibility
+    }
 
     const keyRedis = this.getKeyRedisForDeepLinking(deviceId);
     const deepLinkingDataString = await this.redisService.get(keyRedis);
@@ -245,6 +289,8 @@ export class LtiService {
       nonce: string;
       azp?: string;
     };
+    this.logger.debug(`Deep Linking Data from Redis: ${deepLinkingDataString}`);
+
     const clientId = this.configService.get<string>('lti.clientId');
     const platformId = this.configService.get<string>('lti.platformId');
     const deploymentId = this.configService.get<string>('lti.deploymentId');
@@ -263,10 +309,15 @@ export class LtiService {
 
     const jwt = await this.keysService.generateDeepLinkingJwt(jwtPayload);
 
-    return {
+    const deepLinkAuthData = {
       jwt,
       deepLinkReturnUrl: deepLinkingData.deepLinkReturnUrl,
     };
+    this.logger.debug(
+      `Deep Linking Response result: ${JSON.stringify(deepLinkAuthData)}`,
+    );
+
+    return deepLinkAuthData;
   }
 
   private issueTokens(

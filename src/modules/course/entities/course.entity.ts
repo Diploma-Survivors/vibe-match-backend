@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { CourseProblem } from 'src/modules/problems/entities/course-problem.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
@@ -41,16 +43,27 @@ export class Course {
   title: string | null;
 
   @ApiProperty({
+    description: 'Course description',
+    example: 'An in-depth course on data structures and algorithms.',
+    nullable: true,
+  })
+  @OneToMany(() => CourseProblem, (courseProblem) => courseProblem.course, {
+    cascade: true,
+    nullable: true,
+  })
+  courseProblems: CourseProblem[];
+
+  @ApiProperty({
     description: 'Course creation timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt: Date;
 
   @ApiProperty({
     description: 'Course last update timestamp',
     example: '2024-01-01T00:00:00.000Z',
   })
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamp with time zone' })
   updatedAt: Date;
 }

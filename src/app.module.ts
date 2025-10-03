@@ -1,30 +1,39 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import appConfig from './config/app.config';
-import databaseConfig from './config/database.config';
-import { redisConfig } from './config/redis.config';
-import { ltiConfig } from './config/lti.config';
-import authConfig from './config/auth.config';
-import environmentValidationSchema from './config/environment.validation';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { DataResponseInterceptor } from './common/interceptors/data-response.interceptor';
+import appConfig from './config/app.config';
+import authConfig from './config/auth.config';
+import { awsConfig } from './config/aws.config';
+import databaseConfig from './config/database.config';
+import environmentValidationSchema from './config/environment.validation';
+import { ltiConfig } from './config/lti.config';
+import { redisConfig } from './config/redis.config';
 import { AuthModule } from './modules/auth/auth.module';
-import { UserModule } from './modules/user/user.module';
-import { LtiModule } from './modules/lti/lti.module';
-import { RedisModule } from './shared/redis/redis.module';
 import { CourseModule } from './modules/course/course.module';
+import { LtiModule } from './modules/lti/lti.module';
+import { ProblemsModule } from './modules/problems/problems.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
+import { UserModule } from './modules/user/user.module';
+import { RedisModule } from './shared/redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: '.env',
-      load: [appConfig, databaseConfig, redisConfig, ltiConfig, authConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        ltiConfig,
+        authConfig,
+        awsConfig,
+      ],
       validationSchema: environmentValidationSchema,
       isGlobal: true,
     }),
@@ -47,6 +56,7 @@ import { UserCourseModule } from './modules/user-course/user-course.module';
     RedisModule,
     CourseModule,
     UserCourseModule,
+    ProblemsModule,
   ],
   controllers: [AppController],
   providers: [

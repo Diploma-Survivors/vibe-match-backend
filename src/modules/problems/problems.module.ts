@@ -1,0 +1,23 @@
+import { Module } from '@nestjs/common';
+import { ProblemsService } from './problems.service';
+import { ProblemsController } from './problems.controller';
+import { TopicsModule } from './topics/topics.module';
+import { TagsModule } from './tags/tags.module';
+import { TestcasesModule } from './testcases/testcases.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Problem } from './entities/problem.entity';
+import { ProblemTag } from './entities/problem-tag.entity';
+import { ProblemTopic } from './entities/problem-topic.entity';
+
+@Module({
+  controllers: [ProblemsController],
+  providers: [ProblemsService],
+  imports: [
+    TopicsModule,
+    TagsModule,
+    TestcasesModule,
+    TypeOrmModule.forFeature([Problem, ProblemTag, ProblemTopic]),
+  ],
+  exports: [ProblemsService],
+})
+export class ProblemsModule {}

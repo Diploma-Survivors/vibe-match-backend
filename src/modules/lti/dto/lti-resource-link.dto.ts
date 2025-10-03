@@ -169,6 +169,13 @@ class LtiDurationDto {
 }
 
 export class LtiResourceLinkDto {
+  @ApiProperty({
+    description: 'Device ID used to track the user session',
+    example: 'device-12345',
+  })
+  @IsString()
+  deviceId?: string;
+
   type?: ContentItemType;
 
   @ApiProperty({
