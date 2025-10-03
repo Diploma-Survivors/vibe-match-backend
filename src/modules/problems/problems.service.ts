@@ -259,7 +259,7 @@ export class ProblemsService {
     }));
 
     const startCursor = edges.length > 0 ? edges[0].cursor : null;
-    const endCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+    const endCursor = edges.length > 0 ? edges?.at(-1)?.cursor : null;
 
     const hasNextPage = isBackward ? !!query.before : hasMore;
     const hasPreviousPage = isBackward ? hasMore : !!query.after;
@@ -286,7 +286,7 @@ export class ProblemsService {
     const raw = (await queryBuilder
       .select('COUNT(DISTINCT problem.id)', 'count')
       .getRawOne()) as { count: string };
-    return parseInt(raw.count, 10);
+    return Number.parseInt(raw.count, 10);
   }
 
   async findById(id: string, select?: FindOptionsSelect<Problem>) {
