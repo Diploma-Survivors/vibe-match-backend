@@ -12,7 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import {
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiExtraModels,
   ApiOperation,
   ApiParam,
@@ -41,7 +41,6 @@ import { UpdateProblemDto } from './dto/update-problem.dto';
 import { ProblemsService } from './problems.service';
 
 @ApiTags('Problems')
-@ApiCookieAuth('access_token')
 @Controller('problems')
 export class ProblemsController {
   constructor(private readonly problemsService: ProblemsService) {}
@@ -57,6 +56,7 @@ export class ProblemsController {
     status: HttpStatus.FORBIDDEN,
     description: 'Forbidden.',
   })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
@@ -104,6 +104,7 @@ export class ProblemsController {
     },
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async find(@Body() query: ProblemsCursorQueryDto) {
     return await this.problemsService.find(query);
@@ -122,6 +123,7 @@ export class ProblemsController {
     description: 'Problem not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
     return await this.problemsService.findById(id, {
@@ -149,6 +151,7 @@ export class ProblemsController {
     description: 'The problems have been created.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, EnvironmentGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
@@ -177,6 +180,7 @@ export class ProblemsController {
     description: 'Problem not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async update(
@@ -198,6 +202,7 @@ export class ProblemsController {
     description: 'Problem not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async remove(@Param('id') id: string) {
