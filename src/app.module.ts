@@ -21,6 +21,7 @@ import { ProblemsModule } from './modules/problems/problems.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { UserModule } from './modules/user/user.module';
 import { RedisModule } from './shared/redis/redis.module';
+import { SubmissionModule } from './modules/submission/submission.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { RedisModule } from './shared/redis/redis.module';
     CourseModule,
     UserCourseModule,
     ProblemsModule,
+    SubmissionModule,
   ],
   controllers: [AppController],
   providers: [
