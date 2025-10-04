@@ -4,6 +4,7 @@ import { Expose, plainToInstance, Transform } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
+  IsNotEmpty,
   IsPositive,
   IsUUID,
   MaxLength,
@@ -166,6 +167,7 @@ export class CreateProblemDto {
     format: 'binary',
     name: 'testcaseFile',
   })
+  @IsNotEmpty()
   @Expose({ name: TESTCASE_FILE_FIELD_NAME })
   testcase: string;
 
