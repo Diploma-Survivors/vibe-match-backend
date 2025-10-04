@@ -12,14 +12,6 @@ import { CreateTestcaseSampleDto } from '../../problems/testcases/dto/create-tes
 
 export class CreateSubmissionDto {
   @ApiProperty({
-    description: 'User id',
-    example: 1,
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  readonly userId: string;
-
-  @ApiProperty({
     description: 'Programming language identifier',
     example: 71,
   })
