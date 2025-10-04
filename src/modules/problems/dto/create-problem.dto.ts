@@ -18,6 +18,7 @@ import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample
 export class CreateProblemDto {
   @ApiProperty({
     description: 'The title of the problem',
+    example: 'Sample Problem Title',
     minLength: 3,
     maxLength: 128,
   })
@@ -27,6 +28,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The description of the problem',
+    example: 'This is a sample problem description.',
     minLength: 16,
     maxLength: 512,
   })
@@ -38,6 +40,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The input description of the problem',
+    example: 'The first line contains an integer n.',
     minLength: 3,
     maxLength: 512,
   })
@@ -51,6 +54,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The output description of the problem',
+    example: 'Output a single integer, the result.',
     minLength: 1,
     maxLength: 512,
   })
@@ -64,6 +68,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The maximum score for the problem',
+    example: 100,
     minimum: 1,
   })
   @Transform(({ value }: { value: string }) => Number.parseInt(value, 10))
@@ -72,6 +77,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The time limit for the problem in milliseconds',
+    example: 1000,
     minimum: 1,
   })
   @Transform(({ value }: { value: string }) => Number.parseFloat(value))
@@ -80,6 +86,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The memory limit for the problem in kilobytes',
+    example: 65536,
     minimum: 1,
   })
   @Transform(({ value }: { value: string }) => Number.parseFloat(value))
@@ -88,6 +95,7 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The difficulty level of the problem',
+    example: DifficultyLevel.EASY,
     enum: DifficultyLevel,
   })
   @IsEnum(DifficultyLevel, {
@@ -153,7 +161,9 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The test case file associated with the problem',
+    example: 'testcase.txt',
     type: 'string',
+    format: 'binary',
     name: 'testcaseFile',
   })
   @Expose({ name: TESTCASE_FILE_FIELD_NAME })
