@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ClassSerializerInterceptor,
   Controller,
@@ -8,11 +9,14 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiExtraModels,
   ApiOperation,
   ApiParam,
@@ -21,10 +25,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { Environment } from 'src/common/enums/environment.enum';
-import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import {
   CursorEdgeDto,
@@ -32,7 +33,11 @@ import {
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
-import { CreateProblemBulkDto } from './dto/create-problem-bulk.dto';
+import {
+  TESTCASE_FILE_FIELD_NAME,
+  TESTCASE_FILE_MIME_TYPE,
+  TESTCASE_MAX_FILE_SIZE,
+} from './constants/testcase.constant';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { GetProblemResponseDto } from './dto/get-problem-response.dto';
@@ -56,15 +61,38 @@ export class ProblemsController {
     status: HttpStatus.FORBIDDEN,
     description: 'Forbidden.',
   })
+  @ApiConsumes('multipart/form-data')
   @ApiBearerAuth()
+  @UseInterceptors(
+    FileInterceptor(TESTCASE_FILE_FIELD_NAME, {
+      limits: { fileSize: TESTCASE_MAX_FILE_SIZE },
+      fileFilter: (_req, file, cb) => {
+        if (file.mimetype !== TESTCASE_FILE_MIME_TYPE) {
+          return cb(
+            new BadRequestException(
+              'Invalid file type. File must be a text/plain file.',
+            ),
+            false,
+          );
+        }
+
+        return cb(null, true);
+      },
+    }),
+    ClassSerializerInterceptor,
+  )
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
-  async createProblemStandalone(
+  async createProblem(
     @Body() createProblemDto: CreateProblemDto,
     @CurrentUser() user: JwtPayload,
+    @UploadedFile() testcaseFile: Express.Multer.File,
   ) {
-    const problem = await this.problemsService.create(createProblemDto, user);
+    const problem = await this.problemsService.create(
+      createProblemDto,
+      user,
+      testcaseFile,
+    );
     return new CreateProblemResponseDto(problem);
   }
 
@@ -106,7 +134,7 @@ export class ProblemsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  async find(@Body() query: ProblemsCursorQueryDto) {
+  async findProblems(@Body() query: ProblemsCursorQueryDto) {
     return await this.problemsService.find(query);
   }
 
@@ -140,31 +168,6 @@ export class ProblemsController {
       createdAt: true,
       updatedAt: true,
     });
-  }
-
-  @Post('bulk')
-  @ApiOperation({ summary: 'Create multiple problems (Only development)' })
-  @ApiResponse({
-    type: () => CreateProblemResponseDto,
-    isArray: true,
-    status: HttpStatus.CREATED,
-    description: 'The problems have been created.',
-  })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, EnvironmentGuard)
-  @UseInterceptors(ClassSerializerInterceptor)
-  @Roles(RoleEnum.INSTRUCTOR)
-  @EnvGuard(Environment.DEVELOPMENT)
-  async createBulk(
-    @Body() createProblemBulkDto: CreateProblemBulkDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    const problems = await this.problemsService.createBulk(
-      createProblemBulkDto.problems,
-      user,
-    );
-    return problems.map((problem) => new CreateProblemResponseDto(problem));
   }
 
   @Patch(':id')

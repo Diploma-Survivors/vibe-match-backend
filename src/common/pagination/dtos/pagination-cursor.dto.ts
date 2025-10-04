@@ -5,8 +5,10 @@ import {
   IsString,
   Max,
   Min,
+  MinLength,
   Validate,
 } from 'class-validator';
+import { MatchMode } from '../enums/match-mode.enum';
 import { SortOrder } from '../enums/sort-order.enum';
 import { ValidCursorPagination } from '../validators/valid-cursor-pagination.validator';
 
@@ -17,7 +19,7 @@ export class PaginationCursorDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @MinLength(1)
   keyword?: string;
 
   @ApiProperty({
@@ -76,6 +78,17 @@ export class PaginationCursorDto {
   @IsOptional()
   @IsEnum(SortOrder)
   sortOrder?: SortOrder = SortOrder.ASC;
+
+  @ApiProperty({
+    enum: MatchMode,
+    description: 'Match mode for filtering by multiple criteria',
+    example: MatchMode.ANY,
+    default: MatchMode.ALL,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(MatchMode)
+  matchMode: MatchMode = MatchMode.ALL;
 
   @Validate(ValidCursorPagination)
   private readonly _validate?: any;

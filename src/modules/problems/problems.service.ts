@@ -1,14 +1,26 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
 import { SortOrder } from 'src/common/pagination/enums/sort-order.enum';
 import { CursorPaginated } from 'src/common/pagination/interfaces/cursor-paginated.interface';
 import { decodeCursor, encodeCursor } from 'src/common/utils/cursor-query.util';
-import { DataSource, FindOptionsSelect, In, Repository } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  FindOptionsSelect,
+  In,
+  Repository,
+} from 'typeorm';
 import { QueryRunner, SelectQueryBuilder } from 'typeorm/browser';
+import { v4 as uuidV4 } from 'uuid';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { StoragesService } from '../storages/storages.service';
+import { TESTCASE_FILE_EXTENSION } from './constants/testcase.constant';
 import { CreateProblemDto } from './dto/create-problem.dto';
+import { GetProblemResponseDto } from './dto/get-problem-response.dto';
 import {
   ProblemCursorFieldsDto,
   ProblemsCursorQueryDto,
@@ -28,9 +40,15 @@ export class ProblemsService {
     @InjectRepository(Problem)
     private readonly problemsRepository: Repository<Problem>,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
+    private readonly storagesService: StoragesService,
   ) {}
 
-  async create(createProblemDto: CreateProblemDto, user: JwtPayload) {
+  async create(
+    createProblemDto: CreateProblemDto,
+    user: JwtPayload,
+    testcaseFile: Express.Multer.File,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
@@ -41,6 +59,7 @@ export class ProblemsService {
         queryRunner,
         createProblemDto,
         user,
+        testcaseFile,
       );
       await queryRunner.commitTransaction();
       return problem;
@@ -52,36 +71,36 @@ export class ProblemsService {
     }
   }
 
-  async createBulk(createProblemDtos: CreateProblemDto[], user: JwtPayload) {
-    const queryRunner = this.dataSource.createQueryRunner();
+  private async uploadAndSaveFileTestcase(
+    queryRunner: QueryRunner,
+    file: Express.Multer.File,
+    currentUser: JwtPayload,
+  ) {
+    const seed = uuidV4();
+    const key = `${seed}_${currentUser.userId}_${currentUser.courseId}${TESTCASE_FILE_EXTENSION}`;
+    const bucket = this.configService.get<string>(
+      'aws.s3.bucketName',
+    ) as string;
 
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    await this.storagesService.upload({
+      bucket,
+      key,
+      file: file.buffer,
+    });
 
-    try {
-      const problems = await Promise.all(
-        createProblemDtos.map(async (createProblemDto) =>
-          this.createProblemWithTransaction(
-            queryRunner,
-            createProblemDto,
-            user,
-          ),
-        ),
-      );
-      await queryRunner.commitTransaction();
-      return problems;
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
+    const url = this.storagesService.getObjectUrl(bucket, key);
+
+    const testcase = queryRunner.manager.create(Testcase, {
+      fileUrl: url,
+    });
+    return queryRunner.manager.save(Testcase, testcase);
   }
 
   private async createProblemWithTransaction(
     queryRunner: QueryRunner,
     createProblemDto: CreateProblemDto,
     user: JwtPayload,
+    testcaseFile: Express.Multer.File,
   ): Promise<Problem> {
     const tags = await queryRunner.manager.find(Tag, {
       where: { id: In(createProblemDto.tags) },
@@ -99,10 +118,11 @@ export class ProblemsService {
       throw new BadRequestException('Some topics are invalid');
     }
 
-    const testcase = await queryRunner.manager.findOneOrFail(Testcase, {
-      where: { id: createProblemDto.testcase },
-      select: ['id'],
-    });
+    const testcase = await this.uploadAndSaveFileTestcase(
+      queryRunner,
+      testcaseFile,
+      user,
+    );
 
     const problem = queryRunner.manager.create(Problem, {
       ...createProblemDto,
@@ -121,13 +141,30 @@ export class ProblemsService {
   async find(query: ProblemsCursorQueryDto) {
     const { limit, isBackward } = this.validateAndGetPagination(query);
     const queryBuilder = this.buildBaseQuery();
-    this.applyFilters(queryBuilder, query);
+
+    if (query.matchMode === MatchMode.ALL) {
+      this.applyMatchAllFilters(queryBuilder, query);
+    } else if (query.matchMode === MatchMode.ANY) {
+      this.applyMatchAnyFilters(queryBuilder, query);
+    }
 
     await this.applyCursorPagination(queryBuilder, query, isBackward);
 
     queryBuilder.take(limit + 1);
 
-    const items = await queryBuilder.getMany();
+    queryBuilder
+      .select([
+        'problem.id AS id',
+        'problem.title AS title',
+        'problem.difficulty AS difficulty',
+        `COALESCE(json_agg(DISTINCT jsonb_build_object('id', tag.id, 'name', tag.name))
+         FILTER (WHERE tag.id IS NOT NULL), '[]') AS tags`,
+        `COALESCE(json_agg(DISTINCT jsonb_build_object('id', topic.id, 'name', topic.name)) 
+         FILTER (WHERE topic.id IS NOT NULL), '[]') AS topics`,
+      ])
+      .groupBy('problem.id');
+
+    const items = await queryBuilder.getRawMany<GetProblemResponseDto>();
     return this.buildPaginatedResult(items, limit, isBackward, query);
   }
 
@@ -148,10 +185,12 @@ export class ProblemsService {
     return this.problemsRepository
       .createQueryBuilder('problem')
       .leftJoin('problem.problemTags', 'problemTags')
-      .leftJoin('problem.problemTopics', 'problemTopics');
+      .leftJoin('problemTags.tag', 'tag')
+      .leftJoin('problem.problemTopics', 'problemTopics')
+      .leftJoin('problemTopics.topic', 'topic');
   }
 
-  private applyFilters(
+  private applyMatchAllFilters(
     queryBuilder: SelectQueryBuilder<Problem>,
     query: ProblemsCursorQueryDto,
   ) {
@@ -168,7 +207,13 @@ export class ProblemsService {
       });
     }
 
-    if (query?.filters?.topics) {
+    if (query?.filters?.type) {
+      queryBuilder.andWhere('problem.type = :type', {
+        type: query.filters.type,
+      });
+    }
+
+    if (query?.filters?.topics && query.filters.topics.length > 0) {
       queryBuilder.andWhere('problemTopics.topic IN (:...topicIds)', {
         topicIds: query.filters.topics,
       });
@@ -179,6 +224,55 @@ export class ProblemsService {
         tagIds: query.filters.tags,
       });
     }
+  }
+
+  private applyMatchAnyFilters(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    query: ProblemsCursorQueryDto,
+  ) {
+    if (query?.keyword) {
+      queryBuilder.where(
+        `"problem"."tsv" @@ websearch_to_tsquery('simple', unaccent(:keyword))`,
+        { keyword: query.keyword },
+      );
+    }
+
+    if (
+      !query?.filters?.difficulty &&
+      !query?.filters?.type &&
+      (!query?.filters?.topics || query.filters.topics.length === 0) &&
+      (!query?.filters?.tags || query.filters.tags.length === 0)
+    ) {
+      return;
+    }
+
+    const subQuery = new Brackets((qb) => {
+      if (query?.filters?.difficulty) {
+        qb.where('problem.difficulty = :difficulty', {
+          difficulty: query.filters.difficulty,
+        });
+      }
+
+      if (query?.filters?.type) {
+        qb.orWhere('problem.type = :type', {
+          type: query.filters.type,
+        });
+      }
+
+      if (query?.filters?.topics && query.filters.topics.length > 0) {
+        qb.orWhere('problemTopics.topic IN (:...topicIds)', {
+          topicIds: query.filters.topics,
+        });
+      }
+
+      if (query?.filters?.tags && query.filters.tags.length > 0) {
+        qb.orWhere('problemTags.tag IN (:...tagIds)', {
+          tagIds: query.filters.tags,
+        });
+      }
+    });
+
+    queryBuilder.andWhere(subQuery);
   }
 
   private async applyCursorPagination(
@@ -236,11 +330,11 @@ export class ProblemsService {
   }
 
   private async buildPaginatedResult(
-    items: Problem[],
+    items: GetProblemResponseDto[],
     limit: number,
     isBackward: boolean,
     query: ProblemsCursorQueryDto,
-  ): Promise<CursorPaginated<Problem>> {
+  ): Promise<CursorPaginated<GetProblemResponseDto>> {
     const hasMore = items.length > limit;
     if (hasMore) {
       items.pop();
@@ -275,14 +369,20 @@ export class ProblemsService {
         endCursor,
       },
       totalCount,
-    } as CursorPaginated<Problem>;
+    } as CursorPaginated<GetProblemResponseDto>;
   }
 
   private async getTotalCountWithFilters(
     query: ProblemsCursorQueryDto,
   ): Promise<number> {
     const queryBuilder = this.buildBaseQuery();
-    this.applyFilters(queryBuilder, query);
+
+    if (query.matchMode === MatchMode.ALL) {
+      this.applyMatchAllFilters(queryBuilder, query);
+    } else if (query.matchMode === MatchMode.ANY) {
+      this.applyMatchAnyFilters(queryBuilder, query);
+    }
+
     const raw = (await queryBuilder
       .select('COUNT(DISTINCT problem.id)', 'count')
       .getRawOne()) as { count: string };

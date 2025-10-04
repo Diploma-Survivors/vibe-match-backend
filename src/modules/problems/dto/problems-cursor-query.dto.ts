@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
@@ -13,8 +14,8 @@ import {
 } from 'class-validator';
 import { PaginationCursorDto } from 'src/common/pagination/dtos/pagination-cursor.dto';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
+import { ProblemType } from '../enums/problem-type.enum';
 import { SortBy } from '../enums/sort-by.enum';
-import { ApiProperty } from '@nestjs/swagger';
 
 class QueryProblemsFilterDto {
   @ApiProperty({
@@ -26,6 +27,16 @@ class QueryProblemsFilterDto {
   @IsOptional()
   @IsEnum(DifficultyLevel)
   difficulty?: DifficultyLevel;
+
+  @ApiProperty({
+    enum: ProblemType,
+    description: 'Filter problems by type',
+    example: ProblemType.CONTEST,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ProblemType)
+  type?: ProblemType;
 
   @ApiProperty({
     description: 'Filter problems by topic ID',

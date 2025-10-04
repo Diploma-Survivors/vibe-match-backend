@@ -1,5 +1,6 @@
+import { BadRequestException, Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose, Type } from 'class-transformer';
+import { Expose, plainToInstance, Transform } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -9,6 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { TESTCASE_FILE_FIELD_NAME } from '../constants/testcase.constant';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
@@ -64,6 +66,7 @@ export class CreateProblemDto {
     description: 'The maximum score for the problem',
     minimum: 1,
   })
+  @Transform(({ value }: { value: string }) => Number.parseInt(value, 10))
   @IsPositive({ message: 'Max score must be a positive number' })
   maxScore: number;
 
@@ -71,6 +74,7 @@ export class CreateProblemDto {
     description: 'The time limit for the problem in milliseconds',
     minimum: 1,
   })
+  @Transform(({ value }: { value: string }) => Number.parseFloat(value))
   @IsPositive({ message: 'Time limit must be a positive number' })
   timeLimitMs: number;
 
@@ -78,6 +82,7 @@ export class CreateProblemDto {
     description: 'The memory limit for the problem in kilobytes',
     minimum: 1,
   })
+  @Transform(({ value }: { value: string }) => Number.parseFloat(value))
   @IsPositive({ message: 'Memory limit must be a positive number' })
   memoryLimitKb: number;
 
@@ -105,6 +110,18 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
     name: 'tagIds',
   })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as string[];
+      } catch (err) {
+        Logger.warn(err);
+        throw new BadRequestException('Invalid JSON format for tagIds');
+      }
+    }
+
+    throw new BadRequestException('tagIds must be a JSON array string');
+  })
   @IsArray()
   @IsUUID('all', { each: true })
   @Expose({ name: 'tagIds' })
@@ -117,27 +134,52 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
     name: 'topicIds',
   })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as string[];
+      } catch (err) {
+        Logger.warn(err);
+        throw new BadRequestException('Invalid JSON format for topicIds');
+      }
+    }
+
+    throw new BadRequestException('topicIds must be a JSON array string');
+  })
   @IsArray()
   @IsUUID('all', { each: true })
   @Expose({ name: 'topicIds' })
   topics: string[];
 
   @ApiProperty({
-    description: 'The ID of the test case associated with the problem',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'The test case file associated with the problem',
     type: 'string',
-    format: 'uuid',
-    name: 'testcaseId',
+    name: 'testcaseFile',
   })
-  @IsUUID()
-  @Expose({ name: 'testcaseId' })
+  @Expose({ name: TESTCASE_FILE_FIELD_NAME })
   testcase: string;
 
   @ApiProperty({
     description: 'The IDs of the sample test cases associated with the problem',
     type: () => [CreateTestcaseSampleDto],
   })
-  @Type(() => CreateTestcaseSampleDto)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        const parsedValue = JSON.parse(value) as unknown;
+        return plainToInstance(CreateTestcaseSampleDto, parsedValue);
+      } catch (err) {
+        Logger.error(err);
+        throw new BadRequestException(
+          'Invalid JSON format for testcaseSamples',
+        );
+      }
+    }
+
+    throw new BadRequestException(
+      'testcaseSamples must be a JSON array string',
+    );
+  })
   @IsArray()
   @ValidateNested({ each: true })
   testcaseSamples: CreateTestcaseSampleDto[];
