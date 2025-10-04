@@ -32,7 +32,7 @@ export class ContestsService {
         .leftJoin('problem.courseProblems', 'courseProblem')
         .leftJoin('problem.contestProblems', 'contestProblem')
         .where('problem.id IN (:...ids)', {
-          ids: createContestDto.problems,
+          ids: createContestDto.problems.map((problem) => problem.id),
         })
         .andWhere(
           '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
@@ -63,7 +63,10 @@ export class ContestsService {
 
       const contest = queryRunner.manager.create(Contest, {
         ...createContestDto,
-        contestProblems: problems.map((problem) => ({ problem })),
+        contestProblems: createContestDto.problems.map((problem) => ({
+          problem: { id: problem.id },
+          score: problem.score,
+        })),
         course: { id: user.courseId },
         author: { id: user.userId },
       });

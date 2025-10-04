@@ -1,26 +1,44 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDate,
   IsEnum,
-  IsNotEmpty,
-  IsNumber,
+  IsOptional,
   IsPositive,
-  IsString,
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { IsAfterNow } from '../decorators/is-after-now.decorator';
 import { IsLessThan } from '../decorators/is-less-than.decorator';
 import { ContestStatus } from '../enums/contest-status.enum';
+
+export class CreateProblemWithContestDto {
+  @ApiProperty({
+    description: 'The unique identifier of the problem',
+    example: '123jfk2-456abc',
+  })
+  @IsUUID()
+  id: string;
+
+  @ApiProperty({
+    description: 'The score assigned to the problem in the contest',
+    example: 100,
+    minimum: 1,
+  })
+  @IsPositive()
+  score: number;
+}
 
 export class CreateContestDto {
   @ApiProperty({
     description: 'The name of the contest',
     example: 'Weekly Coding Challenge',
+    minLength: 3,
+    maxLength: 100,
   })
-  @IsNotEmpty()
-  @IsString()
   @MinLength(3)
   @MaxLength(100)
   name: string;
@@ -28,17 +46,18 @@ export class CreateContestDto {
   @ApiProperty({
     description: 'A brief description of the contest',
     example: 'A contest to test your coding skills',
+    minLength: 10,
+    maxLength: 500,
   })
-  @IsString()
   @MinLength(10)
   @MaxLength(500)
   description: string;
 
   @ApiProperty({
-    description: 'The start time of the contest in ISO 8601 format',
-    example: '2025-10-01T10:00:00Z',
+    description:
+      'The start time of the contest in ISO 8601 format (must be before endTime and in the future)',
+    example: new Date().toISOString(),
   })
-  @IsNotEmpty()
   @Type(() => Date)
   @IsDate()
   @IsLessThan<Date>('endTime', {
@@ -46,13 +65,13 @@ export class CreateContestDto {
       validationFailed: 'startTime must be less than endTime',
     },
   })
+  @IsAfterNow()
   startTime: Date;
 
   @ApiProperty({
     description: 'The end time of the contest in ISO 8601 format',
-    example: '2025-10-01T12:00:00Z',
+    example: new Date().toISOString(),
   })
-  @IsNotEmpty()
   @Type(() => Date)
   @IsDate()
   endTime: Date;
@@ -60,10 +79,11 @@ export class CreateContestDto {
   @ApiProperty({
     description: 'The duration of the contest in minutes',
     example: 120,
+    minimum: 1,
   })
-  @IsNumber()
+  @IsOptional()
   @IsPositive()
-  durationMinutes: number;
+  durationMinutes?: number;
 
   @ApiProperty({
     description: 'The status of the contest',
@@ -74,10 +94,9 @@ export class CreateContestDto {
   status: ContestStatus;
 
   @ApiProperty({
-    description: 'List of problem IDs to be included in the contest',
-    example: ['123abc', '123jfk2-456abc', '789xyz'],
+    description: 'List of problems included in the contest with their scores',
   })
-  @IsUUID('all', { each: true })
-  @Expose({ name: 'problemIds' })
-  problems: string[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  problems: CreateProblemWithContestDto[];
 }

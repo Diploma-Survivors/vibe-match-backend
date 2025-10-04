@@ -1,4 +1,10 @@
-import { Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Contest } from './contest.entity';
 import { Problem } from 'src/modules/problems/entities/problem.entity';
 
@@ -14,4 +20,7 @@ export class ContestProblem {
   @ManyToOne(() => Problem, (problem) => problem.contestProblems)
   @JoinColumn({ name: 'problem_id' })
   problem: Problem;
+
+  @Column({ type: 'int', nullable: false })
+  score: number;
 }

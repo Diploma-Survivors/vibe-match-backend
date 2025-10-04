@@ -27,13 +27,13 @@ export class Contest {
   @Column('varchar')
   description: string;
 
-  @Column('timestamp', { name: 'start_time' })
+  @Column('timestamp with time zone', { name: 'start_time', precision: 3 })
   startTime: Date;
 
-  @Column('timestamp', { name: 'end_time' })
+  @Column('timestamp with time zone', { name: 'end_time', precision: 3 })
   endTime: Date;
 
-  @Column('int', { name: 'duration_minutes' })
+  @Column('int', { name: 'duration_minutes', nullable: true })
   durationMinutes: number;
 
   @Column('enum', {
@@ -57,9 +57,17 @@ export class Contest {
   })
   contestProblems: ContestProblem[];
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamp with time zone',
+    precision: 3,
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamp with time zone',
+    precision: 3,
+  })
   updatedAt: Date;
 }

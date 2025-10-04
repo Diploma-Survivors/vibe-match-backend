@@ -11,8 +11,15 @@ export const AFTER_TIME_VALIDATOR = 'AFTER_TIME_VALIDATOR';
 @Injectable()
 export class IsLessThanValidator<T> implements ValidatorConstraintInterface {
   validate(value: T, args: ValidationArguments): Promise<boolean> | boolean {
+    if (!value) {
+      return false;
+    }
+
     const [relatedPropertyName] = args.constraints as string[];
     const relatedValue = args?.object?.[relatedPropertyName] as T;
+    if (!relatedValue) {
+      return false;
+    }
 
     return value < relatedValue;
   }
