@@ -22,7 +22,7 @@ export class AddFTSIndexProblems1759025592703 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TRIGGER tsv_update
+      CREATE TRIGGER problems_tsv_update
       BEFORE INSERT OR UPDATE ON "problems"
       FOR EACH ROW
       EXECUTE FUNCTION problems_tsv_trigger();
@@ -36,7 +36,7 @@ export class AddFTSIndexProblems1759025592703 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_Problems_TSV";');
     await queryRunner.query(
-      'DROP TRIGGER IF EXISTS "tsv_update" ON "problems";',
+      'DROP TRIGGER IF EXISTS "problems_tsv_update" ON "problems";',
     );
     await queryRunner.query('DROP FUNCTION IF EXISTS "problems_tsv_trigger";');
     await queryRunner.query(

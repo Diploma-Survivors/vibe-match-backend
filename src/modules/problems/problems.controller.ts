@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -96,8 +97,11 @@ export class ProblemsController {
     return new CreateProblemResponseDto(problem);
   }
 
-  @Post('list')
-  @ApiOperation({ summary: 'Get list problems' })
+  @Get('training')
+  @ApiOperation({
+    summary: 'Get list problems for training',
+    description: 'Get list problems that students can practice on',
+  })
   @ApiExtraModels(
     PaginationCursorResponseDto,
     CursorEdgeDto,
@@ -134,8 +138,112 @@ export class ProblemsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  async findProblems(@Body() query: ProblemsCursorQueryDto) {
-    return await this.problemsService.find(query);
+  @Roles(RoleEnum.STUDENT)
+  async findTrainableProblems(
+    @Query() query: ProblemsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.problemsService.findProblemsByStudent(query, user);
+  }
+
+  @Get('selectable-for-contest')
+  @ApiOperation({
+    summary: 'Get list problems for contest creation',
+    description:
+      'Get list problems that instructors can select to add to a contest',
+  })
+  @ApiExtraModels(
+    PaginationCursorResponseDto,
+    CursorEdgeDto,
+    GetProblemResponseDto,
+  )
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of problems.',
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(PaginationCursorResponseDto) },
+        {
+          properties: {
+            edges: {
+              type: 'array',
+              items: {
+                allOf: [
+                  {
+                    $ref: getSchemaPath(CursorEdgeDto),
+                  },
+                  {
+                    properties: {
+                      node: { $ref: getSchemaPath(GetProblemResponseDto) },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async findSelectableForContest(
+    @Query() query: ProblemsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return await this.problemsService.findProblemsForContestCreation(
+      query,
+      user,
+    );
+  }
+
+  @Get('selectable-for-assignment')
+  @ApiOperation({
+    summary: 'Get list problems for assignment creation',
+    description:
+      'Get list problems that instructors can select to add to an assignment',
+  })
+  @ApiExtraModels(
+    PaginationCursorResponseDto,
+    CursorEdgeDto,
+    GetProblemResponseDto,
+  )
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of problems.',
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(PaginationCursorResponseDto) },
+        {
+          properties: {
+            edges: {
+              type: 'array',
+              items: {
+                allOf: [
+                  {
+                    $ref: getSchemaPath(CursorEdgeDto),
+                  },
+                  {
+                    properties: {
+                      node: { $ref: getSchemaPath(GetProblemResponseDto) },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async findSelectableForAssignment(@Query() query: ProblemsCursorQueryDto) {
+    return await this.problemsService.findProblemsForAssignmentCreation(query);
   }
 
   @Get(':id')

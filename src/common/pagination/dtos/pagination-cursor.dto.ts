@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsEnum,
   IsOptional,
@@ -51,6 +52,7 @@ export class PaginationCursorDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
   @Min(1)
   @Max(100)
   first?: number;
@@ -64,6 +66,7 @@ export class PaginationCursorDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
   @Min(1)
   @Max(100)
   last?: number;

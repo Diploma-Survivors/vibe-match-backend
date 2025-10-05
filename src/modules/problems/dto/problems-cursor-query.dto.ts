@@ -5,7 +5,6 @@ import {
   IsDate,
   IsEnum,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsPositive,
   IsString,
@@ -45,7 +44,8 @@ class QueryProblemsFilterDto {
     required: false,
   })
   @IsOptional()
-  @IsUUID()
+  @IsArray()
+  @IsUUID('all', { each: true })
   @Expose({ name: 'topicIds' })
   topics?: string[];
 
@@ -64,7 +64,6 @@ class QueryProblemsFilterDto {
 }
 
 export class ProblemCursorFieldsDto {
-  @IsNotEmpty()
   @IsUUID()
   id: string;
 

@@ -12,6 +12,7 @@ import {
   DataSource,
   FindOptionsSelect,
   In,
+  ObjectLiteral,
   Repository,
 } from 'typeorm';
 import { QueryRunner, SelectQueryBuilder } from 'typeorm/browser';
@@ -27,6 +28,8 @@ import {
 } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { Problem } from './entities/problem.entity';
+import { ProblemType } from './enums/problem-type.enum';
+import { SortBy } from './enums/sort-by.enum';
 import { Tag } from './tags/entities/tag.entity';
 import { Testcase } from './testcases/entities/testcase.entity';
 import { Topic } from './topics/entities/topic.entity';
@@ -138,34 +141,158 @@ export class ProblemsService {
     return problem;
   }
 
-  async find(query: ProblemsCursorQueryDto) {
-    const { limit, isBackward } = this.validateAndGetPagination(query);
-    const queryBuilder = this.buildBaseQuery();
+  async findProblemsByStudent(
+    query: ProblemsCursorQueryDto,
+    currentUser: JwtPayload,
+  ) {
+    return this.findProblemsWithPagination(query, {
+      joins: ['courseProblem', 'problemTag', 'problemTopic'],
+      filterFn: (qb) => this.applyStudentFilter(qb, currentUser.courseId!),
+    });
+  }
 
-    if (query.matchMode === MatchMode.ALL) {
-      this.applyMatchAllFilters(queryBuilder, query);
-    } else if (query.matchMode === MatchMode.ANY) {
-      this.applyMatchAnyFilters(queryBuilder, query);
+  async findProblemsForAssignmentCreation(query: ProblemsCursorQueryDto) {
+    return this.findProblemsWithPagination(query, {
+      joins: ['problemTag', 'problemTopic'],
+      filterFn: (qb) => this.applyAssignmentCreationFilter(qb),
+    });
+  }
+
+  async findProblemsForContestCreation(
+    query: ProblemsCursorQueryDto,
+    currentUser: JwtPayload,
+  ) {
+    return this.findProblemsWithPagination(query, {
+      joins: ['courseProblem', 'contestProblem', 'problemTag', 'problemTopic'],
+      filterFn: (qb) =>
+        this.applyContestCreationFilter(qb, currentUser.courseId!),
+    });
+  }
+
+  private async findProblemsWithPagination(
+    query: ProblemsCursorQueryDto,
+    config: {
+      joins: string[];
+      filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+    },
+  ) {
+    const pagination = this.validateAndGetPagination(query);
+    const sortConfig = this.buildSortConfiguration(
+      query,
+      pagination.isBackward,
+    );
+
+    const ids = await this.findProblemIds(
+      query,
+      pagination.limit,
+      sortConfig,
+      config,
+    );
+
+    if (ids.length === 0) {
+      return this.buildPaginatedResult(
+        [],
+        pagination.limit,
+        pagination.isBackward,
+        query,
+      );
     }
 
-    await this.applyCursorPagination(queryBuilder, query, isBackward);
+    const items = await this.findProblemByIds(ids, sortConfig);
+    return this.buildPaginatedResult(
+      items,
+      pagination.limit,
+      pagination.isBackward,
+      query,
+    );
+  }
 
-    queryBuilder.take(limit + 1);
+  private async findProblemIds(
+    query: ProblemsCursorQueryDto,
+    limit: number,
+    sortConfig: {
+      sortBy: SortBy;
+      sortOrder: 'ASC' | 'DESC';
+      operator: '<' | '>';
+    },
+    config: {
+      joins: string[];
+      filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+    },
+  ) {
+    const queryBuilder = this.buildBaseQuery(config.joins);
+
+    config.filterFn(queryBuilder);
+    this.applyMatchFilters(queryBuilder, query);
+
+    await this.applyCursorPagination(queryBuilder, query, sortConfig);
 
     queryBuilder
-      .select([
-        'problem.id AS id',
-        'problem.title AS title',
-        'problem.difficulty AS difficulty',
-        `COALESCE(json_agg(DISTINCT jsonb_build_object('id', tag.id, 'name', tag.name))
-         FILTER (WHERE tag.id IS NOT NULL), '[]') AS tags`,
-        `COALESCE(json_agg(DISTINCT jsonb_build_object('id', topic.id, 'name', topic.name)) 
-         FILTER (WHERE topic.id IS NOT NULL), '[]') AS topics`,
-      ])
-      .groupBy('problem.id');
+      .select('problem.id', 'id')
+      .addSelect(`problem.${sortConfig.sortBy}`, sortConfig.sortBy)
+      .distinct(true)
+      .limit(limit + 1);
 
-    const items = await queryBuilder.getRawMany<GetProblemResponseDto>();
-    return this.buildPaginatedResult(items, limit, isBackward, query);
+    const items = await queryBuilder.getRawMany<{
+      id: string;
+      [key: string]: any;
+    }>();
+    this.logger.debug(`Found problem IDs: ${JSON.stringify(items)}`);
+
+    return items.map((item) => item.id);
+  }
+
+  private buildBaseQuery(joins: string[]) {
+    const queryBuilder = this.dataSource.createQueryBuilder(Problem, 'problem');
+
+    const joinMap: Record<string, string> = {
+      courseProblem: 'problem.courseProblems',
+      contestProblem: 'problem.contestProblems',
+      problemTag: 'problem.problemTags',
+      problemTopic: 'problem.problemTopics',
+    };
+
+    joins.forEach((join) => {
+      if (joinMap[join]) {
+        queryBuilder.leftJoin(joinMap[join], join);
+      }
+    });
+
+    return queryBuilder;
+  }
+
+  private applyStudentFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    courseId: string,
+  ) {
+    queryBuilder.where(
+      '(problem.type IN (:...types) AND courseProblem.course = :courseId)',
+      {
+        types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+        courseId,
+      },
+    );
+  }
+
+  private applyAssignmentCreationFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+  ) {
+    queryBuilder.where('problem.type IN (:...types)', {
+      types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+    });
+  }
+
+  private applyContestCreationFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    courseId: string,
+  ) {
+    queryBuilder.where(
+      '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
+      {
+        types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+        courseId,
+      },
+    );
   }
 
   private validateAndGetPagination(query: ProblemsCursorQueryDto) {
@@ -181,152 +308,154 @@ export class ProblemsService {
     return { limit, isBackward };
   }
 
-  private buildBaseQuery() {
-    return this.problemsRepository
-      .createQueryBuilder('problem')
-      .leftJoin('problem.problemTags', 'problemTags')
-      .leftJoin('problemTags.tag', 'tag')
-      .leftJoin('problem.problemTopics', 'problemTopics')
-      .leftJoin('problemTopics.topic', 'topic');
-  }
-
-  private applyMatchAllFilters(
-    queryBuilder: SelectQueryBuilder<Problem>,
-    query: ProblemsCursorQueryDto,
-  ) {
-    if (query?.keyword) {
-      queryBuilder.where(
-        `"problem"."tsv" @@ websearch_to_tsquery('simple', unaccent(:keyword))`,
-        { keyword: query.keyword },
-      );
-    }
-
-    if (query?.filters?.difficulty) {
-      queryBuilder.andWhere('problem.difficulty = :difficulty', {
-        difficulty: query.filters.difficulty,
-      });
-    }
-
-    if (query?.filters?.type) {
-      queryBuilder.andWhere('problem.type = :type', {
-        type: query.filters.type,
-      });
-    }
-
-    if (query?.filters?.topics && query.filters.topics.length > 0) {
-      queryBuilder.andWhere('problemTopics.topic IN (:...topicIds)', {
-        topicIds: query.filters.topics,
-      });
-    }
-
-    if (query?.filters?.tags && query.filters.tags.length > 0) {
-      queryBuilder.andWhere('problemTags.tag IN (:...tagIds)', {
-        tagIds: query.filters.tags,
-      });
-    }
-  }
-
-  private applyMatchAnyFilters(
-    queryBuilder: SelectQueryBuilder<Problem>,
-    query: ProblemsCursorQueryDto,
-  ) {
-    if (query?.keyword) {
-      queryBuilder.where(
-        `"problem"."tsv" @@ websearch_to_tsquery('simple', unaccent(:keyword))`,
-        { keyword: query.keyword },
-      );
-    }
-
-    if (
-      !query?.filters?.difficulty &&
-      !query?.filters?.type &&
-      (!query?.filters?.topics || query.filters.topics.length === 0) &&
-      (!query?.filters?.tags || query.filters.tags.length === 0)
-    ) {
-      return;
-    }
-
-    const subQuery = new Brackets((qb) => {
-      if (query?.filters?.difficulty) {
-        qb.where('problem.difficulty = :difficulty', {
-          difficulty: query.filters.difficulty,
-        });
-      }
-
-      if (query?.filters?.type) {
-        qb.orWhere('problem.type = :type', {
-          type: query.filters.type,
-        });
-      }
-
-      if (query?.filters?.topics && query.filters.topics.length > 0) {
-        qb.orWhere('problemTopics.topic IN (:...topicIds)', {
-          topicIds: query.filters.topics,
-        });
-      }
-
-      if (query?.filters?.tags && query.filters.tags.length > 0) {
-        qb.orWhere('problemTags.tag IN (:...tagIds)', {
-          tagIds: query.filters.tags,
-        });
-      }
-    });
-
-    queryBuilder.andWhere(subQuery);
-  }
-
-  private async applyCursorPagination(
-    queryBuilder: SelectQueryBuilder<Problem>,
+  private buildSortConfiguration(
     query: ProblemsCursorQueryDto,
     isBackward: boolean,
   ) {
     const sortBy = query?.sortBy;
     const naturalOrder = query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
 
-    let operator: '>' | '<' = '>';
-    if (query?.after) {
-      operator = naturalOrder === 'ASC' ? '>' : '<';
-    } else if (query?.before) {
-      operator = naturalOrder === 'ASC' ? '<' : '>';
-    }
+    const operator = this.determineCursorOperator(query, naturalOrder);
 
-    let effectiveOrder: 'ASC' | 'DESC';
+    let sortOrder: 'ASC' | 'DESC';
     if (isBackward) {
-      effectiveOrder = naturalOrder === 'ASC' ? 'DESC' : 'ASC';
+      sortOrder = naturalOrder === 'ASC' ? 'DESC' : 'ASC';
     } else {
-      effectiveOrder = naturalOrder;
+      sortOrder = naturalOrder;
     }
 
+    return { sortBy, sortOrder, operator };
+  }
+
+  private determineCursorOperator(
+    query: ProblemsCursorQueryDto,
+    naturalOrder: 'ASC' | 'DESC',
+  ): '>' | '<' {
+    if (query?.after) {
+      return naturalOrder === 'ASC' ? '>' : '<';
+    }
+
+    if (query?.before) {
+      return naturalOrder === 'ASC' ? '<' : '>';
+    }
+
+    return '>';
+  }
+
+  private applyKeywordFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    keyword?: string,
+  ) {
+    if (keyword) {
+      queryBuilder.andWhere(
+        `"problem"."tsv" @@ websearch_to_tsquery('simple', unaccent(:keyword))`,
+        { keyword },
+      );
+    }
+  }
+
+  private applyMatchFilters(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    query: ProblemsCursorQueryDto,
+  ) {
+    this.applyKeywordFilter(queryBuilder, query?.keyword);
+
+    const hasFilters =
+      !!query?.filters?.difficulty ||
+      !!query?.filters?.type ||
+      (query?.filters?.topics && query.filters.topics.length > 0) ||
+      (query?.filters?.tags && query.filters.tags.length > 0);
+
+    if (!hasFilters) {
+      return;
+    }
+
+    let filterBracket!: Brackets;
+
+    if (query.matchMode === MatchMode.ALL) {
+      filterBracket = new Brackets((qb) => {
+        this.applyIndividualFilters(
+          qb.andWhere.bind(qb) as (
+            condition: string,
+            parameters?: ObjectLiteral,
+          ) => SelectQueryBuilder<Problem>,
+          query,
+        );
+      });
+    } else if (query.matchMode === MatchMode.ANY) {
+      filterBracket = new Brackets((qb) => {
+        this.applyIndividualFilters(
+          qb.orWhere.bind(qb) as (
+            condition: string,
+            parameters?: ObjectLiteral,
+          ) => SelectQueryBuilder<Problem>,
+          query,
+        );
+      });
+    }
+
+    queryBuilder.andWhere(filterBracket);
+  }
+
+  private applyIndividualFilters(
+    where: (
+      condition: string,
+      parameters?: ObjectLiteral,
+    ) => SelectQueryBuilder<Problem>,
+    query: ProblemsCursorQueryDto,
+  ) {
+    if (query?.filters?.difficulty) {
+      where('problem.difficulty = :difficulty', {
+        difficulty: query.filters.difficulty,
+      });
+    }
+
+    if (query?.filters?.type) {
+      where('problem.type = :type', {
+        type: query.filters.type,
+      });
+    }
+
+    if (query?.filters?.topics && query.filters.topics.length > 0) {
+      where('problemTopic.topic IN (:...topicIds)', {
+        topicIds: query.filters.topics,
+      });
+    }
+
+    if (query?.filters?.tags && query.filters.tags.length > 0) {
+      where('problemTag.tag IN (:...tagIds)', {
+        tagIds: query.filters.tags,
+      });
+    }
+  }
+
+  private async applyCursorPagination(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    query: ProblemsCursorQueryDto,
+    sortConfig: {
+      sortBy: SortBy;
+      sortOrder: 'ASC' | 'DESC';
+      operator: '<' | '>';
+    },
+  ) {
     if (query?.after || query?.before) {
       const cursor = await this.getAndValidateCursorPayload(
         query?.after ?? (query?.before as string),
       );
+      this.logger.debug(`Decoded cursor: ${JSON.stringify(cursor)}`);
 
       queryBuilder.andWhere(
-        `(problem.${sortBy}, problem.id) ${operator} (:cursorValue, :cursorId)`,
+        `(problem.${sortConfig.sortBy}, problem.id) ${sortConfig.operator} (:cursorValue, :cursorId)`,
         {
-          cursorValue: cursor[sortBy],
+          cursorValue: cursor[sortConfig.sortBy],
           cursorId: cursor.id,
         },
       );
     }
 
     queryBuilder
-      .orderBy(`problem.${sortBy}`, effectiveOrder)
-      .addOrderBy('problem.id', effectiveOrder);
-  }
-
-  private async getAndValidateCursorPayload(
-    payload: string,
-  ): Promise<ProblemCursorFieldsDto> {
-    const cursorRaw = decodeCursor(payload) as Record<string, any>;
-    const cursor = plainToInstance(ProblemCursorFieldsDto, cursorRaw);
-    const errors = await validate(cursor);
-    if (errors.length > 0) {
-      throw new BadRequestException('Invalid cursor');
-    }
-
-    return cursor;
+      .orderBy(`problem.${sortConfig.sortBy}`, sortConfig.sortOrder)
+      .addOrderBy('problem.id', sortConfig.sortOrder);
   }
 
   private async buildPaginatedResult(
@@ -372,16 +501,77 @@ export class ProblemsService {
     } as CursorPaginated<GetProblemResponseDto>;
   }
 
+  private async getAndValidateCursorPayload(
+    payload: string,
+  ): Promise<ProblemCursorFieldsDto> {
+    const cursorRaw = decodeCursor(payload) as Record<string, any>;
+    const cursor = plainToInstance(ProblemCursorFieldsDto, cursorRaw);
+    const errors = await validate(cursor);
+    if (errors.length > 0) {
+      throw new BadRequestException('Invalid cursor');
+    }
+
+    return cursor;
+  }
+
+  private async findProblemByIds(
+    ids: string[],
+    sortConfig: {
+      sortBy: SortBy;
+      sortOrder: 'ASC' | 'DESC';
+    },
+  ) {
+    const queryBuilder = this.dataSource.createQueryBuilder(Problem, 'problem');
+
+    queryBuilder.where('problem.id IN (:...ids)', { ids });
+
+    this.selectFieldsForProblem(queryBuilder, sortConfig.sortBy);
+
+    queryBuilder
+      .orderBy(`problem.${sortConfig.sortBy}`, sortConfig.sortOrder)
+      .addOrderBy('problem.id', sortConfig.sortOrder);
+
+    return queryBuilder.getRawMany<GetProblemResponseDto>();
+  }
+
+  private selectFieldsForProblem(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    sortBy: SortBy,
+  ) {
+    queryBuilder.select([
+      'problem.id AS id',
+      'problem.title AS title',
+      'problem.difficulty AS difficulty',
+      `problem.${sortBy} AS "${sortBy}"`,
+
+      // subquery for tags
+      `(SELECT COALESCE(json_agg(jsonb_build_object('id', tag.tag_id, 'name', tag.name)), '[]')
+          FROM problem_tags problemTag
+          JOIN tags tag ON problemTag.tag_id = tag.tag_id
+          WHERE problemTag.problem_id = problem.problem_id
+        ) AS tags`,
+
+      // subquery for topics
+      `(SELECT COALESCE(json_agg(jsonb_build_object('id', topic.topic_id, 'name', topic.name)), '[]')
+          FROM problem_topics problemTopic
+          JOIN topics topic ON problemTopic.topic_id = topic.topic_id
+          WHERE problemTopic.problem_id = problem.problem_id
+        ) AS topics`,
+    ]);
+  }
+
   private async getTotalCountWithFilters(
     query: ProblemsCursorQueryDto,
   ): Promise<number> {
-    const queryBuilder = this.buildBaseQuery();
+    const queryBuilder = this.buildBaseQuery([
+      'courseProblem',
+      'contestProblem',
+      'problemTag',
+      'problemTopic',
+    ]);
 
-    if (query.matchMode === MatchMode.ALL) {
-      this.applyMatchAllFilters(queryBuilder, query);
-    } else if (query.matchMode === MatchMode.ANY) {
-      this.applyMatchAnyFilters(queryBuilder, query);
-    }
+    this.applyKeywordFilter(queryBuilder, query?.keyword);
+    this.applyMatchFilters(queryBuilder, query);
 
     const raw = (await queryBuilder
       .select('COUNT(DISTINCT problem.id)', 'count')
