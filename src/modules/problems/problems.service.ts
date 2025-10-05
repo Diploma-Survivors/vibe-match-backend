@@ -21,7 +21,7 @@ import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { StoragesService } from '../storages/storages.service';
 import { TESTCASE_FILE_EXTENSION } from './constants/testcase.constant';
 import { CreateProblemDto } from './dto/create-problem.dto';
-import { GetProblemResponseDto } from './dto/get-problem-response.dto';
+import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import {
   ProblemCursorFieldsDto,
   ProblemsCursorQueryDto,
@@ -459,11 +459,11 @@ export class ProblemsService {
   }
 
   private async buildPaginatedResult(
-    items: GetProblemResponseDto[],
+    items: GetProblemsResponseDto[],
     limit: number,
     isBackward: boolean,
     query: ProblemsCursorQueryDto,
-  ): Promise<CursorPaginated<GetProblemResponseDto>> {
+  ): Promise<CursorPaginated<GetProblemsResponseDto>> {
     const hasMore = items.length > limit;
     if (hasMore) {
       items.pop();
@@ -498,7 +498,7 @@ export class ProblemsService {
         endCursor,
       },
       totalCount,
-    } as CursorPaginated<GetProblemResponseDto>;
+    } as CursorPaginated<GetProblemsResponseDto>;
   }
 
   private async getAndValidateCursorPayload(
@@ -531,7 +531,7 @@ export class ProblemsService {
       .orderBy(`problem.${sortConfig.sortBy}`, sortConfig.sortOrder)
       .addOrderBy('problem.id', sortConfig.sortOrder);
 
-    return queryBuilder.getRawMany<GetProblemResponseDto>();
+    return queryBuilder.getRawMany<GetProblemsResponseDto>();
   }
 
   private selectFieldsForProblem(

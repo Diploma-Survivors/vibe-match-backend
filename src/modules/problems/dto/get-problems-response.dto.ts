@@ -28,7 +28,7 @@ export class GetTopicDto {
   })
   name: string;
 }
-export class GetProblemResponseDto {
+export class GetProblemsResponseDto {
   @ApiProperty({
     description: 'The unique identifier of the problem',
     example: 'problem123',

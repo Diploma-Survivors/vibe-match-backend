@@ -41,7 +41,7 @@ import {
 } from './constants/testcase.constant';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
-import { GetProblemResponseDto } from './dto/get-problem-response.dto';
+import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import { ProblemsCursorQueryDto } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { ProblemsService } from './problems.service';
@@ -105,7 +105,7 @@ export class ProblemsController {
   @ApiExtraModels(
     PaginationCursorResponseDto,
     CursorEdgeDto,
-    GetProblemResponseDto,
+    GetProblemsResponseDto,
   )
   @ApiResponse({
     status: HttpStatus.OK,
@@ -124,7 +124,7 @@ export class ProblemsController {
                   },
                   {
                     properties: {
-                      node: { $ref: getSchemaPath(GetProblemResponseDto) },
+                      node: { $ref: getSchemaPath(GetProblemsResponseDto) },
                     },
                   },
                 ],
@@ -155,7 +155,7 @@ export class ProblemsController {
   @ApiExtraModels(
     PaginationCursorResponseDto,
     CursorEdgeDto,
-    GetProblemResponseDto,
+    GetProblemsResponseDto,
   )
   @ApiResponse({
     status: HttpStatus.OK,
@@ -174,7 +174,7 @@ export class ProblemsController {
                   },
                   {
                     properties: {
-                      node: { $ref: getSchemaPath(GetProblemResponseDto) },
+                      node: { $ref: getSchemaPath(GetProblemsResponseDto) },
                     },
                   },
                 ],
@@ -208,7 +208,7 @@ export class ProblemsController {
   @ApiExtraModels(
     PaginationCursorResponseDto,
     CursorEdgeDto,
-    GetProblemResponseDto,
+    GetProblemsResponseDto,
   )
   @ApiResponse({
     status: HttpStatus.OK,
@@ -227,7 +227,7 @@ export class ProblemsController {
                   },
                   {
                     properties: {
-                      node: { $ref: getSchemaPath(GetProblemResponseDto) },
+                      node: { $ref: getSchemaPath(GetProblemsResponseDto) },
                     },
                   },
                 ],
@@ -250,7 +250,7 @@ export class ProblemsController {
   @ApiOperation({ summary: 'Get a problem by ID' })
   @ApiParam({ name: 'id', type: 'string', description: 'Problem ID' })
   @ApiResponse({
-    type: () => GetProblemResponseDto,
+    type: () => GetProblemsResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been found.',
   })
