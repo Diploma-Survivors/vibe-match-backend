@@ -80,7 +80,7 @@ export class PaginationCursorDto {
   })
   @IsOptional()
   @IsEnum(SortOrder)
-  sortOrder?: SortOrder = SortOrder.ASC;
+  sortOrder: SortOrder = SortOrder.ASC;
 
   @ApiProperty({
     enum: MatchMode,
