@@ -31,9 +31,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
   }
 
   async validate(req: Request): Promise<JwtPayload> {
-    const refreshToken = (req?.body as Record<string, string>)?.[
-      'refreshToken'
-    ];
+    const refreshToken = (req.headers?.authorization as string)?.split(' ')[1];
     const deviceId = (req?.body as Record<string, string>)?.['deviceId'];
 
     return await this.jwtAuthService.validateRefreshToken(
