@@ -47,22 +47,6 @@ export class Judge0Service {
     }
   }
 
-  /**
-   * Convert time from milliseconds to seconds for Judge0
-   */
-  msToSeconds(ms: number): number {
-    return Math.ceil(ms / 1000);
-  }
-
-  encodeBase64(data: string): string {
-    return Buffer.from(data).toString('base64');
-  }
-
-  decodeBase64(data?: string): string | undefined {
-    if (!data) return undefined;
-    return Buffer.from(data, 'base64').toString('utf-8');
-  }
-
   getCallbackUrl(
     submissionId: string,
     testcaseId: string,

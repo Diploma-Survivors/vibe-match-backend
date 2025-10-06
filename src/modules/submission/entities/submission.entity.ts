@@ -8,9 +8,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Problem } from '../../problems/entities/problem.entity';
-import { SubmissionStatus } from '../enums/submission.enum';
 import { Language } from '../language/language.entity';
 import { User } from '../../user/entities/user.entity';
+import { SubmissionStatus } from '../enums/submission-status.enum';
 
 // TODO: missing contest participant id
 @Entity()

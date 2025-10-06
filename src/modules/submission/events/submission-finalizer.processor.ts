@@ -2,13 +2,9 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { CallbackProcessor } from '../helpers/callback.processor';
-import {
-  QUEUE_FINALIZE_RUN_JOB,
-  QUEUE_FINALIZE_SUBMIT_JOB,
-  SUBMISSION_FINALIZE_QUEUE,
-} from '../../../common/constants/submission.constant';
+import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
 
-@Processor(SUBMISSION_FINALIZE_QUEUE)
+@Processor(SubmissionQueue.FINALIZE)
 @Injectable()
 export class SubmissionFinalizeProcessor extends WorkerHost {
   private readonly logger = new Logger(SubmissionFinalizeProcessor.name);
@@ -19,11 +15,11 @@ export class SubmissionFinalizeProcessor extends WorkerHost {
 
   // BullMQ pattern: single entrypoint for all jobs in this queue
   async process(job: Job<{ submissionId: string }>): Promise<void> {
-    if (job.name === QUEUE_FINALIZE_RUN_JOB) {
+    if (job.name === (SubmissionJob.FINALIZE_RUN as string)) {
       const { submissionId } = job.data;
       await this.callbackProcessor.finalizer(submissionId, false);
       this.logger.log(`Finalized submission ${submissionId}.`);
-    } else if (job.name === QUEUE_FINALIZE_SUBMIT_JOB) {
+    } else if (job.name === (SubmissionJob.FINALIZE_SUBMIT as string)) {
       const { submissionId } = job.data;
       await this.callbackProcessor.finalizer(submissionId, true);
       this.logger.log(`Finalized submission ${submissionId}.`);

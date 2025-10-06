@@ -8,12 +8,9 @@ import {
 import { Observable, ReplaySubject } from 'rxjs';
 import { Redis } from 'ioredis';
 import { REDIS } from '../../../shared/redis/redis.module';
-import {
-  SUBMISSION_CLEANUP_STREAM_TIME,
-  SUBMISSION_EVENT_REDIS_CHANNEL,
-  SUBMISSION_REPLAY_SUBJECT_BUFFER,
-  SUBMISSION_RESULT_EVENT,
-} from '../../../common/constants/submission.constant';
+import { ConfigService } from '@nestjs/config';
+import { SubmissionConstants } from '../constants/submission.constant';
+import { SubmissionEvent } from '../enums/submission-event.enum';
 
 @Injectable()
 export class SubmissionsSseService implements OnModuleInit {
@@ -23,14 +20,16 @@ export class SubmissionsSseService implements OnModuleInit {
   private readonly streams = new Map<string, ReplaySubject<MessageEvent>>();
 
   private readonly cleanupTimers = new Map<string, NodeJS.Timeout>();
-  private readonly cleanupMs = SUBMISSION_CLEANUP_STREAM_TIME;
 
-  constructor(@Inject(REDIS) private readonly redis: Redis) {}
+  constructor(
+    @Inject(REDIS) private readonly redis: Redis,
+    private readonly configService: ConfigService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     this.sub = this.redis.duplicate();
 
-    await this.sub.subscribe(SUBMISSION_EVENT_REDIS_CHANNEL);
+    await this.sub.subscribe(SubmissionConstants.EVENT_REDIS_CHANNEL);
     this.sub.on('message', (_channel, message) => {
       try {
         const { submissionId, payload } = JSON.parse(message) as {
@@ -48,7 +47,7 @@ export class SubmissionsSseService implements OnModuleInit {
     let stream = this.streams.get(submissionId);
     if (!stream) {
       stream = new ReplaySubject<MessageEvent>(
-        SUBMISSION_REPLAY_SUBJECT_BUFFER,
+        SubmissionConstants.REPLAY_SUBJECT_BUFFER,
       );
       this.streams.set(submissionId, stream);
     }
@@ -67,19 +66,22 @@ export class SubmissionsSseService implements OnModuleInit {
     let stream = this.streams.get(submissionId);
     if (!stream) {
       stream = new ReplaySubject<MessageEvent>(
-        SUBMISSION_REPLAY_SUBJECT_BUFFER,
+        SubmissionConstants.REPLAY_SUBJECT_BUFFER,
       );
       this.streams.set(submissionId, stream);
     }
 
     const event: MessageEvent = {
-      type: SUBMISSION_RESULT_EVENT,
+      type: SubmissionEvent.RESULT,
       data: data,
     };
     stream.next(event);
 
     if (!this.cleanupTimers.has(submissionId)) {
-      const t = setTimeout(() => this.cleanup(submissionId), this.cleanupMs);
+      const cleanupMs = this.configService.get<number>(
+        'submission.streamCleanupMs',
+      );
+      const t = setTimeout(() => this.cleanup(submissionId), cleanupMs);
       this.cleanupTimers.set(submissionId, t);
     }
   }

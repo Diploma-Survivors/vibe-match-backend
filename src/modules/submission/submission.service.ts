@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
-import { judge0StatusMap, SubmissionStatus } from './enums/submission.enum';
+import {
+  judge0StatusMap,
+  SubmissionStatus,
+} from './enums/submission-status.enum';
 import { SubmissionResultDto } from './dto/submission.response.dto';
 import { Judge0Service } from '../judge0/judge0.service';
 import {
@@ -28,7 +31,9 @@ import { User } from '../user/entities/user.entity';
 import { Language } from './language/language.entity';
 import { ConfigService } from '@nestjs/config';
 import { StoragesService } from '../storages/storages.service';
-import { SUBMISSION_FILE_EXTENSION } from '../../common/constants/submission.constant';
+import { Base64Util } from '../../shared/util/base64.util';
+import { TimeUtil } from '../../shared/util/time.util';
+import { SubmissionConstants } from './constants/submission.constant';
 
 @Injectable()
 export class SubmissionService {
@@ -107,7 +112,7 @@ export class SubmissionService {
     const isMultiFile = dto.languageId === 89;
     const sourceBase64 =
       !isMultiFile && dto.sourceCode
-        ? this.judge0Service.encodeBase64(dto.sourceCode)
+        ? Base64Util.encodeBase64(dto.sourceCode)
         : undefined;
     const additionalFilesBase64 =
       isMultiFile && file?.buffer ? file.buffer.toString('base64') : undefined;
@@ -186,7 +191,7 @@ export class SubmissionService {
       );
     }
     const seed = uuidv4();
-    const key = `submissions/${userId}/${problemId}/${seed}${SUBMISSION_FILE_EXTENSION}`;
+    const key = `submissions/${userId}/${problemId}/${seed}${SubmissionConstants.FILE_EXTENSION}`;
     const bucket = this.configService.get<string>(
       'aws.s3.bucketName',
     ) as string;
@@ -209,12 +214,12 @@ export class SubmissionService {
       language_id: dto.languageId,
       source_code: sourceBase64,
       additional_files: additionalFilesBase64,
-      stdin: stdinRaw ? this.judge0Service.encodeBase64(stdinRaw) : undefined,
+      stdin: stdinRaw ? Base64Util.encodeBase64(stdinRaw) : undefined,
       expected_output: expectedOutput
-        ? this.judge0Service.encodeBase64(expectedOutput)
+        ? Base64Util.encodeBase64(expectedOutput)
         : undefined,
       redirect_stderr_to_stdout: true,
-      cpu_time_limit: this.judge0Service.msToSeconds(problem.timeLimitMs),
+      cpu_time_limit: TimeUtil.msToSeconds(problem.timeLimitMs),
       memory_limit: problem.memoryLimitKb,
       callback_url: this.judge0Service.getCallbackUrl(
         submissionId,
@@ -342,18 +347,18 @@ export class SubmissionService {
   }
 
   buildTestResult(judge0Response: Judge0Response): TestResultDto {
-    const stdout = this.judge0Service.decodeBase64(judge0Response.stdout);
+    const stdout = Base64Util.decodeBase64(judge0Response.stdout);
 
     return {
       stdout: stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
-      status: judge0Response.status,
-      stderr: this.judge0Service.decodeBase64(judge0Response.stderr),
+      status:
+        judge0StatusMap[judge0Response.status.id] ||
+        SubmissionStatus.UNKNOWN_ERROR,
+      stderr: Base64Util.decodeBase64(judge0Response.stderr),
       token: judge0Response.token,
-      expectedOutput: this.judge0Service.decodeBase64(
-        judge0Response.expected_output,
-      ),
+      expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
     };
   }
 
@@ -391,15 +396,11 @@ export class SubmissionService {
     for (const result of results) {
       sumRuntime += result.time || 0;
       sumMemory += result.memory || 0;
-      if (result.status.id === 3) {
+      if (result.status === SubmissionStatus.ACCEPTED) {
         passedTests++;
-      } else if (
-        result.status.id !== 3 &&
-        overallStatus === SubmissionStatus.ACCEPTED
-      ) {
+      } else {
         // only set the first not accepted status
-        overallStatus =
-          judge0StatusMap[result.status.id] ?? SubmissionStatus.UNKNOWN_ERROR;
+        overallStatus = result.status;
       }
     }
     return { overallStatus, passedTests, totalTests, sumRuntime, sumMemory };

@@ -52,4 +52,11 @@ export default Joi.object({
   LTI_FRONTEND_DEEP_LINKING_URL: Joi.string().uri().required(),
   LTI_FRONTEND_STUDENT_SET_COOKIES_URL: Joi.string().uri().required(),
   LTI_FRONTEND_INSTRUCTOR_SET_COOKIES_URL: Joi.string().uri().required(),
+  SUBMISSION_CLEANUP_STREAM_TIME: Joi.number().required(),
+  SUBMISSION_PING_TIME: Joi.number().required(),
+  JOB_ATTEMPTS: Joi.number().required(),
+  JOB_BACKOFF_TYPE: Joi.string().required(),
+  JOB_BACKOFF_DELAY: Joi.number().required(),
+  JOB_REMOVE_ON_COMPLETE: Joi.boolean().required(),
+  JOB_REMOVE_ON_FAIL: Joi.number().required(),
 });
