@@ -8,6 +8,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Problem } from './entities/problem.entity';
 import { ProblemTag } from './entities/problem-tag.entity';
 import { ProblemTopic } from './entities/problem-topic.entity';
+import { CourseProblem } from './entities/course-problem.entity';
+import { TestcaseSample } from './testcases/entities/testcase-sample.entity';
 
 @Module({
   controllers: [ProblemsController],
@@ -16,7 +18,13 @@ import { ProblemTopic } from './entities/problem-topic.entity';
     TopicsModule,
     TagsModule,
     TestcasesModule,
-    TypeOrmModule.forFeature([Problem, ProblemTag, ProblemTopic]),
+    TypeOrmModule.forFeature([
+      Problem,
+      ProblemTag,
+      ProblemTopic,
+      CourseProblem,
+      TestcaseSample,
+    ]),
   ],
   exports: [ProblemsService],
 })
