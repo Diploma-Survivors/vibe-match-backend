@@ -9,8 +9,8 @@ import { Problem } from '../../../src/modules/problems/entities/problem.entity';
 import { DifficultyLevel } from '../../../src/modules/problems/enums/difficulty-level.enum';
 import { DataSource } from 'typeorm';
 import * as process from 'node:process';
-import { SUBMISSION_RESULT_EVENT } from '../../../src/common/constants/submission.constant';
-import { SubmissionStatus } from '../../../src/modules/submission/enums/submission.enum';
+import { SubmissionStatus } from '../../../src/modules/submission/enums/submission-status.enum';
+import { SubmissionEvent } from '../../../src/modules/submission/enums/submission-event.enum';
 
 describe('SubmissionController (e2e)', () => {
   let app: INestApplication;
@@ -109,7 +109,7 @@ print(a + b)
         console.log(`Connecting to SSE stream at: ${url}`);
         const es = new EventSource(url);
 
-        es.addEventListener(SUBMISSION_RESULT_EVENT, (event) => {
+        es.addEventListener(SubmissionEvent.RESULT, (event) => {
           try {
             es.close();
             const data = JSON.parse(event.data);
