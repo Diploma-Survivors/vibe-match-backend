@@ -1,6 +1,12 @@
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  S3ClientConfig,
+} from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
-import { PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
+import * as readline from 'node:readline';
 import { FileUploadOptions } from './interfaces/file-update-options.interface';
 
 @Injectable()
@@ -41,5 +47,21 @@ export class StoragesService {
   getObjectUrl(bucket: string, key: string) {
     const region = this.configService.get<string>('aws.s3.region');
     return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+  }
+
+  // TODO: Test later
+  async *streamLines(bucket: string, key: string): AsyncGenerator<string> {
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const response = await this.client.send(command);
+    const bodyStream = response.Body as NodeJS.ReadableStream;
+
+    const rl = readline.createInterface({
+      input: bodyStream,
+      crlfDelay: Infinity,
+    });
+
+    for await (const line of rl) {
+      yield line.trim();
+    }
   }
 }

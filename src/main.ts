@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { Response } from 'express';
 import qs from 'qs';
 import { AppModule } from './app.module';
+import { Environment } from './common/enums/environment.enum';
 import { ExpressSetting } from './common/enums/express-setting.enum';
 
 async function bootstrap() {
@@ -64,7 +65,7 @@ async function bootstrap() {
   SwaggerModule.setup(swaggerEndpoint, app, document);
 
   const env = configService.get<string>('appConfig.environment');
-  if (env !== 'production') {
+  if (env !== Environment.PRODUCTION) {
     app
       .getHttpAdapter()
       .get(`/${apiVersion}/swagger-json`, (_req, res: Response) => {

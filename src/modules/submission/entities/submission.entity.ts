@@ -1,0 +1,62 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Problem } from '../../problems/entities/problem.entity';
+import { Language } from '../language/language.entity';
+import { User } from '../../user/entities/user.entity';
+import { SubmissionStatus } from '../enums/submission-status.enum';
+
+// TODO: missing contest participant id
+@Entity()
+export class Submission {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('text', { nullable: true })
+  sourceCode: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @ManyToOne(() => Problem)
+  @JoinColumn({ name: 'problem_id' })
+  problem: Problem;
+
+  @Column({
+    type: 'enum',
+    enum: SubmissionStatus,
+    default: SubmissionStatus.PENDING,
+  })
+  status: SubmissionStatus;
+
+  @CreateDateColumn()
+  submittedAt: Date;
+
+  @OneToOne(() => Language, (language) => language.id)
+  language: Language;
+
+  @Column({ type: 'varchar', nullable: true })
+  fileUrl: string | null;
+
+  @Column('int')
+  totalTests: number;
+
+  @Column('int')
+  passedTests: number;
+
+  @Column('float')
+  score: number;
+
+  @Column({ type: 'float', nullable: true })
+  runtime: number;
+
+  @Column({ nullable: true })
+  memoryUsed: number;
+}

@@ -1,0 +1,60 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios, { AxiosResponse } from 'axios';
+import {
+  Judge0BatchResponse,
+  Judge0SubmissionPayload,
+} from './judge0.interface';
+
+@Injectable()
+export class Judge0Service {
+  private readonly logger = new Logger(Judge0Service.name);
+  private readonly judge0Url: string;
+  private readonly publicUrl: string;
+  private readonly apiVersion: string;
+
+  constructor(private readonly configService: ConfigService) {
+    this.judge0Url = this.configService.get<string>('appConfig.judge0Url')!;
+    this.publicUrl = this.configService.get<string>(
+      'appConfig.judge0CallbackUrl',
+    )!;
+    this.apiVersion = this.configService.get<string>('appConfig.apiVersion')!;
+  }
+
+  /**
+   * Create batch submissions with callbacks
+   */
+  async createSubmissionBatch(
+    items: Judge0SubmissionPayload[],
+  ): Promise<Judge0BatchResponse> {
+    try {
+      const url = `${this.judge0Url}/submissions/batch?base64_encoded=true`;
+
+      const response: AxiosResponse<Judge0BatchResponse> = await axios.post(
+        url,
+        { submissions: items },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Failed to create batch submission: ${error}`);
+      throw error;
+    }
+  }
+
+  getCallbackUrl(
+    submissionId: string,
+    testcaseId: string,
+    isSubmit: boolean,
+  ): string {
+    if (isSubmit) {
+      return `${this.publicUrl}/${this.apiVersion}/submissions/judge0/callback/submit?sid=${submissionId}&tcid=${testcaseId}`;
+    }
+    return `${this.publicUrl}/${this.apiVersion}/submissions/judge0/callback/run?sid=${submissionId}&tcid=${testcaseId}`;
+  }
+}
