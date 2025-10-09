@@ -6,7 +6,6 @@ import {
   IsString,
   Max,
   Min,
-  MinLength,
   Validate,
 } from 'class-validator';
 import { MatchMode } from '../enums/match-mode.enum';
@@ -20,7 +19,7 @@ export class PaginationCursorDto {
     required: false,
   })
   @IsOptional()
-  @MinLength(1)
+  @IsString()
   keyword?: string;
 
   @ApiProperty({
