@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
+import { CourseProblem } from '../entities/course-problem.entity';
+import { Exclude } from 'class-transformer';
 
 class GetTestcaseSampleDto {
   @ApiProperty({
@@ -33,7 +35,7 @@ class GetTestcaseSampleDto {
   })
   updatedAt: Date;
 }
-export class GetProblemResponseDto {
+export class GetDetailProblemResponseDto {
   @ApiProperty({
     description: 'The unique identifier of the problem',
     example: '550e8400-e29b-41d4-a716-446655440000',
@@ -102,6 +104,9 @@ export class GetProblemResponseDto {
   })
   testcaseSamples: GetTestcaseSampleDto[];
 
+  @Exclude()
+  courseProblems: CourseProblem[];
+
   @ApiProperty({
     description: 'The creation timestamp of the problem',
     example: '2025-10-01T12:00:00Z',
@@ -113,4 +118,8 @@ export class GetProblemResponseDto {
     example: '2025-10-01T12:00:00Z',
   })
   updatedAt: Date;
+
+  constructor(partial: Partial<GetDetailProblemResponseDto>) {
+    Object.assign(this, partial);
+  }
 }

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -399,5 +404,44 @@ export class ContestsService {
     }
 
     return '>';
+  }
+
+  async getDetailContest(id: string, currentUser: JwtPayload) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id },
+      relations: ['contestProblems', 'contestProblems.problem', 'course'],
+    });
+    if (!contest) {
+      throw new BadRequestException('Contest not found');
+    }
+
+    const isAccessible =
+      contest.status === ContestStatus.PUBLIC ||
+      contest.course.id === currentUser.courseId;
+
+    if (!isAccessible) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    const problems = contest.contestProblems.map((cp) => ({
+      id: cp.problem.id,
+      title: cp.problem.title,
+      score: cp.score,
+      difficulty: cp.problem.difficulty,
+      memoryLimitKb: cp.problem.memoryLimitKb,
+      timeLimitMs: cp.problem.timeLimitMs,
+    }));
+
+    const sortedProblems = problems.toSorted((a, b) => {
+      if (a.score === b.score) {
+        return a.title.localeCompare(b.title);
+      }
+      return a.score - b.score;
+    });
+
+    return {
+      ...contest,
+      contestProblems: sortedProblems,
+    };
   }
 }

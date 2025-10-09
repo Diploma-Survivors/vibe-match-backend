@@ -95,7 +95,9 @@ export class CreateContestDto {
 
   @ApiProperty({
     description: 'List of problems included in the contest with their scores',
+    type: () => [CreateProblemWithContestDto],
   })
+  @Type(() => CreateProblemWithContestDto)
   @IsArray()
   @ValidateNested({ each: true })
   problems: CreateProblemWithContestDto[];

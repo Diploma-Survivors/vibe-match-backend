@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
@@ -584,11 +589,22 @@ export class ProblemsService {
     return await this.problemsRepository.findOne({ where: { id }, select });
   }
 
-  async findDetailProblemById(id: string) {
+  async findDetailProblemById(id: string, currentUser: JwtPayload) {
     const problem = await this.problemsRepository.findOne({
       where: { id },
-      relations: ['testcaseSamples'],
+      relations: ['testcaseSamples', 'courseProblems', 'courseProblems.course'],
     });
+    if (!problem) {
+      throw new BadRequestException('Problem not found');
+    }
+
+    const isAccessible = problem.courseProblems.some(
+      (cp) => cp.course.id === currentUser.courseId,
+    );
+
+    if (!isAccessible) {
+      throw new ForbiddenException('You do not have access to this problem');
+    }
 
     return problem;
   }

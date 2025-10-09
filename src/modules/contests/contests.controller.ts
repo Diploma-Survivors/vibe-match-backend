@@ -1,16 +1,20 @@
 import {
   Body,
+  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpStatus,
+  Param,
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiExtraModels,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
   getSchemaPath,
@@ -28,6 +32,7 @@ import { ContestsService } from './contests.service';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
+import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
 
 @Controller('contests')
 @ApiTags('Contests')
@@ -109,5 +114,34 @@ export class ContestsController {
       contestsCursorQueryDto,
       currentUser,
     );
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get detailed information about a specific contest',
+    description:
+      'Retrieve detailed information about a specific contest by ID.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Contest details retrieved successfully',
+    type: () => GetDetailContestResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request.' })
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
+  async getDetailContest(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const contest = await this.contestsService.getDetailContest(id, user);
+
+    return new GetDetailContestResponseDto(contest);
   }
 }

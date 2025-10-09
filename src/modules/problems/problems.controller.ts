@@ -41,7 +41,7 @@ import {
 } from './constants/testcase.constant';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
-import { GetProblemResponseDto } from './dto/get-problem-response.dto';
+import { GetDetailProblemResponseDto } from './dto/get-problem-response.dto';
 import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import { ProblemsCursorQueryDto } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
@@ -251,7 +251,7 @@ export class ProblemsController {
   @ApiOperation({ summary: 'Get a problem by ID' })
   @ApiParam({ name: 'id', type: 'string', description: 'Problem ID' })
   @ApiResponse({
-    type: () => GetProblemResponseDto,
+    type: () => GetDetailProblemResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been found.',
   })
@@ -262,8 +262,17 @@ export class ProblemsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  async findOne(@Param('id') id: string) {
-    return this.problemsService.findDetailProblemById(id);
+  @UseInterceptors(ClassSerializerInterceptor)
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const problem = await this.problemsService.findDetailProblemById(
+      id,
+      currentUser,
+    );
+
+    return new GetDetailProblemResponseDto(problem);
   }
 
   @Patch(':id')

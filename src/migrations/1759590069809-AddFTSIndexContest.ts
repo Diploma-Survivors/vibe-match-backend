@@ -22,6 +22,7 @@ export class AddFTSIndexContest1759590069809 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
+        DROP TRIGGER IF EXISTS contests_tsv_update ON "contests";
         CREATE TRIGGER contests_tsv_update
         BEFORE INSERT OR UPDATE ON "contests"
         FOR EACH ROW
