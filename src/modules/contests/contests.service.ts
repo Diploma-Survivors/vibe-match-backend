@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
@@ -34,6 +34,7 @@ export class ContestsService {
   private readonly logger = new Logger(ContestsService.name);
 
   constructor(
+    @InjectDataSource()
     private readonly dataSource: DataSource,
     @InjectRepository(Contest)
     private readonly contestsRepository: Repository<Contest>,

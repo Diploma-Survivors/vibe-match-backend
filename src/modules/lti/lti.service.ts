@@ -445,7 +445,10 @@ export class LtiService {
       ) as string;
     }
 
-    return { redirectPath: `${baseUrl}/${problemId}`, postRedirectUrl };
+    return {
+      redirectPath: `${baseUrl}/${problemId}`,
+      postRedirectUrl,
+    };
   }
 
   private getKeyRedisForDeepLinking(deviceId: string): string {

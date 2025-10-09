@@ -41,6 +41,7 @@ import {
 } from './constants/testcase.constant';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
+import { GetProblemResponseDto } from './dto/get-problem-response.dto';
 import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import { ProblemsCursorQueryDto } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
@@ -250,7 +251,7 @@ export class ProblemsController {
   @ApiOperation({ summary: 'Get a problem by ID' })
   @ApiParam({ name: 'id', type: 'string', description: 'Problem ID' })
   @ApiResponse({
-    type: () => GetProblemsResponseDto,
+    type: () => GetProblemResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been found.',
   })
@@ -262,20 +263,7 @@ export class ProblemsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
-    return await this.problemsService.findById(id, {
-      id: true,
-      title: true,
-      description: true,
-      inputDescription: true,
-      outputDescription: true,
-      maxScore: true,
-      timeLimitMs: true,
-      memoryLimitKb: true,
-      difficulty: true,
-      type: true,
-      createdAt: true,
-      updatedAt: true,
-    });
+    return this.problemsService.findDetailProblemById(id);
   }
 
   @Patch(':id')

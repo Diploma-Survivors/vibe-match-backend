@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
@@ -42,6 +42,7 @@ export class ProblemsService {
   constructor(
     @InjectRepository(Problem)
     private readonly problemsRepository: Repository<Problem>,
+    @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly storagesService: StoragesService,
@@ -581,6 +582,15 @@ export class ProblemsService {
 
   async findById(id: string, select?: FindOptionsSelect<Problem>) {
     return await this.problemsRepository.findOne({ where: { id }, select });
+  }
+
+  async findDetailProblemById(id: string) {
+    const problem = await this.problemsRepository.findOne({
+      where: { id },
+      relations: ['testcaseSamples'],
+    });
+
+    return problem;
   }
 
   async update(id: string, updateProblemDto: UpdateProblemDto) {
