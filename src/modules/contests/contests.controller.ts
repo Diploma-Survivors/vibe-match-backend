@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiExtraModels,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -62,6 +63,11 @@ export class ContestsController {
     description:
       'Retrieve a list of contests with support for cursor-based pagination, filtering, and sorting.',
   })
+  @ApiExtraModels(
+    PaginationCursorResponseDto,
+    CursorEdgeDto,
+    GetContestsResponseDto,
+  )
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'List of contests retrieved successfully',
