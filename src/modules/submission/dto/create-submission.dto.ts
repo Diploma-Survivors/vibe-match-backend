@@ -35,6 +35,10 @@ export class CreateSubmissionDto {
   @IsNotEmpty()
   readonly problemId: string;
 
+  @ApiProperty({
+    description: 'Test case samples for the submission',
+    type: [CreateTestcaseSampleDto],
+  })
   @Transform(({ value }) => {
     let parsed: unknown = value;
 
