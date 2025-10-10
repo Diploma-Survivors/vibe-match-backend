@@ -264,12 +264,6 @@ export class ProblemsService {
       }
     }
 
-    joins.forEach((join) => {
-      if (joinMap[join]) {
-        queryBuilder.leftJoin(joinMap[join], join);
-      }
-    });
-
     return queryBuilder;
   }
 
