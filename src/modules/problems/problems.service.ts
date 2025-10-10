@@ -258,6 +258,12 @@ export class ProblemsService {
       problemTopic: 'problem.problemTopics',
     };
 
+    for (const join of joins) {
+      if (joinMap[join]) {
+        queryBuilder.leftJoin(joinMap[join], join);
+      }
+    }
+
     joins.forEach((join) => {
       if (joinMap[join]) {
         queryBuilder.leftJoin(joinMap[join], join);
