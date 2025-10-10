@@ -156,11 +156,11 @@ export class ContestsService {
     queryBuilder.select([
       'contest.id AS id',
       'contest.name AS name',
-      'contest.startTime AS startTime',
-      'contest.endTime AS endTime',
-      'contest.durationMinutes AS durationMinutes',
+      'contest.startTime AS "startTime"',
+      'contest.endTime AS "endTime"',
+      'contest.durationMinutes AS "durationMinutes"',
       'contest.status AS status',
-      `contest.${sortBy} AS sortBy`,
+      `contest.${sortBy} AS "sortBy"`,
     ]);
   }
 
