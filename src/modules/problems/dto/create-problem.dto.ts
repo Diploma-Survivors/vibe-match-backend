@@ -4,7 +4,6 @@ import { Expose, plainToInstance, Transform } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
-  IsNotEmpty,
   IsPositive,
   IsUUID,
   MaxLength,
@@ -165,14 +164,12 @@ export class CreateProblemDto {
     example: 'testcase.txt',
     type: 'string',
     format: 'binary',
-    name: 'testcaseFile',
+    name: TESTCASE_FILE_FIELD_NAME,
   })
-  @IsNotEmpty()
-  @Expose({ name: TESTCASE_FILE_FIELD_NAME })
   testcase: string;
 
   @ApiProperty({
-    description: 'The IDs of the sample test cases associated with the problem',
+    description: 'The sample test cases associated with the problem',
     type: () => [CreateTestcaseSampleDto],
   })
   @Transform(({ value }) => {

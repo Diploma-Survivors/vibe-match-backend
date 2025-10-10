@@ -4,6 +4,7 @@ import { StoragesModule } from '../storages/storages.module';
 import { ProblemTag } from './entities/problem-tag.entity';
 import { ProblemTopic } from './entities/problem-topic.entity';
 import { Problem } from './entities/problem.entity';
+import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsController } from './problems.controller';
 import { ProblemsService } from './problems.service';
 import { TagsModule } from './tags/tags.module';
@@ -12,7 +13,7 @@ import { TopicsModule } from './topics/topics.module';
 
 @Module({
   controllers: [ProblemsController],
-  providers: [ProblemsService],
+  providers: [ProblemsService, FileRequiredPipe],
   imports: [
     TopicsModule,
     TagsModule,

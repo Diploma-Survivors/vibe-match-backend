@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose, Transform } from 'class-transformer';
+import { Exclude, Expose, Transform } from 'class-transformer';
 import { Course } from 'src/modules/course/entities/course.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { ProblemTag } from '../entities/problem-tag.entity';
@@ -149,6 +149,9 @@ export class CreateProblemResponseDto {
     example: '2025-10-01T12:00:00Z',
   })
   updatedAt: Date;
+
+  @Exclude()
+  tsv: string;
 
   constructor(partial: Partial<CreateProblemResponseDto>) {
     Object.assign(this, partial);

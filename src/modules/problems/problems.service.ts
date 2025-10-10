@@ -43,6 +43,10 @@ import { Topic } from './topics/entities/topic.entity';
 export class ProblemsService {
   private readonly logger = new Logger(ProblemsService.name);
   private readonly MAX_PAGE_SIZE = 100;
+  private readonly SELECTABLE_PROBLEM_TYPES = [
+    ProblemType.STANDALONE,
+    ProblemType.HYBRID,
+  ];
 
   constructor(
     @InjectRepository(Problem)
@@ -274,7 +278,7 @@ export class ProblemsService {
     queryBuilder.where(
       '(problem.type IN (:...types) AND courseProblem.course = :courseId)',
       {
-        types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+        types: this.SELECTABLE_PROBLEM_TYPES,
         courseId,
       },
     );
@@ -284,7 +288,7 @@ export class ProblemsService {
     queryBuilder: SelectQueryBuilder<Problem>,
   ) {
     queryBuilder.where('problem.type IN (:...types)', {
-      types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+      types: this.SELECTABLE_PROBLEM_TYPES,
     });
   }
 
@@ -295,7 +299,7 @@ export class ProblemsService {
     queryBuilder.where(
       '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
       {
-        types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+        types: this.SELECTABLE_PROBLEM_TYPES,
         courseId,
       },
     );
@@ -319,16 +323,14 @@ export class ProblemsService {
     isBackward: boolean,
   ) {
     const sortBy = query?.sortBy;
-    const naturalOrder = query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
-
+    const naturalOrder: 'ASC' | 'DESC' =
+      query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
     const operator = this.determineCursorOperator(query, naturalOrder);
 
-    let sortOrder: 'ASC' | 'DESC';
-    if (isBackward) {
-      sortOrder = naturalOrder === 'ASC' ? 'DESC' : 'ASC';
-    } else {
-      sortOrder = naturalOrder;
-    }
+    // Reverse sort order for backward pagination
+    const reversedOrder: 'ASC' | 'DESC' =
+      naturalOrder === 'ASC' ? 'DESC' : 'ASC';
+    const sortOrder: 'ASC' | 'DESC' = isBackward ? reversedOrder : naturalOrder;
 
     return { sortBy, sortOrder, operator };
   }
@@ -410,28 +412,39 @@ export class ProblemsService {
     ) => SelectQueryBuilder<Problem>,
     query: ProblemsCursorQueryDto,
   ) {
-    if (query?.filters?.difficulty) {
-      where('problem.difficulty = :difficulty', {
-        difficulty: query.filters.difficulty,
-      });
-    }
+    const filters = [
+      {
+        value: query?.filters?.difficulty,
+        condition: 'problem.difficulty = :difficulty',
+        params: { difficulty: query?.filters?.difficulty },
+      },
+      {
+        value: query?.filters?.type,
+        condition: 'problem.type = :type',
+        params: { type: query?.filters?.type },
+      },
+      {
+        value: query?.filters?.topics,
+        condition: 'problemTopic.topic IN (:...topicIds)',
+        params: { topicIds: query?.filters?.topics },
+        checkLength: true,
+      },
+      {
+        value: query?.filters?.tags,
+        condition: 'problemTag.tag IN (:...tagIds)',
+        params: { tagIds: query?.filters?.tags },
+        checkLength: true,
+      },
+    ];
 
-    if (query?.filters?.type) {
-      where('problem.type = :type', {
-        type: query.filters.type,
-      });
-    }
+    for (const filter of filters) {
+      const shouldApply = filter.checkLength
+        ? Array.isArray(filter.value) && filter.value.length > 0
+        : !!filter.value;
 
-    if (query?.filters?.topics && query.filters.topics.length > 0) {
-      where('problemTopic.topic IN (:...topicIds)', {
-        topicIds: query.filters.topics,
-      });
-    }
-
-    if (query?.filters?.tags && query.filters.tags.length > 0) {
-      where('problemTag.tag IN (:...tagIds)', {
-        tagIds: query.filters.tags,
-      });
+      if (shouldApply) {
+        where(filter.condition, filter.params);
+      }
     }
   }
 
