@@ -1,4 +1,5 @@
-import { Validate, ValidationOptions } from 'class-validator';
+import { Validate } from 'class-validator';
+import { ValidationOptions } from 'joi';
 import { IsLessThanValidator } from '../validators/is-less-than.validator';
 
 export function IsLessThan<T>(
