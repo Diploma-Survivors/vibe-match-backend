@@ -68,6 +68,7 @@ export class ContestsService {
         )
         .select('problem.id', 'id')
         .addSelect('problem.type', 'type')
+        .distinct(true)
         .getRawMany<Problem>();
 
       if (problems.length !== createContestDto.problems.length) {
