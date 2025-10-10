@@ -1,6 +1,6 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose, plainToInstance, Transform } from 'class-transformer';
+import { Expose, plainToInstance, Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -11,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { TESTCASE_FILE_FIELD_NAME } from '../constants/testcase.constant';
+import { JsonArrayTransform } from '../decorators/json-transform.decorator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
@@ -71,7 +72,7 @@ export class CreateProblemDto {
     example: 100,
     minimum: 1,
   })
-  @Transform(({ value }: { value: string }) => Number.parseInt(value, 10))
+  @Type(() => Number)
   @IsPositive({ message: 'Max score must be a positive number' })
   maxScore: number;
 
@@ -80,7 +81,7 @@ export class CreateProblemDto {
     example: 1000,
     minimum: 1,
   })
-  @Transform(({ value }: { value: string }) => Number.parseFloat(value))
+  @Type(() => Number)
   @IsPositive({ message: 'Time limit must be a positive number' })
   timeLimitMs: number;
 
@@ -89,7 +90,7 @@ export class CreateProblemDto {
     example: 65536,
     minimum: 1,
   })
-  @Transform(({ value }: { value: string }) => Number.parseFloat(value))
+  @Type(() => Number)
   @IsPositive({ message: 'Memory limit must be a positive number' })
   memoryLimitKb: number;
 
@@ -118,18 +119,7 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
     name: 'tagIds',
   })
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value) as string[];
-      } catch (err) {
-        Logger.warn(err);
-        throw new BadRequestException('Invalid JSON format for tagIds');
-      }
-    }
-
-    throw new BadRequestException('tagIds must be a JSON array string');
-  })
+  @JsonArrayTransform('tagIds')
   @IsArray()
   @IsUUID('all', { each: true })
   @Expose({ name: 'tagIds' })
@@ -142,18 +132,7 @@ export class CreateProblemDto {
     items: { type: 'string', format: 'uuid' },
     name: 'topicIds',
   })
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value) as string[];
-      } catch (err) {
-        Logger.warn(err);
-        throw new BadRequestException('Invalid JSON format for topicIds');
-      }
-    }
-
-    throw new BadRequestException('topicIds must be a JSON array string');
-  })
+  @JsonArrayTransform('topicIds')
   @IsArray()
   @IsUUID('all', { each: true })
   @Expose({ name: 'topicIds' })
