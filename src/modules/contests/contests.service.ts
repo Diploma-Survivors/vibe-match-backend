@@ -160,7 +160,7 @@ export class ContestsService {
       'contest.endTime AS "endTime"',
       'contest.durationMinutes AS "durationMinutes"',
       'contest.status AS status',
-      `contest.${sortBy} AS "sortBy"`,
+      `contest.${sortBy} AS "${sortBy}"`,
     ]);
   }
 
