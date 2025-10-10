@@ -70,4 +70,8 @@ export class Contest {
     precision: 3,
   })
   updatedAt: Date;
+
+  @Column('tsvector', { select: false, nullable: true })
+  @Index('IDX_Contests_TSV', { fulltext: true })
+  tsv: string;
 }

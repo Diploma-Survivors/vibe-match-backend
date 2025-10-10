@@ -115,4 +115,8 @@ export class Problem {
     precision: 3,
   })
   updatedAt: Date;
+
+  @Column('tsvector', { select: false, nullable: true })
+  @Index('IDX_Problems_TSV', { fulltext: true })
+  tsv: string;
 }
