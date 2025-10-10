@@ -117,6 +117,6 @@ export class Problem {
   updatedAt: Date;
 
   @Column('tsvector', { select: false, nullable: true })
-  @Index('IDX_Problems_TSV', { fulltext: true })
+  @Index('IDX_Problems_TSV', { synchronize: false })
   tsv: string;
 }

@@ -72,6 +72,6 @@ export class Contest {
   updatedAt: Date;
 
   @Column('tsvector', { select: false, nullable: true })
-  @Index('IDX_Contests_TSV', { fulltext: true })
+  @Index('IDX_Contests_TSV', { synchronize: false })
   tsv: string;
 }
