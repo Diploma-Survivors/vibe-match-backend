@@ -3,6 +3,7 @@ import {
   ClassSerializerInterceptor,
   Controller,
   HttpCode,
+  HttpStatus,
   MessageEvent,
   Param,
   Post,
@@ -16,7 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { finalize, interval, merge, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
@@ -28,6 +29,7 @@ import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
 import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
+import { SubmissionResultDto } from './dto/submission.response.dto';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -41,6 +43,11 @@ export class SubmissionController {
   ) {}
 
   @Post('run')
+  @ApiResponse({
+    type: () => SubmissionResultDto,
+    status: HttpStatus.OK,
+    description: 'Code has been submitted successfully.',
+  })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async run(
     @Body() dto: CreateSubmissionDto,
@@ -50,6 +57,11 @@ export class SubmissionController {
   }
 
   @Post('submit')
+  @ApiResponse({
+    type: () => SubmissionResultDto,
+    status: HttpStatus.OK,
+    description: 'Code has been submitted successfully.',
+  })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async submit(
     @Body() dto: CreateSubmissionDto,
