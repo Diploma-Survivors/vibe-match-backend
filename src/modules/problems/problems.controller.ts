@@ -167,7 +167,7 @@ export class ProblemsController {
   @ApiPaginatedProblemsResponse()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.INSTRUCTOR)
+  @Roles(RoleEnum.STUDENT)
   async findTrainableProblems(
     @Query() query: ProblemsCursorQueryDto,
     @CurrentUser() user: JwtPayload,
