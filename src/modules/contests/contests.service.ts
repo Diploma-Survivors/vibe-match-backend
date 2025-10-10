@@ -37,6 +37,10 @@ import { SortBy } from './enums/sort-by.enum';
 export class ContestsService {
   private readonly MAX_PAGE_SIZE = 100;
   private readonly logger = new Logger(ContestsService.name);
+  private readonly SELECTABLE_PROBLEM_TYPES = [
+    ProblemType.STANDALONE,
+    ProblemType.HYBRID,
+  ];
 
   constructor(
     @InjectDataSource()
@@ -62,7 +66,7 @@ export class ContestsService {
         .andWhere(
           '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
           {
-            types: [ProblemType.STANDALONE, ProblemType.HYBRID],
+            types: this.SELECTABLE_PROBLEM_TYPES,
             courseId: user.courseId,
           },
         )
@@ -284,26 +288,33 @@ export class ContestsService {
     ) => SelectQueryBuilder<Contest>,
     query: ContestsCursorQueryDto,
   ) {
-    if (query?.filters?.startTime) {
-      where('contest.startTime >= :startTime', {
-        startTime: query.filters.startTime,
-      });
-    }
+    const filters = [
+      {
+        value: query?.filters?.startTime,
+        condition: 'contest.startTime >= :startTime',
+        params: { startTime: query?.filters?.startTime },
+      },
+      {
+        value: query?.filters?.endTime,
+        condition: 'contest.endTime <= :endTime',
+        params: { endTime: query?.filters?.endTime },
+      },
+      {
+        value: query?.filters?.minDurationMinutes,
+        condition: 'contest.durationMinutes >= :minDurationMinutes',
+        params: { minDurationMinutes: query?.filters?.minDurationMinutes },
+      },
+      {
+        value: query?.filters?.maxDurationMinutes,
+        condition: 'contest.durationMinutes <= :maxDurationMinutes',
+        params: { maxDurationMinutes: query?.filters?.maxDurationMinutes },
+      },
+    ];
 
-    if (query?.filters?.endTime) {
-      where('contest.endTime <= :endTime', { endTime: query.filters.endTime });
-    }
-
-    if (query?.filters?.minDurationMinutes) {
-      where('contest.durationMinutes >= :minDurationMinutes', {
-        minDurationMinutes: query.filters.minDurationMinutes,
-      });
-    }
-
-    if (query?.filters?.maxDurationMinutes) {
-      where('contest.durationMinutes <= :maxDurationMinutes', {
-        maxDurationMinutes: query.filters.maxDurationMinutes,
-      });
+    for (const filter of filters) {
+      if (filter.value) {
+        where(filter.condition, filter.params);
+      }
     }
   }
 
@@ -378,16 +389,14 @@ export class ContestsService {
     isBackward: boolean,
   ) {
     const sortBy = query?.sortBy;
-    const naturalOrder = query?.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
-
+    const naturalOrder: 'ASC' | 'DESC' =
+      query?.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
     const operator = this.determineCursorOperator(query, naturalOrder);
 
-    let sortOrder: 'ASC' | 'DESC';
-    if (isBackward) {
-      sortOrder = naturalOrder === 'ASC' ? 'DESC' : 'ASC';
-    } else {
-      sortOrder = naturalOrder;
-    }
+    // Reverse sort order for backward pagination
+    const reversedOrder: 'ASC' | 'DESC' =
+      naturalOrder === 'ASC' ? 'DESC' : 'ASC';
+    const sortOrder: 'ASC' | 'DESC' = isBackward ? reversedOrder : naturalOrder;
 
     return { sortBy, sortOrder, operator };
   }
