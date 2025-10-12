@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 100M
+
 services:
   postgres:
     image: postgres:16
@@ -36,7 +42,7 @@ services:
       retries: 10
 
   moodle:
-    image: bitnami/moodle:4.3
+    image: docker.io/bitnamilegacy/moodle:4.3
     depends_on:
       mariadb:
         condition: service_healthy
@@ -58,6 +64,31 @@ services:
     ports:
       - '8888:8080'
       - '8443:443'
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    ports:
+      - '2358:2358'
+    privileged: true
+    <<: *default-logging
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    command: ['./scripts/workers']
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    privileged: true
+    <<: *default-logging
+    depends_on:
+      - postgres
+      - redis
+    restart: always
 
 volumes:
   mariadb_data:
