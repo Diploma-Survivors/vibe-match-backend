@@ -12,12 +12,13 @@ export default Joi.object({
   CORS_ORIGINS: Joi.string().required(),
   // Database Configuration
   DATABASE_PORT: Joi.number().port().default(5432),
-  DATABASE_PASS: Joi.string().required(),
+  DATABASE_PASSWORD: Joi.string().required(),
   DATABASE_HOST: Joi.string().required(),
   DATABASE_NAME: Joi.string().required(),
-  DATABASE_USER: Joi.string().required(),
+  DATABASE_USERNAME: Joi.string().required(),
   DATABASE_AUTOLOAD: Joi.boolean().default(true),
   DATABASE_SYNC: Joi.boolean().default(false),
+  DATABASE_MIGRATIONS_RUN: Joi.boolean().default(false),
   // Redis Configuration
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().required(),
