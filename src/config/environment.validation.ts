@@ -11,11 +11,11 @@ export default Joi.object({
   SWAGGER_ENDPOINT: Joi.string().default('api/docs'),
   CORS_ORIGINS: Joi.string().required(),
   // Database Configuration
-  DB_PORT: Joi.number().port().default(5432),
-  DB_PASS: Joi.string().required(),
-  DB_HOST: Joi.string().required(),
-  DB_NAME: Joi.string().required(),
-  DB_USER: Joi.string().required(),
+  DATABASE_PORT: Joi.number().port().default(5432),
+  DATABASE_PASS: Joi.string().required(),
+  DATABASE_HOST: Joi.string().required(),
+  DATABASE_NAME: Joi.string().required(),
+  DATABASE_USER: Joi.string().required(),
   DATABASE_AUTOLOAD: Joi.boolean().default(true),
   DATABASE_SYNC: Joi.boolean().default(false),
   // Redis Configuration
