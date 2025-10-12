@@ -2,25 +2,18 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { RedisKeys } from './redis-keys.helper';
 import { Judge0Response } from '../../judge0/judge0.interface';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { BackoffOptions, Queue } from 'bullmq';
 import { SubmissionService } from '../submission.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 import Redis from 'ioredis';
 import { REDIS } from '../../../shared/redis/redis.module';
-import {
-  JOB_ATTEMPTS,
-  JOB_BACKOFF,
-  JOB_REMOVE_ON_COMPLETE,
-  JOB_REMOVE_ON_FAIL,
-  QUEUE_FINALIZE_RUN_JOB,
-  QUEUE_FINALIZE_SUBMIT_JOB,
-  SUBMISSION_EVENT_REDIS_CHANNEL,
-  SUBMISSION_FINALIZE_QUEUE,
-} from '../../../common/constants/submission.constant';
 import { Submission } from '../entities/submission.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SubmissionResultDto } from '../dto/submission.response.dto';
+import { SubmissionConstants } from '../constants/submission.constant';
+import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
+import { ConfigService } from '@nestjs/config';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -64,11 +57,12 @@ export class CallbackProcessor implements OnModuleInit {
   constructor(
     @Inject(REDIS) private readonly redis: Redis,
     private readonly redisKeys: RedisKeys,
-    @InjectQueue(SUBMISSION_FINALIZE_QUEUE)
+    @InjectQueue(SubmissionQueue.FINALIZE)
     private readonly finalizeQueue: Queue,
     private readonly submissionService: SubmissionService,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
+    private readonly configService: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -135,17 +129,23 @@ export class CallbackProcessor implements OnModuleInit {
 
   private async scheduleFinalizeJob(submissionId: string, isSubmit: boolean) {
     const jobName = isSubmit
-      ? QUEUE_FINALIZE_SUBMIT_JOB
-      : QUEUE_FINALIZE_RUN_JOB;
+      ? SubmissionJob.FINALIZE_SUBMIT
+      : SubmissionJob.FINALIZE_RUN;
     await this.finalizeQueue.add(
       jobName,
       { submissionId },
       {
         jobId: submissionId,
-        attempts: JOB_ATTEMPTS,
-        backoff: JOB_BACKOFF,
-        removeOnComplete: JOB_REMOVE_ON_COMPLETE,
-        removeOnFail: JOB_REMOVE_ON_FAIL,
+        attempts: this.configService.get<number>('submission.job.attempts'),
+        backoff: this.configService.get<object>(
+          'submission.job.backoff',
+        ) as BackoffOptions,
+        removeOnComplete: this.configService.get<boolean>(
+          'submission.job.removeOnComplete',
+        ),
+        removeOnFail: this.configService.get<number>(
+          'submission.job.removeOnFail',
+        ),
       },
     );
   }
@@ -268,7 +268,7 @@ export class CallbackProcessor implements OnModuleInit {
 
   async publishFinalize<T = any>(submissionId: string, payload: T) {
     await this.pub.publish(
-      SUBMISSION_EVENT_REDIS_CHANNEL,
+      SubmissionConstants.EVENT_REDIS_CHANNEL,
       JSON.stringify({ submissionId, payload }),
     );
     this.logger.log(`Published finalize for ${submissionId}`);

@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SubmissionStatus } from '../../../submission/enums/submission.enum';
-import * as judge0Interface_1 from '../../../judge0/judge0.interface';
+import { SubmissionStatus } from '../../../submission/enums/submission-status.enum';
 
 export class TestResultDto {
   @ApiProperty({
@@ -37,7 +36,7 @@ export class TestResultDto {
     description: 'Submission status',
     example: SubmissionStatus.ACCEPTED,
   })
-  status: judge0Interface_1.Judge0Status;
+  status: SubmissionStatus;
 
   @ApiProperty({
     description: 'Expected output',

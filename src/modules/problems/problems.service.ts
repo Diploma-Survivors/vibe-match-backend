@@ -1,20 +1,40 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
 import { SortOrder } from 'src/common/pagination/enums/sort-order.enum';
 import { CursorPaginated } from 'src/common/pagination/interfaces/cursor-paginated.interface';
 import { decodeCursor, encodeCursor } from 'src/common/utils/cursor-query.util';
-import { DataSource, FindOptionsSelect, In, Repository } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  FindOptionsSelect,
+  In,
+  ObjectLiteral,
+  Repository,
+} from 'typeorm';
 import { QueryRunner, SelectQueryBuilder } from 'typeorm/browser';
+import { v4 as uuidV4 } from 'uuid';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { StoragesService } from '../storages/storages.service';
+import { TESTCASE_FILE_EXTENSION } from './constants/testcase.constant';
 import { CreateProblemDto } from './dto/create-problem.dto';
+import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import {
   ProblemCursorFieldsDto,
   ProblemsCursorQueryDto,
 } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { Problem } from './entities/problem.entity';
+import { ProblemType } from './enums/problem-type.enum';
+import { SortBy } from './enums/sort-by.enum';
 import { Tag } from './tags/entities/tag.entity';
 import { Testcase } from './testcases/entities/testcase.entity';
 import { Topic } from './topics/entities/topic.entity';
@@ -23,14 +43,25 @@ import { Topic } from './topics/entities/topic.entity';
 export class ProblemsService {
   private readonly logger = new Logger(ProblemsService.name);
   private readonly MAX_PAGE_SIZE = 100;
+  private readonly SELECTABLE_PROBLEM_TYPES = [
+    ProblemType.STANDALONE,
+    ProblemType.HYBRID,
+  ];
 
   constructor(
     @InjectRepository(Problem)
     private readonly problemsRepository: Repository<Problem>,
+    @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
+    private readonly storagesService: StoragesService,
   ) {}
 
-  async create(createProblemDto: CreateProblemDto, user: JwtPayload) {
+  async create(
+    createProblemDto: CreateProblemDto,
+    user: JwtPayload,
+    testcaseFile: Express.Multer.File,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
@@ -41,6 +72,7 @@ export class ProblemsService {
         queryRunner,
         createProblemDto,
         user,
+        testcaseFile,
       );
       await queryRunner.commitTransaction();
       return problem;
@@ -52,36 +84,36 @@ export class ProblemsService {
     }
   }
 
-  async createBulk(createProblemDtos: CreateProblemDto[], user: JwtPayload) {
-    const queryRunner = this.dataSource.createQueryRunner();
+  private async uploadAndSaveFileTestcase(
+    queryRunner: QueryRunner,
+    file: Express.Multer.File,
+    currentUser: JwtPayload,
+  ) {
+    const seed = uuidV4();
+    const key = `${seed}_${currentUser.userId}_${currentUser.courseId}${TESTCASE_FILE_EXTENSION}`;
+    const bucket = this.configService.get<string>(
+      'aws.s3.bucketName',
+    ) as string;
 
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    await this.storagesService.upload({
+      bucket,
+      key,
+      file: file.buffer,
+    });
 
-    try {
-      const problems = await Promise.all(
-        createProblemDtos.map(async (createProblemDto) =>
-          this.createProblemWithTransaction(
-            queryRunner,
-            createProblemDto,
-            user,
-          ),
-        ),
-      );
-      await queryRunner.commitTransaction();
-      return problems;
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
+    const url = this.storagesService.getObjectUrl(bucket, key);
+
+    const testcase = queryRunner.manager.create(Testcase, {
+      fileUrl: url,
+    });
+    return queryRunner.manager.save(Testcase, testcase);
   }
 
   private async createProblemWithTransaction(
     queryRunner: QueryRunner,
     createProblemDto: CreateProblemDto,
     user: JwtPayload,
+    testcaseFile: Express.Multer.File,
   ): Promise<Problem> {
     const tags = await queryRunner.manager.find(Tag, {
       where: { id: In(createProblemDto.tags) },
@@ -99,10 +131,11 @@ export class ProblemsService {
       throw new BadRequestException('Some topics are invalid');
     }
 
-    const testcase = await queryRunner.manager.findOneOrFail(Testcase, {
-      where: { id: createProblemDto.testcase },
-      select: ['id'],
-    });
+    const testcase = await this.uploadAndSaveFileTestcase(
+      queryRunner,
+      testcaseFile,
+      user,
+    );
 
     const problem = queryRunner.manager.create(Problem, {
       ...createProblemDto,
@@ -118,17 +151,158 @@ export class ProblemsService {
     return problem;
   }
 
-  async find(query: ProblemsCursorQueryDto) {
-    const { limit, isBackward } = this.validateAndGetPagination(query);
-    const queryBuilder = this.buildBaseQuery();
-    this.applyFilters(queryBuilder, query);
+  async findProblemsByStudent(
+    query: ProblemsCursorQueryDto,
+    currentUser: JwtPayload,
+  ) {
+    return this.findProblemsWithPagination(query, {
+      joins: ['courseProblem', 'problemTag', 'problemTopic'],
+      filterFn: (qb) => this.applyStudentFilter(qb, currentUser.courseId!),
+    });
+  }
 
-    await this.applyCursorPagination(queryBuilder, query, isBackward);
+  async findProblemsForAssignmentCreation(query: ProblemsCursorQueryDto) {
+    return this.findProblemsWithPagination(query, {
+      joins: ['problemTag', 'problemTopic'],
+      filterFn: (qb) => this.applyAssignmentCreationFilter(qb),
+    });
+  }
 
-    queryBuilder.take(limit + 1);
+  async findProblemsForContestCreation(
+    query: ProblemsCursorQueryDto,
+    currentUser: JwtPayload,
+  ) {
+    return this.findProblemsWithPagination(query, {
+      joins: ['courseProblem', 'contestProblem', 'problemTag', 'problemTopic'],
+      filterFn: (qb) =>
+        this.applyContestCreationFilter(qb, currentUser.courseId!),
+    });
+  }
 
-    const items = await queryBuilder.getMany();
-    return this.buildPaginatedResult(items, limit, isBackward, query);
+  private async findProblemsWithPagination(
+    query: ProblemsCursorQueryDto,
+    config: {
+      joins: string[];
+      filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+    },
+  ) {
+    const pagination = this.validateAndGetPagination(query);
+    const sortConfig = this.buildSortConfiguration(
+      query,
+      pagination.isBackward,
+    );
+
+    const ids = await this.findProblemIds(
+      query,
+      pagination.limit,
+      sortConfig,
+      config,
+    );
+
+    if (ids.length === 0) {
+      return this.buildPaginatedResult(
+        [],
+        pagination.limit,
+        pagination.isBackward,
+        query,
+      );
+    }
+
+    const items = await this.findProblemByIds(ids, sortConfig);
+    return this.buildPaginatedResult(
+      items,
+      pagination.limit,
+      pagination.isBackward,
+      query,
+    );
+  }
+
+  private async findProblemIds(
+    query: ProblemsCursorQueryDto,
+    limit: number,
+    sortConfig: {
+      sortBy: SortBy;
+      sortOrder: 'ASC' | 'DESC';
+      operator: '<' | '>';
+    },
+    config: {
+      joins: string[];
+      filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+    },
+  ) {
+    const queryBuilder = this.buildBaseQuery(config.joins);
+
+    config.filterFn(queryBuilder);
+    this.applyMatchFilters(queryBuilder, query);
+
+    await this.applyCursorPagination(queryBuilder, query, sortConfig);
+
+    queryBuilder
+      .select('problem.id', 'id')
+      .addSelect(`problem.${sortConfig.sortBy}`, sortConfig.sortBy)
+      .distinct(true)
+      .limit(limit + 1);
+
+    const items = await queryBuilder.getRawMany<{
+      id: string;
+      [key: string]: any;
+    }>();
+    this.logger.debug(`Found problem IDs: ${JSON.stringify(items)}`);
+
+    return items.map((item) => item.id);
+  }
+
+  private buildBaseQuery(joins: string[]) {
+    const queryBuilder = this.dataSource.createQueryBuilder(Problem, 'problem');
+
+    const joinMap: Record<string, string> = {
+      courseProblem: 'problem.courseProblems',
+      contestProblem: 'problem.contestProblems',
+      problemTag: 'problem.problemTags',
+      problemTopic: 'problem.problemTopics',
+    };
+
+    for (const join of joins) {
+      if (joinMap[join]) {
+        queryBuilder.leftJoin(joinMap[join], join);
+      }
+    }
+
+    return queryBuilder;
+  }
+
+  private applyStudentFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    courseId: string,
+  ) {
+    queryBuilder.where(
+      '(problem.type IN (:...types) AND courseProblem.course = :courseId)',
+      {
+        types: this.SELECTABLE_PROBLEM_TYPES,
+        courseId,
+      },
+    );
+  }
+
+  private applyAssignmentCreationFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+  ) {
+    queryBuilder.where('problem.type IN (:...types)', {
+      types: this.SELECTABLE_PROBLEM_TYPES,
+    });
+  }
+
+  private applyContestCreationFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    courseId: string,
+  ) {
+    queryBuilder.where(
+      '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
+      {
+        types: this.SELECTABLE_PROBLEM_TYPES,
+        courseId,
+      },
+    );
   }
 
   private validateAndGetPagination(query: ProblemsCursorQueryDto) {
@@ -144,103 +318,171 @@ export class ProblemsService {
     return { limit, isBackward };
   }
 
-  private buildBaseQuery() {
-    return this.problemsRepository
-      .createQueryBuilder('problem')
-      .leftJoin('problem.problemTags', 'problemTags')
-      .leftJoin('problem.problemTopics', 'problemTopics');
+  private buildSortConfiguration(
+    query: ProblemsCursorQueryDto,
+    isBackward: boolean,
+  ) {
+    const sortBy = query?.sortBy;
+    const naturalOrder: 'ASC' | 'DESC' =
+      query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
+    const operator = this.determineCursorOperator(query, naturalOrder);
+
+    // Reverse sort order for backward pagination
+    const reversedOrder: 'ASC' | 'DESC' =
+      naturalOrder === 'ASC' ? 'DESC' : 'ASC';
+    const sortOrder: 'ASC' | 'DESC' = isBackward ? reversedOrder : naturalOrder;
+
+    return { sortBy, sortOrder, operator };
   }
 
-  private applyFilters(
+  private determineCursorOperator(
+    query: ProblemsCursorQueryDto,
+    naturalOrder: 'ASC' | 'DESC',
+  ): '>' | '<' {
+    if (query?.after) {
+      return naturalOrder === 'ASC' ? '>' : '<';
+    }
+
+    if (query?.before) {
+      return naturalOrder === 'ASC' ? '<' : '>';
+    }
+
+    return '>';
+  }
+
+  private applyKeywordFilter(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    keyword?: string,
+  ) {
+    if (keyword) {
+      queryBuilder.andWhere(
+        `"problem"."tsv" @@ websearch_to_tsquery('simple', unaccent(:keyword))`,
+        { keyword },
+      );
+    }
+  }
+
+  private applyMatchFilters(
     queryBuilder: SelectQueryBuilder<Problem>,
     query: ProblemsCursorQueryDto,
   ) {
-    if (query?.keyword) {
-      queryBuilder.where(
-        `"problem"."tsv" @@ websearch_to_tsquery('simple', unaccent(:keyword))`,
-        { keyword: query.keyword },
-      );
+    this.applyKeywordFilter(queryBuilder, query?.keyword);
+
+    const hasFilters =
+      !!query?.filters?.difficulty ||
+      !!query?.filters?.type ||
+      (query?.filters?.topics && query.filters.topics.length > 0) ||
+      (query?.filters?.tags && query.filters.tags.length > 0);
+
+    if (!hasFilters) {
+      return;
     }
 
-    if (query?.filters?.difficulty) {
-      queryBuilder.andWhere('problem.difficulty = :difficulty', {
-        difficulty: query.filters.difficulty,
+    let filterBracket!: Brackets;
+
+    if (query.matchMode === MatchMode.ALL) {
+      filterBracket = new Brackets((qb) => {
+        this.applyIndividualFilters(
+          qb.andWhere.bind(qb) as (
+            condition: string,
+            parameters?: ObjectLiteral,
+          ) => SelectQueryBuilder<Problem>,
+          query,
+        );
+      });
+    } else if (query.matchMode === MatchMode.ANY) {
+      filterBracket = new Brackets((qb) => {
+        this.applyIndividualFilters(
+          qb.orWhere.bind(qb) as (
+            condition: string,
+            parameters?: ObjectLiteral,
+          ) => SelectQueryBuilder<Problem>,
+          query,
+        );
       });
     }
 
-    if (query?.filters?.topics) {
-      queryBuilder.andWhere('problemTopics.topic IN (:...topicIds)', {
-        topicIds: query.filters.topics,
-      });
-    }
+    queryBuilder.andWhere(filterBracket);
+  }
 
-    if (query?.filters?.tags && query.filters.tags.length > 0) {
-      queryBuilder.andWhere('problemTags.tag IN (:...tagIds)', {
-        tagIds: query.filters.tags,
-      });
+  private applyIndividualFilters(
+    where: (
+      condition: string,
+      parameters?: ObjectLiteral,
+    ) => SelectQueryBuilder<Problem>,
+    query: ProblemsCursorQueryDto,
+  ) {
+    const filters = [
+      {
+        value: query?.filters?.difficulty,
+        condition: 'problem.difficulty = :difficulty',
+        params: { difficulty: query?.filters?.difficulty },
+      },
+      {
+        value: query?.filters?.type,
+        condition: 'problem.type = :type',
+        params: { type: query?.filters?.type },
+      },
+      {
+        value: query?.filters?.topics,
+        condition: 'problemTopic.topic IN (:...topicIds)',
+        params: { topicIds: query?.filters?.topics },
+        checkLength: true,
+      },
+      {
+        value: query?.filters?.tags,
+        condition: 'problemTag.tag IN (:...tagIds)',
+        params: { tagIds: query?.filters?.tags },
+        checkLength: true,
+      },
+    ];
+
+    for (const filter of filters) {
+      const shouldApply = filter.checkLength
+        ? Array.isArray(filter.value) && filter.value.length > 0
+        : !!filter.value;
+
+      if (shouldApply) {
+        where(filter.condition, filter.params);
+      }
     }
   }
 
   private async applyCursorPagination(
     queryBuilder: SelectQueryBuilder<Problem>,
     query: ProblemsCursorQueryDto,
-    isBackward: boolean,
+    sortConfig: {
+      sortBy: SortBy;
+      sortOrder: 'ASC' | 'DESC';
+      operator: '<' | '>';
+    },
   ) {
-    const sortBy = query?.sortBy;
-    const naturalOrder = query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
-
-    let operator: '>' | '<' = '>';
-    if (query?.after) {
-      operator = naturalOrder === 'ASC' ? '>' : '<';
-    } else if (query?.before) {
-      operator = naturalOrder === 'ASC' ? '<' : '>';
-    }
-
-    let effectiveOrder: 'ASC' | 'DESC';
-    if (isBackward) {
-      effectiveOrder = naturalOrder === 'ASC' ? 'DESC' : 'ASC';
-    } else {
-      effectiveOrder = naturalOrder;
-    }
-
     if (query?.after || query?.before) {
       const cursor = await this.getAndValidateCursorPayload(
         query?.after ?? (query?.before as string),
       );
+      this.logger.debug(`Decoded cursor: ${JSON.stringify(cursor)}`);
 
       queryBuilder.andWhere(
-        `(problem.${sortBy}, problem.id) ${operator} (:cursorValue, :cursorId)`,
+        `(problem.${sortConfig.sortBy}, problem.id) ${sortConfig.operator} (:cursorValue, :cursorId)`,
         {
-          cursorValue: cursor[sortBy],
+          cursorValue: cursor[sortConfig.sortBy],
           cursorId: cursor.id,
         },
       );
     }
 
     queryBuilder
-      .orderBy(`problem.${sortBy}`, effectiveOrder)
-      .addOrderBy('problem.id', effectiveOrder);
-  }
-
-  private async getAndValidateCursorPayload(
-    payload: string,
-  ): Promise<ProblemCursorFieldsDto> {
-    const cursorRaw = decodeCursor(payload) as Record<string, any>;
-    const cursor = plainToInstance(ProblemCursorFieldsDto, cursorRaw);
-    const errors = await validate(cursor);
-    if (errors.length > 0) {
-      throw new BadRequestException('Invalid cursor');
-    }
-
-    return cursor;
+      .orderBy(`problem.${sortConfig.sortBy}`, sortConfig.sortOrder)
+      .addOrderBy('problem.id', sortConfig.sortOrder);
   }
 
   private async buildPaginatedResult(
-    items: Problem[],
+    items: GetProblemsResponseDto[],
     limit: number,
     isBackward: boolean,
     query: ProblemsCursorQueryDto,
-  ): Promise<CursorPaginated<Problem>> {
+  ): Promise<CursorPaginated<GetProblemsResponseDto>> {
     const hasMore = items.length > limit;
     if (hasMore) {
       items.pop();
@@ -275,14 +517,81 @@ export class ProblemsService {
         endCursor,
       },
       totalCount,
-    } as CursorPaginated<Problem>;
+    } as CursorPaginated<GetProblemsResponseDto>;
+  }
+
+  private async getAndValidateCursorPayload(
+    payload: string,
+  ): Promise<ProblemCursorFieldsDto> {
+    const cursorRaw = decodeCursor(payload) as Record<string, any>;
+    const cursor = plainToInstance(ProblemCursorFieldsDto, cursorRaw);
+    const errors = await validate(cursor);
+    if (errors.length > 0) {
+      throw new BadRequestException('Invalid cursor');
+    }
+
+    return cursor;
+  }
+
+  private async findProblemByIds(
+    ids: string[],
+    sortConfig: {
+      sortBy: SortBy;
+      sortOrder: 'ASC' | 'DESC';
+    },
+  ) {
+    const queryBuilder = this.dataSource.createQueryBuilder(Problem, 'problem');
+
+    queryBuilder.where('problem.id IN (:...ids)', { ids });
+
+    this.selectFieldsForProblem(queryBuilder, sortConfig.sortBy);
+
+    queryBuilder
+      .orderBy(`problem.${sortConfig.sortBy}`, sortConfig.sortOrder)
+      .addOrderBy('problem.id', sortConfig.sortOrder);
+
+    return queryBuilder.getRawMany<GetProblemsResponseDto>();
+  }
+
+  private selectFieldsForProblem(
+    queryBuilder: SelectQueryBuilder<Problem>,
+    sortBy: SortBy,
+  ) {
+    queryBuilder.select([
+      'problem.id AS id',
+      'problem.title AS title',
+      'problem.difficulty AS difficulty',
+      `problem.${sortBy} AS "${sortBy}"`,
+
+      // subquery for tags
+      `(SELECT COALESCE(json_agg(jsonb_build_object('id', tag.tag_id, 'name', tag.name)), '[]')
+          FROM problem_tags problemTag
+          JOIN tags tag ON problemTag.tag_id = tag.tag_id
+          WHERE problemTag.problem_id = problem.problem_id
+        ) AS tags`,
+
+      // subquery for topics
+      `(SELECT COALESCE(json_agg(jsonb_build_object('id', topic.topic_id, 'name', topic.name)), '[]')
+          FROM problem_topics problemTopic
+          JOIN topics topic ON problemTopic.topic_id = topic.topic_id
+          WHERE problemTopic.problem_id = problem.problem_id
+        ) AS topics`,
+    ]);
   }
 
   private async getTotalCountWithFilters(
     query: ProblemsCursorQueryDto,
   ): Promise<number> {
-    const queryBuilder = this.buildBaseQuery();
-    this.applyFilters(queryBuilder, query);
+    const queryBuilder = this.buildBaseQuery([
+      'courseProblem',
+      'contestProblem',
+      'problemTag',
+      'problemTopic',
+    ]);
+
+    this.applyKeywordFilter(queryBuilder, query?.keyword);
+    this.applyMatchFilters(queryBuilder, query);
+
     const raw = (await queryBuilder
       .select('COUNT(DISTINCT problem.id)', 'count')
       .getRawOne()) as { count: string };
@@ -291,6 +600,26 @@ export class ProblemsService {
 
   async findById(id: string, select?: FindOptionsSelect<Problem>) {
     return await this.problemsRepository.findOne({ where: { id }, select });
+  }
+
+  async findDetailProblemById(id: string, currentUser: JwtPayload) {
+    const problem = await this.problemsRepository.findOne({
+      where: { id },
+      relations: ['testcaseSamples', 'courseProblems', 'courseProblems.course'],
+    });
+    if (!problem) {
+      throw new BadRequestException('Problem not found');
+    }
+
+    const isAccessible = problem.courseProblems.some(
+      (cp) => cp.course.id === currentUser.courseId,
+    );
+
+    if (!isAccessible) {
+      throw new ForbiddenException('You do not have access to this problem');
+    }
+
+    return problem;
   }
 
   async update(id: string, updateProblemDto: UpdateProblemDto) {

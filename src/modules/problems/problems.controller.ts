@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ClassSerializerInterceptor,
   Controller,
@@ -8,11 +9,15 @@ import {
   Param,
   Patch,
   Post,
+  Query,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiExtraModels,
   ApiOperation,
   ApiParam,
@@ -21,10 +26,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { Environment } from 'src/common/enums/environment.enum';
-import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import {
   CursorEdgeDto,
@@ -32,13 +34,81 @@ import {
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
-import { CreateProblemBulkDto } from './dto/create-problem-bulk.dto';
+import {
+  TESTCASE_FILE_FIELD_NAME,
+  TESTCASE_FILE_MIME_TYPE,
+  TESTCASE_MAX_FILE_SIZE,
+} from './constants/testcase.constant';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
-import { GetProblemResponseDto } from './dto/get-problem-response.dto';
+import { GetDetailProblemResponseDto } from './dto/get-problem-response.dto';
+import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import { ProblemsCursorQueryDto } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
+import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsService } from './problems.service';
+
+// Helper function to generate paginated response schema
+const getPaginatedProblemsSchema = () => ({
+  allOf: [
+    { $ref: getSchemaPath(PaginationCursorResponseDto) },
+    {
+      properties: {
+        edges: {
+          type: 'array',
+          items: {
+            allOf: [
+              {
+                $ref: getSchemaPath(CursorEdgeDto),
+              },
+              {
+                properties: {
+                  node: { $ref: getSchemaPath(GetProblemsResponseDto) },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  ],
+});
+
+// Reusable decorators for common API metadata
+const ApiPaginatedProblemsResponse = () => {
+  return (
+    target: object,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ) => {
+    ApiExtraModels(
+      PaginationCursorResponseDto,
+      CursorEdgeDto,
+      GetProblemsResponseDto,
+    )(target, propertyKey, descriptor);
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'List of problems.',
+      schema: getPaginatedProblemsSchema(),
+    })(target, propertyKey, descriptor);
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'Forbidden.',
+    })(target, propertyKey, descriptor);
+  };
+};
+
+const ApiInstructorAuth = () => {
+  return (
+    target: object,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ) => {
+    ApiBearerAuth()(target, propertyKey, descriptor);
+    UseGuards(JwtAuthGuard)(target, propertyKey, descriptor);
+    Roles(RoleEnum.INSTRUCTOR)(target, propertyKey, descriptor);
+  };
+};
 
 @ApiTags('Problems')
 @Controller('problems')
@@ -56,65 +126,90 @@ export class ProblemsController {
     status: HttpStatus.FORBIDDEN,
     description: 'Forbidden.',
   })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(ClassSerializerInterceptor)
-  @Roles(RoleEnum.INSTRUCTOR)
-  async createProblemStandalone(
+  @ApiConsumes('multipart/form-data')
+  @ApiInstructorAuth()
+  @UseInterceptors(
+    FileInterceptor(TESTCASE_FILE_FIELD_NAME, {
+      limits: { fileSize: TESTCASE_MAX_FILE_SIZE },
+      fileFilter: (_req, file, cb) => {
+        if (file.mimetype !== TESTCASE_FILE_MIME_TYPE) {
+          return cb(
+            new BadRequestException(
+              'Invalid file type. File must be a text/plain file.',
+            ),
+            false,
+          );
+        }
+
+        return cb(null, true);
+      },
+    }),
+    ClassSerializerInterceptor,
+  )
+  async createProblem(
     @Body() createProblemDto: CreateProblemDto,
     @CurrentUser() user: JwtPayload,
+    @UploadedFile(FileRequiredPipe) testcaseFile: Express.Multer.File,
   ) {
-    const problem = await this.problemsService.create(createProblemDto, user);
+    const problem = await this.problemsService.create(
+      createProblemDto,
+      user,
+      testcaseFile,
+    );
     return new CreateProblemResponseDto(problem);
   }
 
-  @Post('list')
-  @ApiOperation({ summary: 'Get list problems' })
-  @ApiExtraModels(
-    PaginationCursorResponseDto,
-    CursorEdgeDto,
-    GetProblemResponseDto,
-  )
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'List of problems.',
-    schema: {
-      allOf: [
-        { $ref: getSchemaPath(PaginationCursorResponseDto) },
-        {
-          properties: {
-            edges: {
-              type: 'array',
-              items: {
-                allOf: [
-                  {
-                    $ref: getSchemaPath(CursorEdgeDto),
-                  },
-                  {
-                    properties: {
-                      node: { $ref: getSchemaPath(GetProblemResponseDto) },
-                    },
-                  },
-                ],
-              },
-            },
-          },
-        },
-      ],
-    },
+  @Get('training')
+  @ApiOperation({
+    summary: 'Get list problems for training',
+    description: 'Get list problems that students can practice on',
   })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiPaginatedProblemsResponse()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  async find(@Body() query: ProblemsCursorQueryDto) {
-    return await this.problemsService.find(query);
+  @Roles(RoleEnum.STUDENT)
+  async findTrainableProblems(
+    @Query() query: ProblemsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.problemsService.findProblemsByStudent(query, user);
+  }
+
+  @Get('selectable-for-contest')
+  @ApiOperation({
+    summary: 'Get list problems for contest creation',
+    description:
+      'Get list problems that instructors can select to add to a contest',
+  })
+  @ApiPaginatedProblemsResponse()
+  @ApiInstructorAuth()
+  async findSelectableForContest(
+    @Query() query: ProblemsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return await this.problemsService.findProblemsForContestCreation(
+      query,
+      user,
+    );
+  }
+
+  @Get('selectable-for-assignment')
+  @ApiOperation({
+    summary: 'Get list problems for assignment creation',
+    description:
+      'Get list problems that instructors can select to add to an assignment',
+  })
+  @ApiPaginatedProblemsResponse()
+  @ApiInstructorAuth()
+  async findSelectableForAssignment(@Query() query: ProblemsCursorQueryDto) {
+    return await this.problemsService.findProblemsForAssignmentCreation(query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a problem by ID' })
   @ApiParam({ name: 'id', type: 'string', description: 'Problem ID' })
   @ApiResponse({
-    type: () => GetProblemResponseDto,
+    type: () => GetDetailProblemResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been found.',
   })
@@ -125,46 +220,17 @@ export class ProblemsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  async findOne(@Param('id') id: string) {
-    return await this.problemsService.findById(id, {
-      id: true,
-      title: true,
-      description: true,
-      inputDescription: true,
-      outputDescription: true,
-      maxScore: true,
-      timeLimitMs: true,
-      memoryLimitKb: true,
-      difficulty: true,
-      type: true,
-      createdAt: true,
-      updatedAt: true,
-    });
-  }
-
-  @Post('bulk')
-  @ApiOperation({ summary: 'Create multiple problems (Only development)' })
-  @ApiResponse({
-    type: () => CreateProblemResponseDto,
-    isArray: true,
-    status: HttpStatus.CREATED,
-    description: 'The problems have been created.',
-  })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, EnvironmentGuard)
   @UseInterceptors(ClassSerializerInterceptor)
-  @Roles(RoleEnum.INSTRUCTOR)
-  @EnvGuard(Environment.DEVELOPMENT)
-  async createBulk(
-    @Body() createProblemBulkDto: CreateProblemBulkDto,
-    @CurrentUser() user: JwtPayload,
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    const problems = await this.problemsService.createBulk(
-      createProblemBulkDto.problems,
-      user,
+    const problem = await this.problemsService.findDetailProblemById(
+      id,
+      currentUser,
     );
-    return problems.map((problem) => new CreateProblemResponseDto(problem));
+
+    return new GetDetailProblemResponseDto(problem);
   }
 
   @Patch(':id')
@@ -180,9 +246,7 @@ export class ProblemsController {
     description: 'Problem not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.INSTRUCTOR)
+  @ApiInstructorAuth()
   async update(
     @Param('id') id: string,
     @Body() updateProblemDto: UpdateProblemDto,
@@ -202,9 +266,7 @@ export class ProblemsController {
     description: 'Problem not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.INSTRUCTOR)
+  @ApiInstructorAuth()
   async remove(@Param('id') id: string) {
     return await this.problemsService.remove(id);
   }

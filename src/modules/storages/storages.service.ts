@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
 import {
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
   S3ClientConfig,
 } from '@aws-sdk/client-s3';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FileUploadOptions } from './interfaces/file-update-options.interface';
 import * as readline from 'node:readline';
+import { FileUploadOptions } from './interfaces/file-update-options.interface';
 
 @Injectable()
 export class StoragesService {

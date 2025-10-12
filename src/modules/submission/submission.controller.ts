@@ -22,14 +22,12 @@ import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import {
-  SUBMISSION_PING_DATA,
-  SUBMISSION_PING_EVENT,
-  SUBMISSION_PING_TIME,
-} from '../../common/constants/submission.constant';
+import { SubmissionConstants } from './constants/submission.constant';
 import * as judge0Interface from '../judge0/judge0.interface';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
+import { SubmissionEvent } from './enums/submission-event.enum';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -39,6 +37,7 @@ export class SubmissionController {
     private readonly submissionService: SubmissionService,
     private readonly submissionsSseService: SubmissionsSseService,
     private readonly submissionCallbackProcessor: CallbackProcessor,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('run')
@@ -87,12 +86,16 @@ export class SubmissionController {
       .catch(() => {});
   }
 
-  @Sse(':id/stream')
   @SkipTransformResponse()
   @Sse(':id/stream')
   streamResults(@Param('id') submissionId: string): Observable<MessageEvent> {
-    const ping$ = interval(SUBMISSION_PING_TIME).pipe(
-      map(() => ({ type: SUBMISSION_PING_EVENT, data: SUBMISSION_PING_DATA })),
+    const ping$ = interval(
+      this.configService.get<number>('submission.pingTime'),
+    ).pipe(
+      map(() => ({
+        type: SubmissionEvent.PING,
+        data: SubmissionConstants.PING_DATA,
+      })),
     );
 
     return merge(this.submissionsSseService.connect(submissionId), ping$).pipe(

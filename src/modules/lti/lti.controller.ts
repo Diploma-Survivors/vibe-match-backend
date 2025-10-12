@@ -146,9 +146,6 @@ export class LtiController {
     status: 400,
     description: 'Bad Request - Invalid input data.',
   })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.INSTRUCTOR)
   public async handleDeepLinkingRequest(
     @Body() ltiDeepLinkingDto: LtiDeepLinkingRequestDto,
     @Res() res: Response,

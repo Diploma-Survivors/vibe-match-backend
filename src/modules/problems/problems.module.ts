@@ -1,30 +1,25 @@
 import { Module } from '@nestjs/common';
-import { ProblemsService } from './problems.service';
-import { ProblemsController } from './problems.controller';
-import { TopicsModule } from './topics/topics.module';
-import { TagsModule } from './tags/tags.module';
-import { TestcasesModule } from './testcases/testcases.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Problem } from './entities/problem.entity';
+import { StoragesModule } from '../storages/storages.module';
 import { ProblemTag } from './entities/problem-tag.entity';
 import { ProblemTopic } from './entities/problem-topic.entity';
-import { CourseProblem } from './entities/course-problem.entity';
-import { TestcaseSample } from './testcases/entities/testcase-sample.entity';
+import { Problem } from './entities/problem.entity';
+import { FileRequiredPipe } from './pipes/file-required.pipe';
+import { ProblemsController } from './problems.controller';
+import { ProblemsService } from './problems.service';
+import { TagsModule } from './tags/tags.module';
+import { TestcasesModule } from './testcases/testcases.module';
+import { TopicsModule } from './topics/topics.module';
 
 @Module({
   controllers: [ProblemsController],
-  providers: [ProblemsService],
+  providers: [ProblemsService, FileRequiredPipe],
   imports: [
     TopicsModule,
     TagsModule,
     TestcasesModule,
-    TypeOrmModule.forFeature([
-      Problem,
-      ProblemTag,
-      ProblemTopic,
-      CourseProblem,
-      TestcaseSample,
-    ]),
+    StoragesModule,
+    TypeOrmModule.forFeature([Problem, ProblemTag, ProblemTopic]),
   ],
   exports: [ProblemsService],
 })

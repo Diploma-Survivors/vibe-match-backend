@@ -15,13 +15,14 @@ import environmentValidationSchema from './config/environment.validation';
 import { ltiConfig } from './config/lti.config';
 import { redisConfig } from './config/redis.config';
 import { AuthModule } from './modules/auth/auth.module';
+import { ContestsModule } from './modules/contests/contests.module';
 import { CourseModule } from './modules/course/course.module';
 import { LtiModule } from './modules/lti/lti.module';
 import { ProblemsModule } from './modules/problems/problems.module';
+import { SubmissionModule } from './modules/submission/submission.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { UserModule } from './modules/user/user.module';
 import { RedisModule } from './shared/redis/redis.module';
-import { SubmissionModule } from './modules/submission/submission.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { SubmissionModule } from './modules/submission/submission.module';
     CourseModule,
     UserCourseModule,
     ProblemsModule,
+    ContestsModule,
     SubmissionModule,
   ],
   controllers: [AppController],

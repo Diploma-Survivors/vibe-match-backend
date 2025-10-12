@@ -1,10 +1,10 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
   IsDate,
   IsEnum,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsPositive,
   IsString,
@@ -13,8 +13,8 @@ import {
 } from 'class-validator';
 import { PaginationCursorDto } from 'src/common/pagination/dtos/pagination-cursor.dto';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
+import { ProblemType } from '../enums/problem-type.enum';
 import { SortBy } from '../enums/sort-by.enum';
-import { ApiProperty } from '@nestjs/swagger';
 
 class QueryProblemsFilterDto {
   @ApiProperty({
@@ -28,13 +28,24 @@ class QueryProblemsFilterDto {
   difficulty?: DifficultyLevel;
 
   @ApiProperty({
+    enum: ProblemType,
+    description: 'Filter problems by type',
+    example: ProblemType.CONTEST,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ProblemType)
+  type?: ProblemType;
+
+  @ApiProperty({
     description: 'Filter problems by topic ID',
     example: ['550e8400-e29b-41d4-a716-446655440000'],
     name: 'topicIds',
     required: false,
   })
   @IsOptional()
-  @IsUUID()
+  @IsArray()
+  @IsUUID('all', { each: true })
   @Expose({ name: 'topicIds' })
   topics?: string[];
 
@@ -53,7 +64,6 @@ class QueryProblemsFilterDto {
 }
 
 export class ProblemCursorFieldsDto {
-  @IsNotEmpty()
   @IsUUID()
   id: string;
 

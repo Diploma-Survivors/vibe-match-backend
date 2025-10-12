@@ -9,5 +9,6 @@ import { StoragesModule } from 'src/modules/storages/storages.module';
   controllers: [TestcasesController],
   providers: [TestcasesService],
   imports: [TypeOrmModule.forFeature([Testcase]), StoragesModule],
+  exports: [TestcasesService],
 })
 export class TestcasesModule {}
