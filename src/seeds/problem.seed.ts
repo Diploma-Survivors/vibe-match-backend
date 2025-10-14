@@ -15,7 +15,6 @@ export async function seedProblems(dataSource: DataSource) {
 
   const userCourse = await userCourseRepository.findOne({
     where: { rolesInCourse: RoleEnum.INSTRUCTOR },
-    relations: ['course'],
   });
   if (!userCourse) {
     console.error(
@@ -39,7 +38,7 @@ export async function seedProblems(dataSource: DataSource) {
       memoryLimitKb: 65536,
       difficulty: DifficultyLevel.EASY,
       type: ProblemType.STANDALONE,
-      courseProblems: [{ course: { id: userCourse.course.id } }],
+      courseProblems: [{ course: { id: userCourse.courseId } }],
       author: { id: userCourse.userId },
       problemTags: getRandomElements<Tag>(tags, 3).map((tag) => ({ tag })),
       problemTopics: getRandomElements<Topic>(topics, 3).map((topic) => ({
@@ -63,7 +62,7 @@ export async function seedProblems(dataSource: DataSource) {
       memoryLimitKb: 65536,
       difficulty: DifficultyLevel.MEDIUM,
       type: ProblemType.STANDALONE,
-      courseProblems: [{ course: { id: userCourse.course.id } }],
+      courseProblems: [{ course: { id: userCourse.courseId } }],
       author: { id: userCourse.userId },
       problemTags: getRandomElements<Tag>(tags, 3).map((tag) => ({ tag })),
       problemTopics: getRandomElements<Topic>(topics, 3).map((topic) => ({
@@ -88,7 +87,7 @@ export async function seedProblems(dataSource: DataSource) {
       memoryLimitKb: 65536,
       difficulty: DifficultyLevel.HARD,
       type: ProblemType.STANDALONE,
-      courseProblems: [{ course: { id: userCourse.course.id } }],
+      courseProblems: [{ course: { id: userCourse.courseId } }],
       author: { id: userCourse.userId },
       problemTags: getRandomElements<Tag>(tags, 3).map((tag) => ({ tag })),
       problemTopics: getRandomElements<Topic>(topics, 3).map((topic) => ({
@@ -112,7 +111,7 @@ export async function seedProblems(dataSource: DataSource) {
       memoryLimitKb: 65536,
       difficulty: DifficultyLevel.EASY,
       type: ProblemType.STANDALONE,
-      courseProblems: [{ course: { id: userCourse.course.id } }],
+      courseProblems: [{ course: { id: userCourse.courseId } }],
       author: { id: userCourse.userId },
       problemTags: getRandomElements<Tag>(tags, 3).map((tag) => ({ tag })),
       problemTopics: getRandomElements<Topic>(topics, 3).map((topic) => ({
@@ -136,7 +135,7 @@ export async function seedProblems(dataSource: DataSource) {
       memoryLimitKb: 65536,
       difficulty: DifficultyLevel.MEDIUM,
       type: ProblemType.STANDALONE,
-      courseProblems: [{ course: { id: userCourse.course.id } }],
+      courseProblems: [{ course: { id: userCourse.courseId } }],
       author: { id: userCourse.userId },
       problemTags: getRandomElements<Tag>(tags, 3).map((tag) => ({ tag })),
       problemTopics: getRandomElements<Topic>(topics, 3).map((topic) => ({
@@ -164,7 +163,7 @@ export async function seedProblems(dataSource: DataSource) {
       memoryLimitKb: 65536,
       difficulty: DifficultyLevel.HARD,
       type: ProblemType.STANDALONE,
-      courseProblems: [{ course: { id: userCourse.course.id } }],
+      courseProblems: [{ course: { id: userCourse.courseId } }],
       author: { id: userCourse.userId },
       problemTags: getRandomElements<Tag>(tags, 3).map((tag) => ({ tag })),
       problemTopics: getRandomElements<Topic>(topics, 3).map((topic) => ({
