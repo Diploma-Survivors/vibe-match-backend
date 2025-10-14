@@ -14,6 +14,7 @@ import { decodeCursor, encodeCursor } from 'src/common/utils/cursor-query.util';
 import {
   Brackets,
   DataSource,
+  FindOptionsRelations,
   FindOptionsSelect,
   FindOptionsWhere,
   ObjectLiteral,
@@ -101,10 +102,10 @@ export class ContestsService {
         author: { id: user.userId },
       });
 
-      await queryRunner.manager.save(Contest, contest);
+      const contestSaved = await queryRunner.manager.save(Contest, contest);
       await queryRunner.commitTransaction();
 
-      return contest;
+      return contestSaved;
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -116,8 +117,9 @@ export class ContestsService {
   async findOne(
     where: FindOptionsWhere<Contest>,
     select?: FindOptionsSelect<Contest>,
+    relations?: FindOptionsRelations<Contest>,
   ): Promise<Contest | null> {
-    return this.contestsRepository.findOne({ where, select });
+    return this.contestsRepository.findOne({ where, select, relations });
   }
 
   async findContests(query: ContestsCursorQueryDto, currentUser: JwtPayload) {

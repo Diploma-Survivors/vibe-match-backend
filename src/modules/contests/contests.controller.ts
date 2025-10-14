@@ -30,6 +30,7 @@ import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestsService } from './contests.service';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
+import { CreateContestResponseDto } from './dto/create-contest-response.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
 import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
@@ -46,7 +47,7 @@ export class ContestsController {
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Contest created successfully',
-    type: CreateContestDto,
+    type: () => CreateContestResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -54,12 +55,17 @@ export class ContestsController {
   })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
   async createContest(
     @Body() createContestDto: CreateContestDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.contestsService.createContest(createContestDto, currentUser);
+    const contest = await this.contestsService.createContest(
+      createContestDto,
+      currentUser,
+    );
+    return new CreateContestResponseDto(contest);
   }
 
   @Get()
