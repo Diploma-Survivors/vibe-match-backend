@@ -23,6 +23,7 @@ import {
 } from './interfaces/lti.interface';
 
 import { plainToInstance } from 'class-transformer';
+import { AssignmentContentType } from 'src/common/enums/assignment-content-type.enum';
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestsService } from '../contests/contests.service';
 import { Course } from '../course/entities/course.entity';
@@ -45,6 +46,15 @@ const LTI_DEEP_LINKING_TIMEOUT_MS = 10 * 60 * 1000;
 export class LtiService {
   private readonly logger = new Logger(LtiService.name);
 
+  // Maps to hold frontend URLs based on roles and content types
+  private readonly frontendAssignmentsPath = new Map<
+    AssignmentContentType,
+    Record<string, string>
+  >();
+
+  // Map to hold frontend set cookies URLs based on roles
+  private readonly frontendSetCookiesUrl = new Map<RoleEnum, string>();
+
   constructor(
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
@@ -55,14 +65,52 @@ export class LtiService {
     private readonly keysService: KeysService,
     private readonly problemsService: ProblemsService,
     private readonly contestService: ContestsService,
-  ) {}
+  ) {
+    // Initialize the frontend URL mappings from configuration
+    this.frontendAssignmentsPath.set(AssignmentContentType.PROBLEM, {
+      [RoleEnum.STUDENT]: this.configService.get<string>(
+        'lti.frontendProblemUrl.student',
+      ) as string,
+      [RoleEnum.INSTRUCTOR]: this.configService.get<string>(
+        'lti.frontendProblemUrl.instructor',
+      ) as string,
+    });
+    this.frontendAssignmentsPath.set(AssignmentContentType.CONTEST, {
+      [RoleEnum.STUDENT]: this.configService.get<string>(
+        'lti.frontendContestUrl.student',
+      ) as string,
+      [RoleEnum.INSTRUCTOR]: this.configService.get<string>(
+        'lti.frontendContestUrl.instructor',
+      ) as string,
+    });
 
+    // Initialize the frontend set cookies URL mappings from configuration
+    this.frontendSetCookiesUrl.set(
+      RoleEnum.STUDENT,
+      this.configService.get<string>(
+        'lti.frontendSetCookiesUrl.student',
+      ) as string,
+    );
+    this.frontendSetCookiesUrl.set(
+      RoleEnum.INSTRUCTOR,
+      this.configService.get<string>(
+        'lti.frontendSetCookiesUrl.instructor',
+      ) as string,
+    );
+  }
+
+  /**
+   * @description Handles the LTI login initiation request.
+   * @param ltiLoginInitiationDto it contains iss, loginHint, targetLinkUri, ltiMessageHint
+   * @returns The URL to redirect the user to the LMS authentication endpoint.
+   */
   public async handleLoginInitiation(
     ltiLoginInitiationDto: LtiLoginInitiationDto,
   ): Promise<string> {
     const { iss, loginHint, targetLinkUri, ltiMessageHint } =
       ltiLoginInitiationDto;
 
+    // Validate the issuer (iss) against the configured platform ID
     const platformId = this.configService.get<string>(
       'lti.platformId',
     ) as string;
@@ -70,9 +118,11 @@ export class LtiService {
       throw new BadRequestException('Invalid issuer');
     }
 
+    // Generate state and nonce for CSRF protection and replay attack prevention
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
 
+    // Store state and nonce in Redis with a TTL
     const stateData = {
       nonce,
       targetLinkUri,
@@ -94,6 +144,7 @@ export class LtiService {
     ) as string;
     const clientId = this.configService.get<string>('lti.clientId') as string;
 
+    // Construct the redirect URL to the LMS authentication endpoint
     const redirectUrl = new URL(authenticationRequestUrl);
     redirectUrl.searchParams.append('scope', 'openid');
     redirectUrl.searchParams.append('response_type', 'id_token');
@@ -110,19 +161,27 @@ export class LtiService {
     return redirectUrl.toString();
   }
 
+  /**
+   * @description Handles the LTI launch request (Do not use for deep linking - Select Content).
+   * @param ltiLaunchRequestDto it contains state, idToken, and other launch parameters
+   * @returns The response for the LTI launch request.
+   */
   public async handleLtiLaunch(
     ltiLaunchRequestDto: LtiLaunchRequestDto,
   ): Promise<LtiLaunchResponse> {
+    // Validate and retrieve the nonce from the state parameter
     const nonce = await this.validateAndGetNonceFromState(
       ltiLaunchRequestDto.state,
     );
 
+    // Validate and parse the ID token to extract claims
     const claims = await this.getAndValidateClaims(
       ltiLaunchRequestDto.idToken,
       LtiMessageType.LTI_RESOURCE_LINK_REQUEST,
       nonce,
     );
 
+    // Get content identifiers from custom claims (currently supporting problem or contest)
     const problemId = claims.customClaims?.['problemId'] as string;
     const contestId = claims.customClaims?.['contestId'] as string;
     if (!problemId && !contestId) {
@@ -131,25 +190,46 @@ export class LtiService {
       );
     }
 
+    // Update or create the user in the local database based on LTI claims
     const user = await this.upsertUserFromClaims(claims);
 
+    // Process the course information and enroll the user if course context is provided
     const course = await this.processCourseAndEnrollUser(claims, user);
 
+    // Issue JWT tokens for the user
     const tokens = await this.issueTokens(user, claims, course);
+
+    const contentType = problemId
+      ? AssignmentContentType.PROBLEM
+      : AssignmentContentType.CONTEST;
+
+    // Determine the appropriate redirect target based on user roles and content type
+    const redirectTarget = this.getRedirectTargetForFrontend(
+      user.roles,
+      contentType,
+      problemId || contestId,
+    );
 
     return {
       ...tokens,
-      ...this.getRedirectTargetForFrontend(user.roles, problemId),
+      ...redirectTarget,
     };
   }
 
+  /**
+   * @description Handles the LTI deep linking request (Use for deep linking - Select Content).
+   * @param ltiDeepLinkingDto it contains state, idToken, and other deep linking parameters
+   * @returns The response for the LTI deep linking request.
+   */
   public async handleDeepLinkingRequest(
     ltiDeepLinkingDto: LtiDeepLinkingRequestDto,
   ): Promise<LtiLaunchResponse> {
+    // Validate and retrieve the nonce from the state parameter
     const nonce = await this.validateAndGetNonceFromState(
       ltiDeepLinkingDto.state,
     );
 
+    // Validate and parse the ID token to extract claims
     const claims = await this.getAndValidateClaims(
       ltiDeepLinkingDto.idToken,
       LtiMessageType.LTI_DEEP_LINKING_REQUEST,
@@ -168,12 +248,16 @@ export class LtiService {
       );
     }
 
+    // Update or create the user in the local database based on LTI claims
     const user = await this.upsertUserFromClaims(claims);
 
+    // Process the course information and enroll the user if course context is provided
     const course = await this.processCourseAndEnrollUser(claims, user);
 
+    // Issue JWT tokens for the user
     const tokens = await this.issueTokens(user, claims, course);
 
+    // Validate that the platform accepts LTI Resource Link content items
     const deepLinkingSettings = claims.deepLinkingSettings;
     const isAcceptLtiResourceLink = deepLinkingSettings.acceptTypes?.includes(
       ContentItemType.LTI_RESOURCE_LINK,
@@ -196,9 +280,11 @@ export class LtiService {
       )}`,
     );
 
+    // Store deep linking data in Redis to handle user selection later
     const keyRedis = this.getKeyRedisForDeepLinking(tokens.deviceId);
     await this.redisService.set(keyRedis, JSON.stringify(deepLinkingData));
 
+    // If the user does not complete deep linking within the timeout, clean up the Redis entry and respond with empty content items
     setTimeout(() => {
       (async () => {
         const deepLinkingData = await this.redisService.get(keyRedis);
@@ -218,7 +304,7 @@ export class LtiService {
     }, LTI_DEEP_LINKING_TIMEOUT_MS);
 
     const redirectPath = this.configService.get<string>(
-      'lti.frontendCallbackUrl.deepLinking',
+      'lti.frontendSelectContentUrl',
     ) as string;
 
     const postRedirectUrl = this.configService.get<string>(
@@ -232,11 +318,19 @@ export class LtiService {
     };
   }
 
+  /**
+   * @description Handles the LTI deep linking response after user selects content.
+   * @param deviceId Use to retrieve deep linking session from Redis
+   * @param currentCourse The current course ID
+   * @param ltiResourceLinkDto The LTI resource link data
+   * @returns The response for the LTI deep linking response.
+   */
   public async handleDeepLinkingResponse(
     deviceId: string,
     currentCourse: string,
     ltiResourceLinkDto?: LtiResourceLinkDto,
   ) {
+    // Resource link for tool handle redirect correctly when launching from activity in LMS
     const url = this.configService.get<string>('lti.toolRedirectionUri');
     const ltiResourceLinks = ltiResourceLinkDto
       ? [
@@ -262,6 +356,7 @@ export class LtiService {
       );
     }
 
+    // Validate the selected content belongs to the current course
     if (problemId) {
       const problem = await this.problemsService.findById(problemId, {
         id: true,
@@ -277,8 +372,8 @@ export class LtiService {
         { id: contestId },
         {
           id: true,
-          course: true,
         },
+        { course: true },
       );
       if (!contest || contest.course.id !== currentCourse) {
         throw new BadRequestException('Contest not found');
@@ -287,6 +382,7 @@ export class LtiService {
       this.logger.debug(`Deep linking selected contest ID: ${contestId}`);
     }
 
+    // Retrieve deep linking session data from Redis
     const keyRedis = this.getKeyRedisForDeepLinking(deviceId);
     const deepLinkingDataString = await this.redisService.get(keyRedis);
     if (!deepLinkingDataString) {
@@ -308,6 +404,7 @@ export class LtiService {
     const platformId = this.configService.get<string>('lti.platformId');
     const deploymentId = this.configService.get<string>('lti.deploymentId');
 
+    // Create the JWT payload for the deep linking response
     const jwtPayload = new LtiDeepLinkingJwtPayloadDto({
       iss: clientId,
       aud: platformId,
@@ -320,6 +417,7 @@ export class LtiService {
       contentItems: ltiResourceLinks,
     });
 
+    // Sign the JWT for the deep linking response, LMS will verify the signature through the public keyset URL
     const jwt = await this.keysService.generateDeepLinkingJwt(jwtPayload);
 
     const deepLinkAuthData = {
@@ -333,6 +431,13 @@ export class LtiService {
     return deepLinkAuthData;
   }
 
+  /**
+   * @description Issues JWT tokens for the user based on LTI claims and optional course.
+   * @param user The user object
+   * @param claims The LTI claims
+   * @param course The course object (optional)
+   * @returns The generated JWT tokens
+   */
   private issueTokens(
     user: User,
     claims: IdTokenPayloadDto,
@@ -350,6 +455,12 @@ export class LtiService {
     });
   }
 
+  /**
+   * @description Processes the course information from LTI claims and enrolls the user if course context is provided.
+   * @param claims The LTI claims
+   * @param user The user object
+   * @returns The enrolled course or null if no course context is provided.
+   */
   private async processCourseAndEnrollUser(
     claims: IdTokenPayloadDto,
     user: User,
@@ -379,6 +490,11 @@ export class LtiService {
     }
   }
 
+  /**
+   * @description Updates or creates the user in the local database based on LTI claims.
+   * @param claims The LTI claims
+   * @returns The updated or created user
+   */
   private async upsertUserFromClaims(claims: IdTokenPayloadDto): Promise<User> {
     const user = await this.userService.findOrCreateByLtiClaims(claims);
     this.logger.log(
@@ -387,6 +503,13 @@ export class LtiService {
     return user;
   }
 
+  /**
+   * @description Validates the ID token and extracts claims.
+   * @param idToken The ID token to validate
+   * @param expectedMessageType The expected LTI message type
+   * @param nonce The nonce value to validate
+   * @returns The extracted claims
+   */
   private async getAndValidateClaims(
     idToken: string,
     expectedMessageType: LtiMessageType,
@@ -413,48 +536,76 @@ export class LtiService {
     return claims;
   }
 
+  /**
+   * @description Validates the state parameter and retrieves the associated nonce from Redis.
+   * @param state The state parameter to validate
+   * @returns The associated nonce
+   */
   private async validateAndGetNonceFromState(state: string): Promise<string> {
     const parsedState = await this.getStateFromRedis(state);
     return parsedState.nonce;
   }
 
+  /**
+   * @description Constructs the Redis key for storing state data.
+   * @param state The state parameter
+   * @returns The Redis key for the state
+   */
   private getStateRedisKey(state: string): string {
     return `lti:state:${state}`;
   }
 
+  /**
+   * @description Determines the appropriate redirect target based on user roles and content type.
+   * @param roles The user roles
+   * @param contentType The content type
+   * @param contentId The content ID
+   * @returns The redirect target information
+   */
   private getRedirectTargetForFrontend(
     roles: RoleEnum[],
-    problemId: string,
+    contentType: AssignmentContentType,
+    contentId: string,
   ): { redirectPath: string; postRedirectUrl: string } {
     let baseUrl = '';
     let postRedirectUrl = '';
 
     if (roles.includes(RoleEnum.INSTRUCTOR)) {
-      baseUrl = this.configService.get<string>(
-        'lti.frontendCallbackUrl.instructor',
-      ) as string;
-      postRedirectUrl = this.configService.get<string>(
-        'lti.frontendSetCookiesUrl.instructor',
+      baseUrl = this.frontendAssignmentsPath.get(contentType)?.[
+        RoleEnum.INSTRUCTOR
+      ] as string;
+      postRedirectUrl = this.frontendSetCookiesUrl.get(
+        RoleEnum.INSTRUCTOR,
       ) as string;
     } else {
-      baseUrl = this.configService.get<string>(
-        'lti.frontendCallbackUrl.student',
-      ) as string;
-      postRedirectUrl = this.configService.get<string>(
-        'lti.frontendSetCookiesUrl.student',
+      baseUrl = this.frontendAssignmentsPath.get(contentType)?.[
+        RoleEnum.STUDENT
+      ] as string;
+      postRedirectUrl = this.frontendSetCookiesUrl.get(
+        RoleEnum.STUDENT,
       ) as string;
     }
 
     return {
-      redirectPath: `${baseUrl}/${problemId}`,
+      redirectPath: baseUrl.replace('{{CONTENT_ID}}', contentId),
       postRedirectUrl,
     };
   }
 
+  /**
+   * @description Constructs the Redis key for deep linking sessions.
+   * @param deviceId The device ID
+   * @returns The Redis key for deep linking
+   */
   private getKeyRedisForDeepLinking(deviceId: string): string {
     return `lti:dl:${deviceId}`;
   }
 
+  /**
+   * @description Generates access and refresh tokens for a user.
+   * @param payload The JWT payload containing user information
+   * @returns The generated token response
+   */
   private async generateTokensForUser(
     payload: JwtPayload,
   ): Promise<TokenResponse> {
@@ -475,11 +626,21 @@ export class LtiService {
     };
   }
 
+  /**
+   * @description Transforms the raw JWT payload into a structured IdTokenPayloadDto.
+   * @param payload The raw JWT payload
+   * @returns The structured IdTokenPayloadDto
+   */
   private transformIdTokenPayload(payload: LtiClaims): IdTokenPayloadDto {
     const claims = plainToInstance(IdTokenPayloadDto, payload);
     return claims;
   }
 
+  /**
+   * @description Validates the state parameter and retrieves the associated nonce from Redis.
+   * @param state The state parameter to validate
+   * @returns The associated nonce
+   */
   private async getStateFromRedis(state: string): Promise<LtiStatePayload> {
     const storedStateString = await this.redisService.get(`lti:state:${state}`);
     if (!storedStateString) {
@@ -496,6 +657,11 @@ export class LtiService {
     return parsedState;
   }
 
+  /**
+   * @description Verifies the JWT from the platform.
+   * @param idToken The JWT to verify
+   * @returns The verified JWT payload
+   */
   private async verifyJwtFromPlatform(
     idToken: string,
   ): Promise<jose.JWTVerifyResult> {

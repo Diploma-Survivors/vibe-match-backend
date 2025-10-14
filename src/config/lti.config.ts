@@ -23,17 +23,25 @@ export const ltiConfig = registerAs('lti', () => ({
   toolRedirectionUri:
     process.env.LTI_TOOL_REDIRECTION_URI ||
     'http://host.docker.internal:3000/v1/lti/launch',
-  frontendCallbackUrl: {
+  frontendProblemUrl: {
     student:
-      process.env.LTI_FRONTEND_STUDENT_CALLBACK_URL ||
-      'http://localhost:3001/problems',
+      process.env.LTI_FRONTEND_STUDENT_PROBLEM_URL ||
+      'http://localhost:3001/problems/{{CONTENT_ID}}/description',
     instructor:
-      process.env.LTI_FRONTEND_INSTRUCTOR_CALLBACK_URL ||
-      'http://localhost:3002/problems',
-    deepLinking:
-      process.env.LTI_FRONTEND_DEEP_LINKING_URL ||
-      'http://localhost:3002/create-problem',
+      process.env.LTI_FRONTEND_INSTRUCTOR_PROBLEM_URL ||
+      'http://localhost:3002/problems/{{CONTENT_ID}}',
   },
+  frontendContestUrl: {
+    student:
+      process.env.LTI_FRONTEND_STUDENT_CONTEST_URL ||
+      'http://localhost:3001/contests/{{CONTENT_ID}}',
+    instructor:
+      process.env.LTI_FRONTEND_INSTRUCTOR_CONTEST_URL ||
+      'http://localhost:3002/contests/{{CONTENT_ID}}',
+  },
+  frontendSelectContentUrl:
+    process.env.LTI_FRONTEND_SELECT_CONTENT_URL ||
+    'http://localhost:3002/options',
   frontendSetCookiesUrl: {
     student:
       process.env.LTI_FRONTEND_STUDENT_SET_COOKIES_URL ||
