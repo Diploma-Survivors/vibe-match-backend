@@ -2,21 +2,17 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Generated,
+  Index,
   OneToOne,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Problem } from '../../entities/problem.entity';
 
 @Entity({ name: 'testcases' })
 export class Testcase {
-  @PrimaryColumn('uuid', {
-    nullable: false,
-    name: 'testcase_id',
-  })
-  @Generated('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'testcase_id' })
+  id: number;
 
   @Column('text', { nullable: false })
   fileUrl: string;
@@ -26,6 +22,10 @@ export class Testcase {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
   updatedAt: Date;
+
+  @Index({ unique: true })
+  @Column('int', { name: 'problem_id' })
+  problemId: number;
 
   @OneToOne(() => Problem, (problem) => problem.testcase)
   problem: Problem;

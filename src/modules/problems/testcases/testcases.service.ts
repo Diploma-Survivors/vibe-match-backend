@@ -11,13 +11,17 @@ import { Testcase } from './entities/testcase.entity';
 @Injectable()
 export class TestcasesService {
   constructor(
-    private readonly storagesService: StoragesService,
     @InjectRepository(Testcase)
     private readonly testcaseRepository: Repository<Testcase>,
+    private readonly storagesService: StoragesService,
     private readonly configService: ConfigService,
   ) {}
 
-  async create(file: Express.Multer.File, user: JwtPayload) {
+  async uploadAndSaveFileTestcase(
+    file: Express.Multer.File,
+    user: JwtPayload,
+    problemId: number,
+  ) {
     const seed = uuidV4();
     const key = `${seed}_${user.userId}_${user.courseId}${TESTCASE_FILE_EXTENSION}`;
     const bucket = this.configService.get<string>(
@@ -34,6 +38,7 @@ export class TestcasesService {
 
     const testcase = await this.testcaseRepository.save({
       fileUrl: url,
+      problemId,
     });
     return testcase;
   }

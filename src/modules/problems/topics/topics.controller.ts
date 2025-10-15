@@ -96,7 +96,7 @@ export class TopicsController {
     description: 'Topic not found.',
   })
   findOne(@Param('id') id: string) {
-    return this.topicsService.findOne(id);
+    return this.topicsService.findOne(+id);
   }
 
   @Patch(':id')
@@ -116,7 +116,7 @@ export class TopicsController {
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.ADMIN)
   update(@Param('id') id: string, @Body() updateTopicDto: UpdateTopicDto) {
-    return this.topicsService.update(id, updateTopicDto);
+    return this.topicsService.update(+id, updateTopicDto);
   }
 
   @Delete(':id')
@@ -135,6 +135,6 @@ export class TopicsController {
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.ADMIN)
   remove(@Param('id') id: string) {
-    return this.topicsService.remove(id);
+    return this.topicsService.remove(+id);
   }
 }

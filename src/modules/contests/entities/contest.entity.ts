@@ -19,8 +19,8 @@ import { ContestParticipation } from './contest-participations.entity';
   name: 'contests',
 })
 export class Contest {
-  @PrimaryGeneratedColumn('uuid', { name: 'contest_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'contest_id' })
+  id: number;
 
   @Column('varchar')
   name: string;
@@ -44,11 +44,17 @@ export class Contest {
   status: ContestStatus;
 
   @Index({ unique: false })
+  @Column('int', { name: 'course_id' })
+  courseId: number;
+
   @ManyToOne(() => Course)
   @JoinColumn({ name: 'course_id' })
   course: Course;
 
   @Index({ unique: false })
+  @Column('int', { name: 'author_id' })
+  authorId: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'author_id' })
   author: User;

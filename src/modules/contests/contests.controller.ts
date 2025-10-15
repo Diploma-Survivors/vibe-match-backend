@@ -131,7 +131,7 @@ export class ContestsController {
   @ApiParam({
     name: 'id',
     description: 'The unique identifier of the contest',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    example: 1,
   })
   @ApiBearerAuth()
   @ApiResponse({
@@ -146,7 +146,7 @@ export class ContestsController {
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    const contest = await this.contestsService.getDetailContest(id, user);
+    const contest = await this.contestsService.getDetailContest(+id, user);
 
     return new GetDetailContestResponseDto(contest);
   }

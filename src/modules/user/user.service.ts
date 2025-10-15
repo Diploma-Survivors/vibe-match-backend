@@ -30,15 +30,15 @@ export class UserService {
     return this.userRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.userRepository.findOne({ where: { id } });
   }
 
-  update(id: string, updateUserDto: UpdateUserDto) {
+  update(id: number, updateUserDto: UpdateUserDto) {
     return this.userRepository.update(id, updateUserDto);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.userRepository.delete(id);
   }
 

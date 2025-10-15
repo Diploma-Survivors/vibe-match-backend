@@ -4,9 +4,9 @@ import { DifficultyLevel } from '../enums/difficulty-level.enum';
 export class GetTagDto {
   @ApiProperty({
     description: 'The unique identifier of the tag',
-    example: 'tag123',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The name of the tag',
@@ -18,9 +18,9 @@ export class GetTagDto {
 export class GetTopicDto {
   @ApiProperty({
     description: 'The unique identifier of the topic',
-    example: 'topic123',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The name of the topic',
@@ -31,9 +31,9 @@ export class GetTopicDto {
 export class GetProblemsResponseDto {
   @ApiProperty({
     description: 'The unique identifier of the problem',
-    example: 'problem123',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The title of the problem',

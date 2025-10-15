@@ -6,9 +6,9 @@ import { ApiProperty } from '@nestjs/swagger';
 export class GetTestcaseSampleDto {
   @ApiProperty({
     description: 'The unique identifier of the testcase sample',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The input of the testcase sample',

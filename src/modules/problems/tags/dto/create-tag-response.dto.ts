@@ -3,9 +3,9 @@ import { ApiProperty } from '@nestjs/swagger';
 export class CreateTagResponseDto {
   @ApiProperty({
     description: 'The unique identifier of the tag',
-    example: 'tag_12345',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The name of the tag',

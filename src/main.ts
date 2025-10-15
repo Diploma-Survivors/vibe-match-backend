@@ -6,13 +6,17 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { Response } from 'express';
 import qs from 'qs';
+import {
+  initializeTransactionalContext,
+  StorageDriver,
+} from 'typeorm-transactional';
 import { AppModule } from './app.module';
 import { Environment } from './common/enums/environment.enum';
 import { ExpressSetting } from './common/enums/express-setting.enum';
-import { initializeTransactionalContext } from 'typeorm-transactional';
 
 async function bootstrap() {
-  initializeTransactionalContext();
+  initializeTransactionalContext({ storageDriver: StorageDriver.AUTO });
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);

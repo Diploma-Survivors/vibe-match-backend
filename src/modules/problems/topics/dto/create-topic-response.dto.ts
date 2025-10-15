@@ -3,9 +3,9 @@ import { ApiProperty } from '@nestjs/swagger';
 export class CreateTopicResponseDto {
   @ApiProperty({
     description: 'The unique identifier of the topic',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The name of the topic',
