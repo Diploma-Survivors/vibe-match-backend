@@ -17,24 +17,24 @@ import { RoleEnum } from '../../user/enums/role.enum';
 export class UserCourse {
   @ApiProperty({
     description: 'UserCourse unique identifier',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: 1,
   })
-  @PrimaryGeneratedColumn('uuid', { name: 'user_course_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'user_course_id' })
+  id: number;
 
   @ApiProperty({
     description: 'User ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    example: 1,
   })
   @Column()
-  userId: string;
+  userId: number;
 
   @ApiProperty({
     description: 'Course ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    example: 1,
   })
   @Column()
-  courseId: string;
+  courseId: number;
 
   @ApiProperty({
     description: 'Roles of the user in this course',

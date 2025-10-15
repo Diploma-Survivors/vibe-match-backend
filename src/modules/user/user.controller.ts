@@ -53,7 +53,7 @@ export class UserController {
     description: 'User not found',
   })
   findOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
+    return this.userService.findOne(+id);
   }
 
   @Patch(':id')
@@ -68,7 +68,7 @@ export class UserController {
     description: 'User not found',
   })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(id, updateUserDto);
+    return this.userService.update(+id, updateUserDto);
   }
 
   @Delete(':id')
@@ -83,6 +83,6 @@ export class UserController {
     description: 'User not found',
   })
   remove(@Param('id') id: string) {
-    return this.userService.remove(id);
+    return this.userService.remove(+id);
   }
 }

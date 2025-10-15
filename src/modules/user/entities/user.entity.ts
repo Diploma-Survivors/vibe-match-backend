@@ -2,23 +2,23 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
-  OneToMany,
 } from 'typeorm';
+import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { AuthTypeEnum } from '../enums/auth-type.enum';
 import { RoleEnum } from '../enums/role.enum';
-import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 
 @Entity()
 @Unique(['ltiSubjectId', 'ltiPlatformId'])
 export class User {
   @ApiProperty({
     description: 'User unique identifier',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: 1,
   })
-  @PrimaryGeneratedColumn('uuid', { name: 'user_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'user_id' })
+  id: number;
 
   @ApiProperty({
     description: 'User email address',
