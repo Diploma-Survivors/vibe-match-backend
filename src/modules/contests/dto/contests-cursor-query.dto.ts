@@ -3,10 +3,10 @@ import { Type } from 'class-transformer';
 import {
   IsDate,
   IsEnum,
+  IsInt,
   IsOptional,
   IsPositive,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
 import { PaginationCursorDto } from 'src/common/pagination/dtos/pagination-cursor.dto';
@@ -91,8 +91,8 @@ export class ContestsCursorQueryDto extends PaginationCursorDto {
 }
 
 export class ContestCursorFieldsDto {
-  @IsUUID()
-  id: string;
+  @IsInt()
+  id: number;
 
   @IsOptional()
   @Type(() => Date)

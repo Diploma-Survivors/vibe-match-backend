@@ -4,9 +4,9 @@ import {
   IsArray,
   IsDate,
   IsEnum,
+  IsInt,
   IsOptional,
   IsPositive,
-  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -18,12 +18,12 @@ import { ContestStatus } from '../enums/contest-status.enum';
 export class CreateProblemWithContestDto {
   @ApiProperty({
     description: 'The unique identifier of the problem',
-    example: '123jfk2-456abc',
+    example: 1,
     name: 'problemId',
   })
-  @IsUUID()
+  @IsInt()
   @Expose({ name: 'problemId' })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The score assigned to the problem in the contest',

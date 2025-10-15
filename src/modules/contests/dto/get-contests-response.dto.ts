@@ -4,9 +4,9 @@ import { ContestStatus } from '../enums/contest-status.enum';
 export class GetContestsResponseDto {
   @ApiProperty({
     description: 'Unique identifier for the contest',
-    example: 'a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'Name of the contest',

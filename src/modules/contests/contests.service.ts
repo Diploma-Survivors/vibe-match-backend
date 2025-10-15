@@ -65,7 +65,7 @@ export class ContestsService {
           ids: createContestDto.problems.map((problem) => problem.id),
         })
         .andWhere(
-          '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
+          '(problem.type IN (:...types) OR (courseProblem.courseId = :courseId AND contestProblem.id IS NULL))',
           {
             types: this.SELECTABLE_PROBLEM_TYPES,
             courseId: user.courseId,
@@ -95,11 +95,11 @@ export class ContestsService {
       const contest = queryRunner.manager.create(Contest, {
         ...createContestDto,
         contestProblems: createContestDto.problems.map((problem) => ({
-          problem: { id: problem.id },
+          problemId: problem.id,
           score: problem.score,
         })),
-        course: { id: user.courseId },
-        author: { id: user.userId },
+        courseId: user.courseId,
+        authorId: user.userId,
       });
 
       const contestSaved = await queryRunner.manager.save(Contest, contest);
@@ -223,17 +223,15 @@ export class ContestsService {
   }
 
   private buildBaseQuery() {
-    return this.dataSource
-      .createQueryBuilder(Contest, 'contest')
-      .leftJoin('contest.course', 'course');
+    return this.dataSource.createQueryBuilder(Contest, 'contest');
   }
 
   private applyCourseFilter(
     queryBuilder: SelectQueryBuilder<Contest>,
-    courseId: string,
+    courseId: number,
   ) {
     queryBuilder.andWhere(
-      '(contest.status = :status OR course.id = :courseId)',
+      '(contest.status = :status OR contest.courseId = :courseId)',
       {
         status: ContestStatus.PUBLIC,
         courseId,
@@ -418,10 +416,10 @@ export class ContestsService {
     return '>';
   }
 
-  async getDetailContest(id: string, currentUser: JwtPayload) {
+  async getDetailContest(id: number, currentUser: JwtPayload) {
     const contest = await this.contestsRepository.findOne({
       where: { id },
-      relations: ['contestProblems', 'contestProblems.problem', 'course'],
+      relations: ['contestProblems', 'contestProblems.problem'],
     });
     if (!contest) {
       throw new BadRequestException('Contest not found');
@@ -429,7 +427,7 @@ export class ContestsService {
 
     const isAccessible =
       contest.status === ContestStatus.PUBLIC ||
-      contest.course.id === currentUser.courseId;
+      contest.courseId === currentUser.courseId;
 
     if (!isAccessible) {
       throw new ForbiddenException('You do not have access to this contest');

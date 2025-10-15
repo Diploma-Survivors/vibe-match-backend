@@ -8,9 +8,9 @@ import { ContestStatus } from '../enums/contest-status.enum';
 export class ContestProblemDetail {
   @ApiProperty({
     description: 'The unique identifier of the problem',
-    example: '123jfk2-456abc',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The title of the problem',
@@ -47,9 +47,9 @@ export class ContestProblemDetail {
 export class GetDetailContestResponseDto {
   @ApiProperty({
     description: 'The unique identifier of the contest',
-    example: '123jfk2-456abc',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'The name of the contest',
@@ -85,7 +85,13 @@ export class GetDetailContestResponseDto {
   status: ContestStatus;
 
   @Exclude()
+  courseId: number;
+
+  @Exclude()
   course: Course;
+
+  @Exclude()
+  authorId: number;
 
   @Exclude()
   author: User;
@@ -103,6 +109,9 @@ export class GetDetailContestResponseDto {
 
   @Exclude()
   updatedAt: Date;
+
+  @Exclude()
+  tsv: string;
 
   constructor(partial: Partial<GetDetailContestResponseDto>) {
     Object.assign(this, partial);
