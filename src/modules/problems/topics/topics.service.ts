@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { FindManyOptions, Repository } from 'typeorm';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Topic } from './entities/topic.entity';
-import { Repository } from 'typeorm';
 
 @Injectable()
 export class TopicsService {
@@ -22,19 +22,23 @@ export class TopicsService {
     return this.topicsRepository.save(topics);
   }
 
-  findAll() {
+  async findAll() {
     return this.topicsRepository.find();
   }
 
-  findOne(id: number) {
+  async find(options: FindManyOptions<Topic>) {
+    return this.topicsRepository.find(options);
+  }
+
+  async findOne(id: number) {
     return this.topicsRepository.findOne({ where: { id } });
   }
 
-  update(id: number, updateTopicDto: UpdateTopicDto) {
+  async update(id: number, updateTopicDto: UpdateTopicDto) {
     return this.topicsRepository.update(id, updateTopicDto);
   }
 
-  remove(id: number) {
+  async remove(id: number) {
     return this.topicsRepository.delete(id);
   }
 }
