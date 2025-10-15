@@ -1,6 +1,8 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
-@Entity()
+@Entity({
+  name: 'languages',
+})
 export class Language {
   @PrimaryColumn()
   id: number; // matches Judge0 language ID

@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { ContestStatus } from '../enums/contest-status.enum';
 import { ContestProblem } from './contest-problem.entity';
+import { ContestParticipation } from './contest-participations.entity';
 
 @Entity({
   name: 'contests',
@@ -56,6 +57,15 @@ export class Contest {
     cascade: true,
   })
   contestProblems: ContestProblem[];
+
+  @OneToMany(
+    () => ContestParticipation,
+    (participation) => participation.contest,
+    {
+      cascade: true,
+    },
+  )
+  contestParticipation: ContestParticipation[];
 
   @CreateDateColumn({
     name: 'created_at',

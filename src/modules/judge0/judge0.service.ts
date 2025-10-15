@@ -12,13 +12,19 @@ export class Judge0Service {
   private readonly judge0Url: string;
   private readonly publicUrl: string;
   private readonly apiVersion: string;
+  private readonly rapidHost: string;
+  private readonly rapidKey: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.judge0Url = this.configService.get<string>('appConfig.judge0Url')!;
+    this.judge0Url = this.configService.get<string>('judge0Config.judge0Url')!;
     this.publicUrl = this.configService.get<string>(
-      'appConfig.judge0CallbackUrl',
+      'judge0Config.judge0CallbackUrl',
     )!;
     this.apiVersion = this.configService.get<string>('appConfig.apiVersion')!;
+    this.rapidHost = this.configService.get<string>(
+      'judge0Config.apiRapidHost',
+    )!;
+    this.rapidKey = this.configService.get<string>('judge0Config.apiRapidKey')!;
   }
 
   /**
@@ -30,12 +36,15 @@ export class Judge0Service {
     try {
       const url = `${this.judge0Url}/submissions/batch?base64_encoded=true`;
 
+      this.logger.log(url);
       const response: AxiosResponse<Judge0BatchResponse> = await axios.post(
         url,
         { submissions: items },
         {
           headers: {
             'Content-Type': 'application/json',
+            'X-RapidAPI-Key': this.rapidKey,
+            'X-RapidAPI-Host': this.rapidHost,
           },
         },
       );

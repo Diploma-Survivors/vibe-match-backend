@@ -36,6 +36,15 @@ export class CreateSubmissionDto {
   readonly problemId: string;
 
   @ApiProperty({
+    description: 'Contest participation identifier, if applicable',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+    nullable: true,
+  })
+  @IsUUID()
+  @IsOptional()
+  readonly contestParticipationId?: string;
+
+  @ApiProperty({
     description: 'Test case samples for the submission',
     type: [CreateTestcaseSampleDto],
   })
@@ -59,4 +68,12 @@ export class CreateSubmissionDto {
   @ValidateNested({ each: true })
   @Type(() => CreateTestcaseSampleDto)
   readonly testCases: CreateTestcaseSampleDto[];
+
+  @ApiPropertyOptional({
+    description: 'Notes for the submission',
+    example: 'This is my first submission.',
+  })
+  @IsString()
+  @IsOptional()
+  readonly notes?: string;
 }

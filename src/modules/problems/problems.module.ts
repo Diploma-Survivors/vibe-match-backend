@@ -10,6 +10,7 @@ import { ProblemsService } from './problems.service';
 import { TagsModule } from './tags/tags.module';
 import { TestcasesModule } from './testcases/testcases.module';
 import { TopicsModule } from './topics/topics.module';
+import { TestcaseSample } from './testcases/entities/testcase-sample.entity';
 
 @Module({
   controllers: [ProblemsController],
@@ -19,7 +20,12 @@ import { TopicsModule } from './topics/topics.module';
     TagsModule,
     TestcasesModule,
     StoragesModule,
-    TypeOrmModule.forFeature([Problem, ProblemTag, ProblemTopic]),
+    TypeOrmModule.forFeature([
+      Problem,
+      ProblemTag,
+      ProblemTopic,
+      TestcaseSample,
+    ]),
   ],
   exports: [ProblemsService],
 })

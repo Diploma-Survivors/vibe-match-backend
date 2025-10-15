@@ -8,6 +8,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as readline from 'node:readline';
 import { FileUploadOptions } from './interfaces/file-update-options.interface';
+import * as fs from 'fs';
 
 @Injectable()
 export class StoragesService {
@@ -57,6 +58,21 @@ export class StoragesService {
 
     const rl = readline.createInterface({
       input: bodyStream,
+      crlfDelay: Infinity,
+    });
+
+    for await (const line of rl) {
+      yield line.trim();
+    }
+  }
+
+  async *streamLinesLocal(filePath: string): AsyncGenerator<string> {
+    const fileStream = fs.createReadStream(filePath, {
+      encoding: 'utf-8',
+    });
+
+    const rl = readline.createInterface({
+      input: fileStream,
       crlfDelay: Infinity,
     });
 

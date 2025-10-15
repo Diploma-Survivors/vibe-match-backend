@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { EventSource } from 'eventsource';
 import { AppModule } from '../../../src/app.module';
-import { SubmissionResultDto } from '../../../src/modules/submission/dto/submission.response.dto';
+import { SubmissionResultDto } from '../../../src/modules/submission/dto/submission.result.dto';
 import { TestcaseSample } from '../../../src/modules/problems/testcases/entities/testcase-sample.entity';
 import { Problem } from '../../../src/modules/problems/entities/problem.entity';
 import { DifficultyLevel } from '../../../src/modules/problems/enums/difficulty-level.enum';
