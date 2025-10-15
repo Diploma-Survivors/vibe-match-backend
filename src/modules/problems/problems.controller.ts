@@ -226,7 +226,7 @@ export class ProblemsController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     const problem = await this.problemsService.findDetailProblemById(
-      id,
+      +id,
       currentUser,
     );
 
@@ -251,7 +251,7 @@ export class ProblemsController {
     @Param('id') id: string,
     @Body() updateProblemDto: UpdateProblemDto,
   ) {
-    return await this.problemsService.update(id, updateProblemDto);
+    return await this.problemsService.update(+id, updateProblemDto);
   }
 
   @Delete(':id')

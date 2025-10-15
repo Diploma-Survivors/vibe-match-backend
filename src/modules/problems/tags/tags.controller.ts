@@ -94,7 +94,7 @@ export class TagsController {
   })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Tag not found.' })
   async findOne(@Param('id') id: string) {
-    return await this.tagsService.findOne(id);
+    return await this.tagsService.findOne(+id);
   }
 
   @Patch(':id')
@@ -110,7 +110,7 @@ export class TagsController {
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async update(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
-    return await this.tagsService.update(id, updateTagDto);
+    return await this.tagsService.update(+id, updateTagDto);
   }
 
   @Delete(':id')
@@ -125,6 +125,6 @@ export class TagsController {
   @UseGuards(JwtAuthGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async remove(@Param('id') id: string) {
-    return await this.tagsService.remove(id);
+    return await this.tagsService.remove(+id);
   }
 }

@@ -86,6 +86,7 @@ export class ProblemsService {
 
   private async uploadAndSaveFileTestcase(
     queryRunner: QueryRunner,
+    problemId: number,
     file: Express.Multer.File,
     currentUser: JwtPayload,
   ) {
@@ -105,6 +106,7 @@ export class ProblemsService {
 
     const testcase = queryRunner.manager.create(Testcase, {
       fileUrl: url,
+      problemId,
     });
     return queryRunner.manager.save(Testcase, testcase);
   }
@@ -131,24 +133,24 @@ export class ProblemsService {
       throw new BadRequestException('Some topics are invalid');
     }
 
-    const testcase = await this.uploadAndSaveFileTestcase(
-      queryRunner,
-      testcaseFile,
-      user,
-    );
-
     const problem = queryRunner.manager.create(Problem, {
       ...createProblemDto,
-      author: { id: user.userId },
-      testcase,
+      authorId: user.userId,
+      testcase: undefined,
       courseProblems: [{ course: { id: user.courseId } }],
       problemTags: tags.map((tag) => ({ tag })),
       problemTopics: topics.map((topic) => ({ topic })),
     });
+    const problemSaved = await queryRunner.manager.save(Problem, problem);
 
-    await queryRunner.manager.save(Problem, problem);
+    await this.uploadAndSaveFileTestcase(
+      queryRunner,
+      problemSaved.id,
+      testcaseFile,
+      user,
+    );
 
-    return problem;
+    return problemSaved;
   }
 
   async findProblemsByStudent(
@@ -205,6 +207,7 @@ export class ProblemsService {
         pagination.limit,
         pagination.isBackward,
         query,
+        config,
       );
     }
 
@@ -214,6 +217,7 @@ export class ProblemsService {
       pagination.limit,
       pagination.isBackward,
       query,
+      config,
     );
   }
 
@@ -273,10 +277,10 @@ export class ProblemsService {
 
   private applyStudentFilter(
     queryBuilder: SelectQueryBuilder<Problem>,
-    courseId: string,
+    courseId: number,
   ) {
     queryBuilder.where(
-      '(problem.type IN (:...types) AND courseProblem.course = :courseId)',
+      '(problem.type IN (:...types) AND courseProblem.courseId = :courseId)',
       {
         types: this.SELECTABLE_PROBLEM_TYPES,
         courseId,
@@ -294,10 +298,10 @@ export class ProblemsService {
 
   private applyContestCreationFilter(
     queryBuilder: SelectQueryBuilder<Problem>,
-    courseId: string,
+    courseId: number,
   ) {
     queryBuilder.where(
-      '(problem.type IN (:...types) OR (courseProblem.course = :courseId AND contestProblem.id IS NULL))',
+      '(problem.type IN (:...types) OR (courseProblem.courseId = :courseId AND contestProblem.id IS NULL))',
       {
         types: this.SELECTABLE_PROBLEM_TYPES,
         courseId,
@@ -482,6 +486,10 @@ export class ProblemsService {
     limit: number,
     isBackward: boolean,
     query: ProblemsCursorQueryDto,
+    config: {
+      joins: string[];
+      filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+    },
   ): Promise<CursorPaginated<GetProblemsResponseDto>> {
     const hasMore = items.length > limit;
     if (hasMore) {
@@ -506,7 +514,7 @@ export class ProblemsService {
     const hasNextPage = isBackward ? !!query.before : hasMore;
     const hasPreviousPage = isBackward ? hasMore : !!query.after;
 
-    const totalCount = await this.getTotalCountWithFilters(query);
+    const totalCount = await this.getTotalCountWithFilters(query, config);
 
     return {
       edges,
@@ -581,15 +589,14 @@ export class ProblemsService {
 
   private async getTotalCountWithFilters(
     query: ProblemsCursorQueryDto,
+    config: {
+      joins: string[];
+      filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+    },
   ): Promise<number> {
-    const queryBuilder = this.buildBaseQuery([
-      'courseProblem',
-      'contestProblem',
-      'problemTag',
-      'problemTopic',
-    ]);
+    const queryBuilder = this.buildBaseQuery(config.joins);
 
-    this.applyKeywordFilter(queryBuilder, query?.keyword);
+    config.filterFn(queryBuilder);
     this.applyMatchFilters(queryBuilder, query);
 
     const raw = (await queryBuilder
@@ -598,21 +605,21 @@ export class ProblemsService {
     return Number.parseInt(raw.count, 10);
   }
 
-  async findById(id: string, select?: FindOptionsSelect<Problem>) {
+  async findById(id: number, select?: FindOptionsSelect<Problem>) {
     return await this.problemsRepository.findOne({ where: { id }, select });
   }
 
-  async findDetailProblemById(id: string, currentUser: JwtPayload) {
+  async findDetailProblemById(id: number, currentUser: JwtPayload) {
     const problem = await this.problemsRepository.findOne({
       where: { id },
-      relations: ['testcaseSamples', 'courseProblems', 'courseProblems.course'],
+      relations: ['testcaseSamples', 'courseProblems'],
     });
     if (!problem) {
       throw new BadRequestException('Problem not found');
     }
 
     const isAccessible = problem.courseProblems.some(
-      (cp) => cp.course.id === currentUser.courseId,
+      (cp) => cp.courseId === currentUser.courseId,
     );
 
     if (!isAccessible) {
@@ -622,7 +629,7 @@ export class ProblemsService {
     return problem;
   }
 
-  async update(id: string, updateProblemDto: UpdateProblemDto) {
+  async update(id: number, updateProblemDto: UpdateProblemDto) {
     await this.problemsRepository.update(id, {
       ...updateProblemDto,
       problemTags: updateProblemDto.tags?.map((tagId) => ({
@@ -631,9 +638,7 @@ export class ProblemsService {
       problemTopics: updateProblemDto.topics?.map((topicId) => ({
         topic: { id: topicId },
       })),
-      testcase: updateProblemDto.testcase
-        ? { id: updateProblemDto.testcase }
-        : undefined,
+      testcase: undefined,
     });
   }
 

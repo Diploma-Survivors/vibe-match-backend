@@ -4,13 +4,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Generated,
   Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
   OneToOne,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
@@ -27,9 +26,8 @@ import { ProblemTopic } from './problem-topic.entity';
 @Index('idx_problem_created_at', ['createdAt', 'id'])
 @Index('idx_problem_title', ['title', 'id'])
 export class Problem {
-  @PrimaryColumn('uuid', { nullable: false, name: 'problem_id' })
-  @Generated('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'problem_id' })
+  id: number;
 
   @Index({ unique: false, fulltext: true })
   @Column('varchar')
@@ -73,6 +71,9 @@ export class Problem {
   courseProblems: CourseProblem[];
 
   @Index({ unique: false })
+  @Column('int', { name: 'author_id' })
+  authorId: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'author_id' })
   author: User;
@@ -87,9 +88,7 @@ export class Problem {
   })
   problemTopics: ProblemTopic[];
 
-  @Index()
   @OneToOne(() => Testcase, (testcase) => testcase.problem, { cascade: true })
-  @JoinColumn({ name: 'testcase_id' })
   testcase: Testcase;
 
   @OneToMany(() => TestcaseSample, (testcaseSample) => testcaseSample.problem, {

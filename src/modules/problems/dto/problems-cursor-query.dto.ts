@@ -8,7 +8,6 @@ import {
   IsOptional,
   IsPositive,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
 import { PaginationCursorDto } from 'src/common/pagination/dtos/pagination-cursor.dto';
@@ -39,33 +38,32 @@ class QueryProblemsFilterDto {
 
   @ApiProperty({
     description: 'Filter problems by topic ID',
-    example: ['550e8400-e29b-41d4-a716-446655440000'],
+    example: [1, 2, 3],
     name: 'topicIds',
     required: false,
   })
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsInt({ each: true })
   @Expose({ name: 'topicIds' })
-  topics?: string[];
+  topics?: number[];
 
   @ApiProperty({
     description: 'Filter problems by an array of tag IDs',
-    example: ['550e8400-e29b-41d4-a716-446655440000'],
-    type: [String],
+    example: [1, 2, 3],
     name: 'tagIds',
     required: false,
   })
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsInt({ each: true })
   @Expose({ name: 'tagIds' })
-  tags?: string[];
+  tags?: number[];
 }
 
 export class ProblemCursorFieldsDto {
-  @IsUUID()
-  id: string;
+  @IsInt()
+  id: number;
 
   @IsOptional()
   @Type(() => Date)

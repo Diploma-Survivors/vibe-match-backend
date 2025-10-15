@@ -27,15 +27,15 @@ export class TagsService {
     return await this.tagsRepository.find();
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     return await this.tagsRepository.findOne({ where: { id } });
   }
 
-  async update(id: string, updateTagDto: UpdateTagDto) {
+  async update(id: number, updateTagDto: UpdateTagDto) {
     await this.tagsRepository.update(id, updateTagDto);
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.tagsRepository.delete(id);
   }
 }

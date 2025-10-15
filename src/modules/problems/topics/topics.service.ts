@@ -26,15 +26,15 @@ export class TopicsService {
     return this.topicsRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.topicsRepository.findOne({ where: { id } });
   }
 
-  update(id: string, updateTopicDto: UpdateTopicDto) {
+  update(id: number, updateTopicDto: UpdateTopicDto) {
     return this.topicsRepository.update(id, updateTopicDto);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.topicsRepository.delete(id);
   }
 }

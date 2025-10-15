@@ -4,8 +4,8 @@ import { Expose, plainToInstance, Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
+  IsInt,
   IsPositive,
-  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -114,29 +114,29 @@ export class CreateProblemDto {
 
   @ApiProperty({
     description: 'The IDs of the tags associated with the problem',
-    example: ['550e8400-e29b-41d4-a716-446655440000'],
+    example: [1, 2, 3],
     type: 'array',
-    items: { type: 'string', format: 'uuid' },
+    items: { type: 'int' },
     name: 'tagIds',
   })
   @JsonArrayTransform('tagIds')
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsInt({ each: true })
   @Expose({ name: 'tagIds' })
-  tags: string[];
+  tags: number[];
 
   @ApiProperty({
     description: 'The IDs of the topics associated with the problem',
-    example: ['550e8400-e29b-41d4-a716-446655440000'],
+    example: [1, 2, 3],
     type: 'array',
-    items: { type: 'string', format: 'uuid' },
+    items: { type: 'int' },
     name: 'topicIds',
   })
   @JsonArrayTransform('topicIds')
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsInt({ each: true })
   @Expose({ name: 'topicIds' })
-  topics: string[];
+  topics: number[];
 
   @ApiProperty({
     description: 'The test case file associated with the problem',

@@ -2,18 +2,16 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Generated,
   OneToMany,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { ProblemTopic } from '../../entities/problem-topic.entity';
 
 @Entity({ name: 'topics' })
 export class Topic {
-  @PrimaryColumn('uuid', { nullable: false, name: 'topic_id' })
-  @Generated('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'topic_id' })
+  id: number;
 
   @Column('varchar', { nullable: false, unique: true })
   name: string;
