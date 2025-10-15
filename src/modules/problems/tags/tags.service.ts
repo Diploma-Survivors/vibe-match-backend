@@ -1,14 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindManyOptions, Repository } from 'typeorm';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { Tag } from './entities/tag.entity';
 
 @Injectable()
 export class TagsService {
-  private readonly logger = new Logger(TagsService.name);
-
   constructor(
     @InjectRepository(Tag) private readonly tagsRepository: Repository<Tag>,
   ) {}
@@ -29,6 +27,10 @@ export class TagsService {
 
   async findOne(id: number) {
     return await this.tagsRepository.findOne({ where: { id } });
+  }
+
+  async find(options: FindManyOptions<Tag>) {
+    return await this.tagsRepository.find(options);
   }
 
   async update(id: number, updateTagDto: UpdateTagDto) {
