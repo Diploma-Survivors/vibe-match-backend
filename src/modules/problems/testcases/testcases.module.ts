@@ -5,7 +5,6 @@ import { Testcase } from './entities/testcase.entity';
 import { TestcasesService } from './testcases.service';
 
 @Module({
-  controllers: [],
   providers: [TestcasesService],
   imports: [TypeOrmModule.forFeature([Testcase]), StoragesModule],
   exports: [TestcasesService],
