@@ -182,9 +182,13 @@ export class LtiService {
     );
 
     // Get content identifiers from custom claims (currently supporting problem or contest)
-    const problemId = claims.customClaims?.['problemId'] as string;
-    const contestId = claims.customClaims?.['contestId'] as string;
-    if (!problemId && !contestId) {
+    const problemId = Number.parseInt(
+      claims.customClaims?.['problemId'] as string,
+    );
+    const contestId = Number.parseInt(
+      claims.customClaims?.['contestId'] as string,
+    );
+    if (isNaN(problemId) && isNaN(contestId)) {
       throw new BadRequestException(
         'Missing required custom claim: problemId or contestId',
       );
@@ -293,7 +297,7 @@ export class LtiService {
 
           await this.handleDeepLinkingResponse(
             tokens.deviceId,
-            course?.id as string,
+            course?.id as number,
           );
         }
       })().catch((error) => {
@@ -327,7 +331,7 @@ export class LtiService {
    */
   public async handleDeepLinkingResponse(
     deviceId: string,
-    currentCourse: string,
+    currentCourse: number,
     ltiResourceLinkDto?: LtiResourceLinkDto,
   ) {
     // Resource link for tool handle redirect correctly when launching from activity in LMS
@@ -342,15 +346,19 @@ export class LtiService {
         ]
       : [];
 
-    const problemId = ltiResourceLinkDto?.custom?.['problemId'] as string;
-    const contestId = ltiResourceLinkDto?.custom?.['contestId'] as string;
+    const problemId = Number.parseInt(
+      ltiResourceLinkDto?.custom?.['problemId'] as string,
+    );
+    const contestId = Number.parseInt(
+      ltiResourceLinkDto?.custom?.['contestId'] as string,
+    );
 
-    if (!problemId && !contestId) {
+    if (isNaN(problemId) && isNaN(contestId)) {
       throw new BadRequestException(
         'Missing required custom claim: problemId or contestId',
       );
     }
-    if (problemId && contestId) {
+    if (!isNaN(problemId) && !isNaN(contestId)) {
       throw new BadRequestException(
         'Redundant field of custom claims: provide either problemId or contestId, not both',
       );
@@ -372,10 +380,10 @@ export class LtiService {
         { id: contestId },
         {
           id: true,
+          courseId: true,
         },
-        { course: true },
       );
-      if (!contest || contest.course.id !== currentCourse) {
+      if (!contest || contest.courseId !== currentCourse) {
         throw new BadRequestException('Contest not found');
       }
 
@@ -565,7 +573,7 @@ export class LtiService {
   private getRedirectTargetForFrontend(
     roles: RoleEnum[],
     contentType: AssignmentContentType,
-    contentId: string,
+    contentId: number,
   ): { redirectPath: string; postRedirectUrl: string } {
     let baseUrl = '';
     let postRedirectUrl = '';
@@ -587,7 +595,7 @@ export class LtiService {
     }
 
     return {
-      redirectPath: baseUrl.replace('{{CONTENT_ID}}', contentId),
+      redirectPath: baseUrl.replace('{{CONTENT_ID}}', contentId.toString()),
       postRedirectUrl,
     };
   }

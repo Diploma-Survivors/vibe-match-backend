@@ -15,10 +15,10 @@ import {
 export class Course {
   @ApiProperty({
     description: 'Course unique identifier',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: 1,
   })
-  @PrimaryGeneratedColumn('uuid', { name: 'course_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'course_id' })
+  id: number;
 
   @ApiProperty({
     description: 'LTI Course ID from the LTI Platform',

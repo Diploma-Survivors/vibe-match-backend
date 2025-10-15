@@ -206,7 +206,7 @@ export class LtiController {
     const { jwt, deepLinkReturnUrl } =
       (await this.ltiService.handleDeepLinkingResponse(
         deviceId as string,
-        user.courseId as string,
+        user.courseId as number,
         ltiDeepLinking,
       )) as {
         jwt: string;
