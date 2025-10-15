@@ -58,7 +58,7 @@ export async function seedTopics(dataSource: DataSource) {
   ];
 
   for (const topic of topics) {
-    const existingTopic = await topicRepository.find({
+    const existingTopic = await topicRepository.findOne({
       where: { name: topic.name },
     });
     if (!existingTopic) {

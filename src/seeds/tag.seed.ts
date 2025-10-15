@@ -18,7 +18,7 @@ export async function seedTags(dataSource: DataSource) {
   ];
 
   for (const tag of tags) {
-    const existingTag = await tagRepository.find({
+    const existingTag = await tagRepository.findOne({
       where: { name: tag },
     });
     if (!existingTag) {
