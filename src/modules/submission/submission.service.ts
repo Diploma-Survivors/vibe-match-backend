@@ -5,37 +5,37 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
-import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
-import {
-  judge0StatusMap,
-  SubmissionStatus,
-} from './enums/submission-status.enum';
-import { SubmissionResultDto } from './dto/submission.result.dto';
-import { Judge0Service } from '../judge0/judge0.service';
+import { ConfigService } from '@nestjs/config';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import Redis from 'ioredis';
+import { DataSource, Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
+import { REDIS } from '../../shared/redis/redis.module';
+import { Base64Util } from '../../shared/util/base64.util';
+import { TimeUtil } from '../../shared/util/time.util';
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { Contest } from '../contests/entities/contest.entity';
 import {
   Judge0BatchResponse,
   Judge0Response,
   Judge0SubmissionPayload,
 } from '../judge0/judge0.interface';
-import { Submission } from './entities/submission.entity';
-import { DataSource, Repository } from 'typeorm';
-import { Problem } from '../problems/entities/problem.entity';
-import { v4 as uuidv4 } from 'uuid';
-import { RedisKeys } from './helpers/redis-keys.helper';
-import Redis from 'ioredis';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { REDIS } from '../../shared/redis/redis.module';
-import { User } from '../user/entities/user.entity';
+import { Judge0Service } from '../judge0/judge0.service';
 import { Language } from '../language/entities/language.entity';
-import { ConfigService } from '@nestjs/config';
+import { Problem } from '../problems/entities/problem.entity';
+import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { StoragesService } from '../storages/storages.service';
-import { Base64Util } from '../../shared/util/base64.util';
-import { TimeUtil } from '../../shared/util/time.util';
+import { User } from '../user/entities/user.entity';
 import { SubmissionConstants } from './constants/submission.constant';
-import { Contest } from '../contests/entities/contest.entity';
-import { ContestParticipation } from '../contests/entities/contest-participations.entity';
-import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { SubmissionResultDto } from './dto/submission.result.dto';
+import { Submission } from './entities/submission.entity';
+import {
+  judge0StatusMap,
+  SubmissionStatus,
+} from './enums/submission-status.enum';
+import { RedisKeys } from './helpers/redis-keys.helper';
 
 @Injectable()
 export class SubmissionService {
@@ -285,7 +285,7 @@ export class SubmissionService {
     return { submissionId };
   }
 
-  private async findProblemOrFail(problemId: string): Promise<Problem> {
+  private async findProblemOrFail(problemId: number): Promise<Problem> {
     const problem = await this.problemRepository.findOne({
       where: { id: problemId },
     });
@@ -294,7 +294,7 @@ export class SubmissionService {
     return problem;
   }
 
-  private async findUserOrFail(userId: string): Promise<User> {
+  private async findUserOrFail(userId: number): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     return user;
@@ -310,8 +310,8 @@ export class SubmissionService {
   }
 
   private async saveSubmitFile(
-    userId: string,
-    problemId: number | string,
+    userId: number,
+    problemId: number,
     file?: Express.Multer.File,
   ): Promise<string> {
     if (!file?.buffer) {
@@ -448,7 +448,7 @@ export class SubmissionService {
   private async initRedis(
     submissionId: string,
     tcCount: number,
-    problemId: number | string,
+    problemId: number,
   ) {
     const metaKey = this.redisKeys.meta(submissionId);
     const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
@@ -494,7 +494,7 @@ export class SubmissionService {
 
   async buildSubmissionResult(
     results: TestResultDto[],
-    problemId: string,
+    problemId: number,
   ): Promise<SubmissionResultDto> {
     const problem: Problem | null = await this.problemRepository.findOne({
       where: { id: problemId },

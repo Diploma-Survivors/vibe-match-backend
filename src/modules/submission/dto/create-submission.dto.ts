@@ -1,13 +1,13 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
 import { CreateTestcaseSampleDto } from '../../problems/testcases/dto/create-testcase-sample.dto';
 
 export class CreateSubmissionDto {
@@ -29,11 +29,11 @@ export class CreateSubmissionDto {
 
   @ApiProperty({
     description: 'Problem identifier',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    example: 1,
   })
-  @IsUUID()
+  @IsInt()
   @IsNotEmpty()
-  readonly problemId: string;
+  readonly problemId: number;
 
   @ApiProperty({
     description: 'Contest participation identifier, if applicable',

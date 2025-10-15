@@ -7,11 +7,11 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Problem } from '../../problems/entities/problem.entity';
+import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Language } from '../../language/entities/language.entity';
+import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
-import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 
 @Entity()
 @Index('idx_submission_user', ['user']) // search submissions by user

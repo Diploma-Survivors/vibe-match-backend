@@ -1,20 +1,20 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { RedisKeys } from './redis-keys.helper';
-import { Judge0Response } from '../../judge0/judge0.interface';
 import { InjectQueue } from '@nestjs/bullmq';
-import { BackoffOptions, Queue } from 'bullmq';
-import { SubmissionService } from '../submission.service';
-import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
-import Redis from 'ioredis';
-import { REDIS } from '../../../shared/redis/redis.module';
-import { Submission } from '../entities/submission.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SubmissionResultDto } from '../dto/submission.result.dto';
-import { SubmissionConstants } from '../constants/submission.constant';
-import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { BackoffOptions, Queue } from 'bullmq';
+import Redis from 'ioredis';
+import { Repository } from 'typeorm';
+import { REDIS } from '../../../shared/redis/redis.module';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
+import { Judge0Response } from '../../judge0/judge0.interface';
+import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
+import { SubmissionConstants } from '../constants/submission.constant';
+import { SubmissionResultDto } from '../dto/submission.result.dto';
+import { Submission } from '../entities/submission.entity';
+import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
+import { SubmissionService } from '../submission.service';
+import { RedisKeys } from './redis-keys.helper';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -109,7 +109,7 @@ export class CallbackProcessor implements OnModuleInit {
     const testResults = this.aggregateTestResults(results);
     const finalResult = await this.submissionService.buildSubmissionResult(
       testResults,
-      meta.problemId,
+      +meta.problemId,
     );
 
     if (isSubmit) {
