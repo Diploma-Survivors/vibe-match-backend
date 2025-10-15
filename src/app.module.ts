@@ -23,6 +23,9 @@ import { SubmissionModule } from './modules/submission/submission.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { UserModule } from './modules/user/user.module';
 import { RedisModule } from './shared/redis/redis.module';
+import { LanguageModule } from './modules/language/language.module';
+import { submissionConfig } from './config/submission.config';
+import { judge0Config } from './config/judge0.config';
 
 @Module({
   imports: [
@@ -35,6 +38,8 @@ import { RedisModule } from './shared/redis/redis.module';
         ltiConfig,
         authConfig,
         awsConfig,
+        submissionConfig,
+        judge0Config,
       ],
       validationSchema: environmentValidationSchema,
       isGlobal: true,
@@ -61,6 +66,7 @@ import { RedisModule } from './shared/redis/redis.module';
     ProblemsModule,
     ContestsModule,
     SubmissionModule,
+    LanguageModule,
   ],
   controllers: [AppController],
   providers: [

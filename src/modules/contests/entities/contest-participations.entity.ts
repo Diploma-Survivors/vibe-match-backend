@@ -1,0 +1,40 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { User } from '../../user/entities/user.entity';
+import { Contest } from './contest.entity';
+import { Submission } from '../../submission/entities/submission.entity';
+
+@Entity()
+@Index('uq_participation_contest_user', ['contest', 'user'], { unique: true }) // search participation by contest and user
+export class ContestParticipation {
+  @PrimaryGeneratedColumn('uuid', { name: 'contest_participation_id' })
+  id: string;
+
+  @ManyToOne(() => Contest, (contest) => contest.contestParticipation)
+  @JoinColumn({ name: 'contest_id' })
+  contest: Contest;
+
+  @ManyToOne(() => User) // unidirectional relationship
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @CreateDateColumn({ name: 'start_time' })
+  startTime: Date;
+
+  @Column({ type: 'time', name: 'end_time', nullable: true })
+  endTime: Date | null;
+
+  @Column({ name: 'final_score', type: 'float', nullable: true })
+  finalScore: number;
+
+  @OneToMany(() => Submission, (submission) => submission.contestParticipation)
+  submissions: Submission[];
+}

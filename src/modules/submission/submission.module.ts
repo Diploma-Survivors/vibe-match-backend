@@ -11,15 +11,24 @@ import { SubmissionFinalizeProcessor } from './events/submission-finalizer.proce
 import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { ConfigService } from '@nestjs/config';
-import { Language } from './language/language.entity';
+import { Language } from '../language/entities/language.entity';
 import { User } from '../user/entities/user.entity';
 import { StoragesService } from '../storages/storages.service';
 import { Module } from '@nestjs/common';
 import { SubmissionQueue } from './enums/submission-event.enum';
+import { Contest } from '../contests/entities/contest.entity';
+import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Submission, Problem, Language, User]),
+    TypeOrmModule.forFeature([
+      Submission,
+      Problem,
+      Language,
+      User,
+      Contest,
+      ContestParticipation,
+    ]),
     Judge0Module,
     RedisModule,
     BullModule.forRootAsync({

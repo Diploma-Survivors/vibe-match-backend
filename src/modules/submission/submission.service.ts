@@ -11,7 +11,7 @@ import {
   judge0StatusMap,
   SubmissionStatus,
 } from './enums/submission-status.enum';
-import { SubmissionResultDto } from './dto/submission.response.dto';
+import { SubmissionResultDto } from './dto/submission.result.dto';
 import { Judge0Service } from '../judge0/judge0.service';
 import {
   Judge0BatchResponse,
@@ -19,26 +19,29 @@ import {
   Judge0SubmissionPayload,
 } from '../judge0/judge0.interface';
 import { Submission } from './entities/submission.entity';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Problem } from '../problems/entities/problem.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { RedisKeys } from './helpers/redis-keys.helper';
 import Redis from 'ioredis';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { REDIS } from '../../shared/redis/redis.module';
-import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { User } from '../user/entities/user.entity';
-import { Language } from './language/language.entity';
+import { Language } from '../language/entities/language.entity';
 import { ConfigService } from '@nestjs/config';
 import { StoragesService } from '../storages/storages.service';
 import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
 import { SubmissionConstants } from './constants/submission.constant';
+import { Contest } from '../contests/entities/contest.entity';
+import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @Injectable()
 export class SubmissionService {
   private static readonly REDIS_TTL_SECONDS = 3600; // 1 hour
   private readonly logger = new Logger(SubmissionService.name);
+  private readonly MAX_PAGE_SIZE = 100;
 
   constructor(
     @InjectRepository(Submission)
@@ -47,14 +50,20 @@ export class SubmissionService {
     private readonly problemRepository: Repository<Problem>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Language) // FIX: inject Language repo
+    @InjectRepository(Language)
     private readonly languageRepository: Repository<Language>,
+    @InjectRepository(Contest)
+    private readonly contestRepository: Repository<Contest>,
+    @InjectRepository(ContestParticipation)
+    private readonly contestParticipationRepo: Repository<ContestParticipation>,
     private readonly configService: ConfigService,
     private readonly storagesService: StoragesService,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
     @Inject(REDIS)
     private readonly redis: Redis,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async run(
@@ -93,6 +102,127 @@ export class SubmissionService {
 
     return this.submitBatch(submission.id, dto, problem, true, file);
   }
+  //
+  // async submitToContest(
+  //   contestId: string,
+  //   createSubmissionDto: CreateSubmissionDto,
+  //   user: JwtPayload,
+  //   file?: Express.Multer.File,
+  // ): Promise<{ submissionId: string }> {
+  //   const savedUser = await this.findUserOrFail(user.userId);
+  //   // Validate contest
+  //   const contest = await this.contestRepository.findOne({
+  //     where: { id: contestId },
+  //     relations: ['contestProblems', 'contestProblems.problem'],
+  //   });
+  //   if (!contest) throw new NotFoundException('Contest not found');
+  //
+  //   const now = new Date();
+  //   if (now < contest.startTime)
+  //     throw new BadRequestException('Contest not started yet');
+  //   if (now > contest.endTime)
+  //     throw new BadRequestException('Contest already ended');
+  //
+  //   // Validate participation
+  //   const contestParticipation = await this.contestParticipationRepo.findOne({
+  //     where: { id: createSubmissionDto.contestParticipationId },
+  //   });
+  //   if (!contestParticipation) {
+  //     throw new NotFoundException('User is not registered in the contest');
+  //   }
+  //
+  //   // Validate problem in contest
+  //   const problem = await this.findProblemOrFail(createSubmissionDto.problemId);
+  //   const contestProblem = contest.contestProblems.find(
+  //     (cp) => cp.problem.id === createSubmissionDto.problemId,
+  //   );
+  //   if (!contestProblem) {
+  //     throw new BadRequestException('Problem not in contest');
+  //   }
+  //   const language = await this.findLanguageOrFail(
+  //     createSubmissionDto.languageId,
+  //   );
+  //
+  //   // All validations passed, proceed to create submission
+  //   let fileUrl: string | null = null;
+  //   const isMultiFile = createSubmissionDto.languageId === 89;
+  //   if (isMultiFile) {
+  //     fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
+  //   }
+  //
+  //   const submission = await this.submissionRepository.save(
+  //     this.submissionRepository.create({
+  //       sourceCode: createSubmissionDto.sourceCode,
+  //       user: savedUser,
+  //       problem,
+  //       contestParticipation,
+  //       language,
+  //       fileUrl,
+  //     }),
+  //   );
+  //
+  //   return this.submitBatch(
+  //     submission.id,
+  //     createSubmissionDto,
+  //     problem,
+  //     true,
+  //     file,
+  //   );
+  // }
+
+  // async getDetailSubmissionById(
+  //   submissionId: string,
+  //   user: JwtPayload,
+  // ): Promise<SubmissionDetailDto> {
+  //   const submission = await this.submissionRepository.findOne({
+  //     where: { id: submissionId },
+  //     relations: ['user', 'language'],
+  //   });
+  //   if (!submission) throw new NotFoundException('Submission not found');
+  //   if (
+  //     submission.user.id !== user.userId &&
+  //     !(
+  //       user.roles.includes(RoleEnum.ADMIN) ||
+  //       user.roles.includes(RoleEnum.INSTRUCTOR)
+  //     )
+  //   ) {
+  //     throw new HttpException(
+  //       'You are not allowed to view this submission',
+  //       HttpStatus.FORBIDDEN,
+  //     );
+  //   }
+  //
+  //   return {
+  //     id: submissionId,
+  //     status: submission.status,
+  //     score: submission.score,
+  //     runtime: submission.runtime,
+  //     memory: submission.memory,
+  //     sourceCode: submission.sourceCode,
+  //     createdAt: submission.createdAt,
+  //     totalTests: submission.totalTests,
+  //     passedTests: submission.passedTests,
+  //     language: submission.language,
+  //     contestParticipationId: submission.contestParticipation?.id,
+  //     resultDescription: submission.resultDescription,
+  //     user: {
+  //       id: submission.user.id,
+  //       firstName: submission.user.firstName ? submission.user.firstName : '',
+  //       lastName: submission.user.lastName ? submission.user.lastName : '',
+  //     },
+  //   };
+  // }
+
+  // async getListSubmissionOfUserInOneProblem(
+  //   problemId: string,
+  //   user: JwtPayload,
+  //   query: SubmissionsCursorQueryDto,
+  // ) {
+  //   return this.findSubmissionWithPagination(query, {
+  //     joins: [],
+  //     filterFn: (qb) => this.applyFubmissionFilter(qb, currentUser.courseId!),
+  //   });
+  // }
 
   async submitBatch(
     submissionId: string,
@@ -236,9 +366,11 @@ export class SubmissionService {
     sourceBase64?: string,
     additionalFilesBase64?: string,
   ): Promise<Judge0SubmissionPayload[]> {
-    const url = new URL(String(problem.testcase.fileUrl));
-    const bucket = url.hostname.split('.')[0];
-    const key = url.pathname.substring(1);
+    // const url = new URL(String(problem.testcase.fileUrl));
+    // const bucket = url.hostname.split('.')[0];
+    // const key = url.pathname.substring(1);
+
+    const url = './testcase.txt';
 
     const items: Judge0SubmissionPayload[] = [];
     let i = 0;
@@ -246,7 +378,7 @@ export class SubmissionService {
     let input = '';
     let output = '';
 
-    for await (const line of this.storagesService.streamLines(bucket, key)) {
+    for await (const line of this.storagesService.streamLinesLocal(url)) {
       if (stage === 'header') {
         // First line is totalTest → skip or validate
         stage = 'index';
@@ -353,9 +485,7 @@ export class SubmissionService {
       stdout: stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
-      status:
-        judge0StatusMap[judge0Response.status.id] ||
-        SubmissionStatus.UNKNOWN_ERROR,
+      status: judge0StatusMap[judge0Response.status.id],
       stderr: Base64Util.decodeBase64(judge0Response.stderr),
       token: judge0Response.token,
       expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
@@ -372,8 +502,14 @@ export class SubmissionService {
     if (!problem) {
       throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
     }
-    const { overallStatus, passedTests, totalTests, sumRuntime, sumMemory } =
-      this.calStats(results);
+    const {
+      overallStatus,
+      passedTests,
+      totalTests,
+      sumRuntime,
+      sumMemory,
+      firstNonAcceptedResult,
+    } = this.calStats(results);
     const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
@@ -384,25 +520,197 @@ export class SubmissionService {
       score: Math.round(score * 100) / 100, // Round to 2 decimal places
       runtime: sumRuntime,
       memory: sumMemory,
+      resultDescription: this.generateResult(firstNonAcceptedResult),
     };
   }
 
   calStats(results: TestResultDto[]) {
     let overallStatus = SubmissionStatus.ACCEPTED;
-    const totalTests = results.length;
-    let passedTests = 0;
-    let sumRuntime = 0;
-    let sumMemory = 0;
+    const totalTests: number = results.length;
+    let passedTests: number = 0;
+    let sumRuntime: number = 0;
+    let sumMemory: number = 0;
+    let firstNonAcceptedResult: TestResultDto | null = null;
     for (const result of results) {
-      sumRuntime += result.time || 0;
-      sumMemory += result.memory || 0;
+      sumRuntime += Number(result.time) || 0;
+      sumMemory += Number(result.memory) || 0;
       if (result.status === SubmissionStatus.ACCEPTED) {
         passedTests++;
       } else {
         // only set the first not accepted status
         overallStatus = result.status;
+        if (!firstNonAcceptedResult) {
+          firstNonAcceptedResult = result;
+        }
       }
     }
-    return { overallStatus, passedTests, totalTests, sumRuntime, sumMemory };
+    return {
+      overallStatus,
+      passedTests,
+      totalTests,
+      sumRuntime,
+      sumMemory,
+      firstNonAcceptedResult,
+    };
   }
+
+  generateResult(firstNonAcceptedResult: TestResultDto | null): string {
+    if (!firstNonAcceptedResult) {
+      return 'All test cases passed';
+    }
+    switch (firstNonAcceptedResult.status) {
+      case SubmissionStatus.WRONG_ANSWER:
+        return `
+        Expected output: ${firstNonAcceptedResult.expectedOutput || 'N/A'}
+        Actual output: ${firstNonAcceptedResult.stdout || 'N/A'}
+        `;
+      case SubmissionStatus.TIME_LIMIT_EXCEEDED:
+        return `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
+      case SubmissionStatus.SIGSEGV:
+        return `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`;
+      case SubmissionStatus.SIGXFSZ:
+        return `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
+      case SubmissionStatus.SIGFPE:
+        return `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`;
+      case SubmissionStatus.SIGABRT:
+        return `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`;
+      case SubmissionStatus.NZEC:
+        return `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`;
+      case SubmissionStatus.RUNTIME_ERROR:
+        return `Runtime error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
+      case SubmissionStatus.COMPILATION_ERROR:
+        return `Compilation error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
+      default:
+        return 'Unknown error occurred';
+    }
+  }
+  //
+  // private async findSubmissionWithPagination(
+  //   query: SubmissionsCursorQueryDto,
+  //   config: {
+  //     joins: string[];
+  //     filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+  //   },
+  // ) {
+  //   const pagination = this.validateAndGetPagination(query);
+  //   const sortConfig = this.buildSortConfiguration(
+  //     query,
+  //     pagination.isBackward,
+  //   );
+  //
+  //   const ids = await this.findSubmissionIds(
+  //     query,
+  //     pagination.limit,
+  //     sortConfig,
+  //     config,
+  //   );
+  //
+  //   const items = await this.findProblemByIds(ids, sortConfig);
+  //   return this.buildPaginatedResult(
+  //     items,
+  //     pagination.limit,
+  //     pagination.isBackward,
+  //     query,
+  //   );
+  // }
+  //
+  // private validateAndGetPagination(query: PaginationCursorDto) {
+  //   const isBackward = !!query?.before && !query?.after;
+  //   const limit = isBackward ? query?.last : query?.first;
+  //
+  //   if (!limit || limit > this.MAX_PAGE_SIZE) {
+  //     throw new BadRequestException(
+  //       `Limit must be between 1 and ${this.MAX_PAGE_SIZE}`,
+  //     );
+  //   }
+  //
+  //   return { limit, isBackward };
+  // }
+  //
+  // private buildSortConfiguration(
+  //   query: SubmissionsCursorQueryDto,
+  //   isBackward: boolean,
+  // ) {
+  //   const sortBy = query?.sortBy;
+  //   const naturalOrder: 'ASC' | 'DESC' =
+  //     query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
+  //   const operator = this.determineCursorOperator(query, naturalOrder);
+  //
+  //   // Reverse sort order for backward pagination
+  //   const reversedOrder: 'ASC' | 'DESC' =
+  //     naturalOrder === 'ASC' ? 'DESC' : 'ASC';
+  //   const sortOrder: 'ASC' | 'DESC' = isBackward ? reversedOrder : naturalOrder;
+  //
+  //   return { sortBy, sortOrder, operator };
+  // }
+  //
+  // private determineCursorOperator(
+  //   query: PaginationCursorDto,
+  //   naturalOrder: 'ASC' | 'DESC',
+  // ): '>' | '<' {
+  //   if (query?.after) {
+  //     return naturalOrder === 'ASC' ? '>' : '<';
+  //   }
+  //
+  //   if (query?.before) {
+  //     return naturalOrder === 'ASC' ? '<' : '>';
+  //   }
+  //
+  //   return '>';
+  // }
+  //
+  // private async findSubmissionIds(
+  //   query: SubmissionsCursorQueryDto,
+  //   limit: number,
+  //   sortConfig: {
+  //     sortBy:  ;
+  //     sortOrder: 'ASC' | 'DESC';
+  //     operator: '<' | '>';
+  //   },
+  //   config: {
+  //     joins: string[];
+  //     filterFn: (qb: SelectQueryBuilder<Problem>) => void;
+  //   },
+  // ) {
+  //   const queryBuilder = this.buildBaseQuery(config.joins);
+  //
+  //   config.filterFn(queryBuilder);
+  //   this.applyMatchFilters(queryBuilder, query);
+  //
+  //   await this.applyCursorPagination(queryBuilder, query, sortConfig);
+  //
+  //   queryBuilder
+  //     .select('submission.id', 'id')
+  //     .addSelect(`submission.${sortConfig.sortBy}`, sortConfig.sortBy)
+  //     .distinct(true)
+  //     .limit(limit + 1);
+  //
+  //   const items = await queryBuilder.getRawMany<{
+  //     id: string;
+  //     [key: string]: any;
+  //   }>();
+  //   this.logger.debug(`Found submission IDs: ${JSON.stringify(items)}`);
+  //
+  //   return items.map((item) => item.id);
+  // }
+  //
+  // private buildBaseQuery(joins: string[]) {
+  //   const queryBuilder = this.dataSource.createQueryBuilder(
+  //     Submission,
+  //     'submission',
+  //   );
+  //
+  //   const joinMap: Record<string, string> = {
+  //     submissionProblem: 'submission.problem',
+  //     submissionContestParticipation: 'submission.user',
+  //   };
+  //
+  //   for (const join of joins) {
+  //     if (joinMap[join]) {
+  //       queryBuilder.leftJoin(joinMap[join], join);
+  //     }
+  //   }
+  //
+  //   return queryBuilder;
+  // }
 }

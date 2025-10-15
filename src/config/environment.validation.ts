@@ -60,4 +60,9 @@ export default Joi.object({
   JOB_BACKOFF_DELAY: Joi.number().required(),
   JOB_REMOVE_ON_COMPLETE: Joi.boolean().required(),
   JOB_REMOVE_ON_FAIL: Joi.number().required(),
+  // Judge0 Configuration
+  JUDGE0_URL: Joi.string().uri().required(),
+  JUDGE0_CALLBACK_URL: Joi.string().uri().required(),
+  RAPIDAPI_KEY: Joi.string().required(),
+  RAPIDAPI_HOST: Joi.string().required(),
 });

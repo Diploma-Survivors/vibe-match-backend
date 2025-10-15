@@ -10,10 +10,11 @@ import { REDIS } from '../../../shared/redis/redis.module';
 import { Submission } from '../entities/submission.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SubmissionResultDto } from '../dto/submission.response.dto';
+import { SubmissionResultDto } from '../dto/submission.result.dto';
 import { SubmissionConstants } from '../constants/submission.constant';
 import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
+import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -62,6 +63,8 @@ export class CallbackProcessor implements OnModuleInit {
     private readonly submissionService: SubmissionService,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
+    @InjectRepository(ContestParticipation)
+    private readonly contestParticipationRepository: Repository<ContestParticipation>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -173,7 +176,7 @@ export class CallbackProcessor implements OnModuleInit {
     savedSubmission.totalTests = finalResult.totalTests;
     savedSubmission.passedTests = finalResult.passedTests;
     savedSubmission.runtime = finalResult.runtime;
-    savedSubmission.memoryUsed = finalResult.memory;
+    savedSubmission.memory = finalResult.memory;
 
     await this.submissionRepository.save(savedSubmission);
   }

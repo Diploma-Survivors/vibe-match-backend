@@ -1,0 +1,43 @@
+import { applyDecorators, HttpStatus } from '@nestjs/common';
+import { ApiExtraModels, ApiResponse, getSchemaPath } from '@nestjs/swagger';
+import {
+  CursorEdgeDto,
+  PaginationCursorResponseDto,
+} from '../../../common/pagination/dtos/pagination-cursor-response.dto';
+import { SubmissionInListDto } from '../dto/get-submissions-response.dto';
+
+export const ApiPaginatedSubmissionsResponse = () => {
+  return applyDecorators(
+    ApiExtraModels(
+      PaginationCursorResponseDto,
+      CursorEdgeDto,
+      SubmissionInListDto,
+    ),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'A paginated list of submissions.',
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(PaginationCursorResponseDto) },
+          {
+            properties: {
+              edges: {
+                type: 'array',
+                items: {
+                  allOf: [
+                    { $ref: getSchemaPath(CursorEdgeDto) },
+                    {
+                      properties: {
+                        node: { $ref: getSchemaPath(SubmissionInListDto) },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    }),
+  );
+};

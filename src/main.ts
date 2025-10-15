@@ -9,8 +9,10 @@ import qs from 'qs';
 import { AppModule } from './app.module';
 import { Environment } from './common/enums/environment.enum';
 import { ExpressSetting } from './common/enums/express-setting.enum';
+import { initializeTransactionalContext } from 'typeorm-transactional';
 
 async function bootstrap() {
+  initializeTransactionalContext();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
