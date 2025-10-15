@@ -34,11 +34,6 @@ import {
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
-import {
-  TESTCASE_FILE_FIELD_NAME,
-  TESTCASE_FILE_MIME_TYPE,
-  TESTCASE_MAX_FILE_SIZE,
-} from './constants/testcase.constant';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { GetDetailProblemResponseDto } from './dto/get-problem-response.dto';
@@ -47,6 +42,11 @@ import { ProblemsCursorQueryDto } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsService } from './problems.service';
+import {
+  TESTCASE_FILE_FIELD_NAME,
+  TESTCASE_FILE_MIME_TYPE,
+  TESTCASE_MAX_FILE_SIZE,
+} from './testcases/constants/testcases.constant';
 
 // Helper function to generate paginated response schema
 const getPaginatedProblemsSchema = () => ({
@@ -251,7 +251,7 @@ export class ProblemsController {
     @Param('id') id: string,
     @Body() updateProblemDto: UpdateProblemDto,
   ) {
-    return await this.problemsService.update(+id, updateProblemDto);
+    return await this.problemsService.updateById(+id, updateProblemDto);
   }
 
   @Delete(':id')

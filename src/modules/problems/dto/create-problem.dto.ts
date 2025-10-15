@@ -10,10 +10,10 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { TESTCASE_FILE_FIELD_NAME } from '../constants/testcase.constant';
 import { JsonArrayTransform } from '../decorators/json-transform.decorator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
+import { TESTCASE_FILE_FIELD_NAME } from '../testcases/constants/testcases.constant';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
 
 export class CreateProblemDto {

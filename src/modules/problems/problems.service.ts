@@ -4,8 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
@@ -14,17 +13,16 @@ import { CursorPaginated } from 'src/common/pagination/interfaces/cursor-paginat
 import { decodeCursor, encodeCursor } from 'src/common/utils/cursor-query.util';
 import {
   Brackets,
-  DataSource,
   FindOptionsSelect,
+  FindOptionsWhere,
   In,
   ObjectLiteral,
   Repository,
 } from 'typeorm';
-import { QueryRunner, SelectQueryBuilder } from 'typeorm/browser';
-import { v4 as uuidV4 } from 'uuid';
-import { JwtPayload } from '../auth/interfaces/jwt.interface';
-import { StoragesService } from '../storages/storages.service';
-import { TESTCASE_FILE_EXTENSION } from './constants/testcase.constant';
+import { Transactional } from 'typeorm-transactional';
+import { SelectQueryBuilder } from 'typeorm/browser';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import {
@@ -35,9 +33,9 @@ import { UpdateProblemDto } from './dto/update-problem.dto';
 import { Problem } from './entities/problem.entity';
 import { ProblemType } from './enums/problem-type.enum';
 import { SortBy } from './enums/sort-by.enum';
-import { Tag } from './tags/entities/tag.entity';
-import { Testcase } from './testcases/entities/testcase.entity';
-import { Topic } from './topics/entities/topic.entity';
+import { TagsService } from './tags/tags.service';
+import { TestcasesService } from './testcases/testcases.service';
+import { TopicsService } from './topics/topics.service';
 
 @Injectable()
 export class ProblemsService {
@@ -51,73 +49,22 @@ export class ProblemsService {
   constructor(
     @InjectRepository(Problem)
     private readonly problemsRepository: Repository<Problem>,
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
-    private readonly configService: ConfigService,
-    private readonly storagesService: StoragesService,
+    private readonly tagsService: TagsService,
+    private readonly topicsService: TopicsService,
+    private readonly testcasesService: TestcasesService,
   ) {}
 
+  getQueryBuilder(): SelectQueryBuilder<Problem> {
+    return this.problemsRepository.createQueryBuilder('problem');
+  }
+
+  @Transactional()
   async create(
     createProblemDto: CreateProblemDto,
     user: JwtPayload,
     testcaseFile: Express.Multer.File,
   ) {
-    const queryRunner = this.dataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const problem = await this.createProblemWithTransaction(
-        queryRunner,
-        createProblemDto,
-        user,
-        testcaseFile,
-      );
-      await queryRunner.commitTransaction();
-      return problem;
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  private async uploadAndSaveFileTestcase(
-    queryRunner: QueryRunner,
-    problemId: number,
-    file: Express.Multer.File,
-    currentUser: JwtPayload,
-  ) {
-    const seed = uuidV4();
-    const key = `${seed}_${currentUser.userId}_${currentUser.courseId}${TESTCASE_FILE_EXTENSION}`;
-    const bucket = this.configService.get<string>(
-      'aws.s3.bucketName',
-    ) as string;
-
-    await this.storagesService.upload({
-      bucket,
-      key,
-      file: file.buffer,
-    });
-
-    const url = this.storagesService.getObjectUrl(bucket, key);
-
-    const testcase = queryRunner.manager.create(Testcase, {
-      fileUrl: url,
-      problemId,
-    });
-    return queryRunner.manager.save(Testcase, testcase);
-  }
-
-  private async createProblemWithTransaction(
-    queryRunner: QueryRunner,
-    createProblemDto: CreateProblemDto,
-    user: JwtPayload,
-    testcaseFile: Express.Multer.File,
-  ): Promise<Problem> {
-    const tags = await queryRunner.manager.find(Tag, {
+    const tags = await this.tagsService.find({
       where: { id: In(createProblemDto.tags) },
       select: ['id'],
     });
@@ -125,7 +72,7 @@ export class ProblemsService {
       throw new BadRequestException('Some tags are invalid');
     }
 
-    const topics = await queryRunner.manager.find(Topic, {
+    const topics = await this.topicsService.find({
       where: { id: In(createProblemDto.topics) },
       select: ['id'],
     });
@@ -133,7 +80,7 @@ export class ProblemsService {
       throw new BadRequestException('Some topics are invalid');
     }
 
-    const problem = queryRunner.manager.create(Problem, {
+    const problem = this.problemsRepository.create({
       ...createProblemDto,
       authorId: user.userId,
       testcase: undefined,
@@ -141,13 +88,12 @@ export class ProblemsService {
       problemTags: tags.map((tag) => ({ tag })),
       problemTopics: topics.map((topic) => ({ topic })),
     });
-    const problemSaved = await queryRunner.manager.save(Problem, problem);
+    const problemSaved = await this.problemsRepository.save(problem);
 
-    await this.uploadAndSaveFileTestcase(
-      queryRunner,
-      problemSaved.id,
+    await this.testcasesService.uploadAndSaveFileTestcase(
       testcaseFile,
       user,
+      problemSaved.id,
     );
 
     return problemSaved;
@@ -257,7 +203,7 @@ export class ProblemsService {
   }
 
   private buildBaseQuery(joins: string[]) {
-    const queryBuilder = this.dataSource.createQueryBuilder(Problem, 'problem');
+    const queryBuilder = this.getQueryBuilder();
 
     const joinMap: Record<string, string> = {
       courseProblem: 'problem.courseProblems',
@@ -548,7 +494,7 @@ export class ProblemsService {
       sortOrder: 'ASC' | 'DESC';
     },
   ) {
-    const queryBuilder = this.dataSource.createQueryBuilder(Problem, 'problem');
+    const queryBuilder = this.getQueryBuilder();
 
     queryBuilder.where('problem.id IN (:...ids)', { ids });
 
@@ -629,7 +575,7 @@ export class ProblemsService {
     return problem;
   }
 
-  async update(id: number, updateProblemDto: UpdateProblemDto) {
+  async updateById(id: number, updateProblemDto: UpdateProblemDto) {
     await this.problemsRepository.update(id, {
       ...updateProblemDto,
       problemTags: updateProblemDto.tags?.map((tagId) => ({
@@ -640,6 +586,13 @@ export class ProblemsService {
       })),
       testcase: undefined,
     });
+  }
+
+  async update(
+    where: FindOptionsWhere<Problem>,
+    updateData: QueryDeepPartialEntity<Problem>,
+  ) {
+    await this.problemsRepository.update(where, updateData);
   }
 
   async remove(id: string) {
