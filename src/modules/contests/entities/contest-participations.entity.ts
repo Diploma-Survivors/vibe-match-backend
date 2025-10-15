@@ -8,15 +8,15 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Submission } from '../../submission/entities/submission.entity';
 import { User } from '../../user/entities/user.entity';
 import { Contest } from './contest.entity';
-import { Submission } from '../../submission/entities/submission.entity';
 
 @Entity()
 @Index('uq_participation_contest_user', ['contest', 'user'], { unique: true }) // search participation by contest and user
 export class ContestParticipation {
-  @PrimaryGeneratedColumn('uuid', { name: 'contest_participation_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'contest_participation_id' })
+  id: number;
 
   @ManyToOne(() => Contest, (contest) => contest.contestParticipation)
   @JoinColumn({ name: 'contest_id' })

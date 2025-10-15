@@ -4,7 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
@@ -13,7 +13,6 @@ import { CursorPaginated } from 'src/common/pagination/interfaces/cursor-paginat
 import { decodeCursor, encodeCursor } from 'src/common/utils/cursor-query.util';
 import {
   Brackets,
-  DataSource,
   FindOptionsRelations,
   FindOptionsSelect,
   FindOptionsWhere,
@@ -21,9 +20,11 @@ import {
   Repository,
   SelectQueryBuilder,
 } from 'typeorm';
-import { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { Transactional } from 'typeorm-transactional';
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { Problem } from '../problems/entities/problem.entity';
 import { ProblemType } from '../problems/enums/problem-type.enum';
+import { ProblemsService } from '../problems/problems.service';
 import {
   ContestCursorFieldsDto,
   ContestsCursorQueryDto,
@@ -44,74 +45,60 @@ export class ContestsService {
   ];
 
   constructor(
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
     @InjectRepository(Contest)
     private readonly contestsRepository: Repository<Contest>,
+    private readonly problemsService: ProblemsService,
   ) {}
 
+  @Transactional()
   async createContest(createContestDto: CreateContestDto, user: JwtPayload) {
-    const queryRunner = this.dataSource.createQueryRunner();
+    const problems = await this.problemsService
+      .getQueryBuilder()
+      .leftJoin('problem.courseProblems', 'courseProblem')
+      .leftJoin('problem.contestProblems', 'contestProblem')
+      .where('problem.id IN (:...ids)', {
+        ids: createContestDto.problems.map((problem) => problem.id),
+      })
+      .andWhere(
+        '(problem.type IN (:...types) OR (courseProblem.courseId = :courseId AND contestProblem.id IS NULL))',
+        {
+          types: this.SELECTABLE_PROBLEM_TYPES,
+          courseId: user.courseId,
+        },
+      )
+      .select('problem.id', 'id')
+      .addSelect('problem.type', 'type')
+      .distinct(true)
+      .getRawMany<Problem>();
 
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const problems = await queryRunner.manager
-        .createQueryBuilder(Problem, 'problem')
-        .leftJoin('problem.courseProblems', 'courseProblem')
-        .leftJoin('problem.contestProblems', 'contestProblem')
-        .where('problem.id IN (:...ids)', {
-          ids: createContestDto.problems.map((problem) => problem.id),
-        })
-        .andWhere(
-          '(problem.type IN (:...types) OR (courseProblem.courseId = :courseId AND contestProblem.id IS NULL))',
-          {
-            types: this.SELECTABLE_PROBLEM_TYPES,
-            courseId: user.courseId,
-          },
-        )
-        .select('problem.id', 'id')
-        .addSelect('problem.type', 'type')
-        .distinct(true)
-        .getRawMany<Problem>();
-
-      if (problems.length !== createContestDto.problems.length) {
-        throw new BadRequestException('Some problems are invalid');
-      }
-
-      await Promise.all(
-        problems.map(async (problem) => {
-          if (problem.type === ProblemType.STANDALONE) {
-            await queryRunner.manager.update(
-              Problem,
-              { id: problem.id },
-              { type: ProblemType.HYBRID },
-            );
-          }
-        }),
-      );
-
-      const contest = queryRunner.manager.create(Contest, {
-        ...createContestDto,
-        contestProblems: createContestDto.problems.map((problem) => ({
-          problemId: problem.id,
-          score: problem.score,
-        })),
-        courseId: user.courseId,
-        authorId: user.userId,
-      });
-
-      const contestSaved = await queryRunner.manager.save(Contest, contest);
-      await queryRunner.commitTransaction();
-
-      return contestSaved;
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
+    if (problems.length !== createContestDto.problems.length) {
+      throw new BadRequestException('Some problems are invalid');
     }
+
+    await Promise.all(
+      problems.map(async (problem) => {
+        if (problem.type === ProblemType.STANDALONE) {
+          await this.problemsService.update(
+            { id: problem.id },
+            { type: ProblemType.HYBRID },
+          );
+        }
+      }),
+    );
+
+    const contest = this.contestsRepository.create({
+      ...createContestDto,
+      contestProblems: createContestDto.problems.map((problem) => ({
+        problemId: problem.id,
+        score: problem.score,
+      })),
+      courseId: user.courseId,
+      authorId: user.userId,
+    });
+
+    const contestSaved = await this.contestsRepository.save(contest);
+
+    return contestSaved;
   }
 
   async findOne(
@@ -223,7 +210,7 @@ export class ContestsService {
   }
 
   private buildBaseQuery() {
-    return this.dataSource.createQueryBuilder(Contest, 'contest');
+    return this.contestsRepository.createQueryBuilder('contest');
   }
 
   private applyCourseFilter(
