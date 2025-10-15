@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
   IsDate,
@@ -19,8 +19,10 @@ export class CreateProblemWithContestDto {
   @ApiProperty({
     description: 'The unique identifier of the problem',
     example: '123jfk2-456abc',
+    name: 'problemId',
   })
   @IsUUID()
+  @Expose({ name: 'problemId' })
   id: string;
 
   @ApiProperty({
