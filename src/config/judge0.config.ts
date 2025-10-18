@@ -5,4 +5,5 @@ export const judge0Config = registerAs('judge0Config', () => ({
   judge0CallbackUrl: process.env.JUDGE0_CALLBACK_URL,
   apiRapidKey: process.env.RAPIDAPI_KEY,
   apiRapidHost: process.env.RAPIDAPI_HOST,
+  judge0UseCe: process.env.JUDGE0_USE_CE === 'true',
 }));

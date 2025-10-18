@@ -14,16 +14,28 @@ export class Judge0Service {
   private readonly apiVersion: string;
   private readonly rapidHost: string;
   private readonly rapidKey: string;
+  private readonly judge0UseCe: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.judge0Url = this.configService.get<string>('judge0Config.judge0Url')!;
+    this.judge0UseCe = this.configService.get<boolean>(
+      'judge0Config.judge0UseCe',
+    )!;
+    this.rapidHost = this.configService.get<string>(
+      'judge0Config.apiRapidHost',
+    )!;
+
+    if (this.judge0UseCe) {
+      this.judge0Url = `https://${this.rapidHost}`;
+    } else {
+      this.judge0Url = this.configService.get<string>(
+        'judge0Config.judge0Url',
+      )!;
+    }
+
     this.publicUrl = this.configService.get<string>(
       'judge0Config.judge0CallbackUrl',
     )!;
     this.apiVersion = this.configService.get<string>('appConfig.apiVersion')!;
-    this.rapidHost = this.configService.get<string>(
-      'judge0Config.apiRapidHost',
-    )!;
     this.rapidKey = this.configService.get<string>('judge0Config.apiRapidKey')!;
   }
 
@@ -37,15 +49,21 @@ export class Judge0Service {
       const url = `${this.judge0Url}/submissions/batch?base64_encoded=true`;
 
       this.logger.log(url);
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (this.judge0UseCe) {
+        headers['X-RapidAPI-Key'] = this.rapidKey;
+        headers['X-RapidAPI-Host'] = this.rapidHost;
+      }
+
       const response: AxiosResponse<Judge0BatchResponse> = await axios.post(
         url,
         { submissions: items },
         {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-RapidAPI-Key': this.rapidKey,
-            'X-RapidAPI-Host': this.rapidHost,
-          },
+          headers,
         },
       );
 

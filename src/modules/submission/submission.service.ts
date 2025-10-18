@@ -370,7 +370,7 @@ export class SubmissionService {
     // const bucket = url.hostname.split('.')[0];
     // const key = url.pathname.substring(1);
 
-    const url = './testcase.txt';
+    const url = 'src/modules/submission/testcase.txt';
 
     const items: Judge0SubmissionPayload[] = [];
     let i = 0;
