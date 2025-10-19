@@ -77,6 +77,14 @@ export class ResourceLinkClaim {
   title?: string;
 }
 
+export class AgsEndpointClaim {
+  scope: string[];
+
+  lineitems: string;
+
+  lineitem: string;
+}
+
 export class IdTokenPayloadDto {
   iss: string;
 
@@ -149,4 +157,8 @@ export class IdTokenPayloadDto {
 
   @Expose({ name: LTI_CLAIMS.CUSTOM })
   customClaims: Record<string, any>;
+
+  @Type(() => AgsEndpointClaim)
+  @Expose({ name: LTI_CLAIMS.AGS_ENDPOINT })
+  agsEndpoint?: AgsEndpointClaim;
 }

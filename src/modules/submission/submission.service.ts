@@ -97,6 +97,9 @@ export class SubmissionService {
         problem,
         language,
         fileUrl,
+        ltiLaunchSession: user.ltiSessionId
+          ? ({ id: user.ltiSessionId } as any)
+          : null,
       }),
     );
 
