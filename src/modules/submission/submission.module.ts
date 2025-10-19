@@ -18,6 +18,8 @@ import { Module } from '@nestjs/common';
 import { SubmissionQueue } from './enums/submission-event.enum';
 import { Contest } from '../contests/entities/contest.entity';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { LtiModule } from '../lti/lti.module';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 
 @Module({
   imports: [
@@ -28,9 +30,11 @@ import { ContestParticipation } from '../contests/entities/contest-participation
       User,
       Contest,
       ContestParticipation,
+      LtiLaunchSession,
     ]),
     Judge0Module,
     RedisModule,
+    LtiModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
