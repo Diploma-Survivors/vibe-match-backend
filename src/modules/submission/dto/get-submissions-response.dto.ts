@@ -1,23 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SubmissionStatus } from '../enums/submission-status.enum';
+import { UserInformationDto } from '../../user/dto/user-information.dto';
+import { Expose, Type } from 'class-transformer';
 
 export class SubmissionInListDto {
   @ApiProperty({
     description: 'The unique identifier of the submission',
     example: 'asfdfa-dafd',
   })
+  @Expose()
   id: string;
 
   @ApiProperty({
     description: 'The status of the submission',
     example: SubmissionStatus.ACCEPTED,
   })
+  @Expose()
   status: SubmissionStatus.ACCEPTED;
 
   @ApiProperty({
     description: 'Language used for the submission',
     example: 'JavaScript',
   })
+  @Expose()
   language: string;
 
   @ApiProperty({
@@ -25,6 +30,7 @@ export class SubmissionInListDto {
     example: 123.45,
     nullable: true,
   })
+  @Expose()
   runtime: number | null;
 
   @ApiProperty({
@@ -32,6 +38,7 @@ export class SubmissionInListDto {
     example: 12.34,
     nullable: true,
   })
+  @Expose()
   memory: number | null;
 
   @ApiProperty({
@@ -39,11 +46,21 @@ export class SubmissionInListDto {
     example: 100,
     nullable: true,
   })
+  @Expose()
   score: number | null;
 
   @ApiProperty({
     description: 'Note about the submission',
     example: 'Too hard solve later',
   })
+  @Expose()
   note: string | null;
+
+  @ApiProperty({
+    description: 'User info who made the submission',
+    example: { id: 1, username: 'john_doe' },
+  })
+  @Expose()
+  @Type(() => UserInformationDto)
+  user: UserInformationDto;
 }

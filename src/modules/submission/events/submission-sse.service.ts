@@ -79,7 +79,7 @@ export class SubmissionsSseService implements OnModuleInit {
 
     if (!this.cleanupTimers.has(submissionId)) {
       const cleanupMs = this.configService.get<number>(
-        'submission.streamCleanupMs',
+        'submission.cleanupStreamTime',
       );
       const t = setTimeout(() => this.cleanup(submissionId), cleanupMs);
       this.cleanupTimers.set(submissionId, t);
