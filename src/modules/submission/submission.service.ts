@@ -15,6 +15,7 @@ import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
 import { Contest } from '../contests/entities/contest.entity';
 import {
   Judge0BatchResponse,
@@ -61,6 +62,7 @@ export class SubmissionService {
     private readonly storagesService: StoragesService,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
+    private readonly gradingStrategyService: GradingStrategyService,
     @Inject(REDIS)
     private readonly redis: Redis,
   ) {}
@@ -127,6 +129,13 @@ export class SubmissionService {
     const problem = await this.findProblemOrFail(dto.problemId);
     const savedUser = await this.findUserOrFail(user.userId);
     const language = await this.findLanguageOrFail(dto.languageId);
+
+    // Validate submission against problem's strategy
+    await this.gradingStrategyService.validateSubmission(
+      user.userId,
+      dto.problemId,
+      user.ltiSessionId,
+    );
 
     let fileUrl: string | null = null;
     const isMultiFile =
