@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Problem } from '../../problems/entities/problem.entity';
 import { SubmissionResultDto } from '../../submission/dto/submission.result.dto';
 import { Submission } from '../../submission/entities/submission.entity';
+import { GradingStrategyService } from '../../submission/strategies/grading-strategy.service';
 import { KeysService } from '../keys.service';
 import { SendScoreDto } from './dto/send-score.dto';
 import { AgsActivityProgress } from './enums/ags-activity-progress.enum';
@@ -26,6 +27,7 @@ export class AgsService {
   constructor(
     private readonly configService: ConfigService,
     private readonly keysService: KeysService,
+    private readonly gradingStrategyService: GradingStrategyService,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
     @InjectRepository(Problem)
@@ -257,11 +259,21 @@ export class AgsService {
         return false;
       }
 
+      const strategyResult =
+        await this.gradingStrategyService.executeStrategy(submissionId);
+
+      if (!strategyResult || !strategyResult.shouldSendGrade) {
+        this.logger.debug(
+          `Strategy determined not to send grade for submission ${submissionId}`,
+        );
+        return false;
+      }
+
       const scoreDto: SendScoreDto = {
         userId: session.ltiUserId,
-        scoreGiven: finalResult.score,
+        scoreGiven: strategyResult.scoreToSend,
         scoreMaximum: problem.maxScore,
-        comment: this.formatComment(finalResult),
+        comment: strategyResult.comment,
         timestamp: new Date().toISOString(),
         activityProgress: AgsActivityProgress.COMPLETED,
         gradingProgress: AgsGradingProgress.FULLY_GRADED,
@@ -271,7 +283,7 @@ export class AgsService {
       await this.sendScore(session.agsLineitemUrl, scoreDto);
 
       this.logger.log(
-        `Grade passback successful for submission ${submissionId}`,
+        `Grade passback successful for submission ${submissionId} (score: ${strategyResult.scoreToSend})`,
       );
       return true;
     } catch (error) {
