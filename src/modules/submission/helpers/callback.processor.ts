@@ -214,6 +214,7 @@ export class CallbackProcessor implements OnModuleInit {
     savedSubmission.passedTests = finalResult.passedTests;
     savedSubmission.runtime = finalResult.runtime;
     savedSubmission.memory = finalResult.memory;
+    savedSubmission.resultDescription = finalResult.resultDescription;
 
     await this.submissionRepository.save(savedSubmission);
   }

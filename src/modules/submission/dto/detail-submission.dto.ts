@@ -3,6 +3,7 @@ import { LanguageDto } from '../../language/dto/language.dto';
 import { SubmissionStatus } from '../enums/submission-status.enum';
 import { UserInformationDto } from '../../user/dto/user-information.dto';
 import { Expose, Type } from 'class-transformer';
+import { ResultDescription } from './result-description.dto';
 
 export class SubmissionDetailDto {
   @ApiProperty({
@@ -78,6 +79,7 @@ export class SubmissionDetailDto {
     type: () => LanguageDto,
   })
   @Expose()
+  @Type(() => LanguageDto)
   language: LanguageDto;
 
   @ApiProperty({
@@ -92,9 +94,10 @@ export class SubmissionDetailDto {
     description: 'Result description or feedback from the judging system.',
     example: 'All test cases passed successfully.',
     nullable: true,
+    type: ResultDescription,
   })
   @Expose()
-  resultDescription?: string;
+  resultDescription?: ResultDescription;
 
   @ApiProperty({
     description: 'Information about the user who made the submission.',

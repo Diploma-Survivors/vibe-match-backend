@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { SubmissionStatus } from '../enums/submission-status.enum';
 import { UserInformationDto } from '../../user/dto/user-information.dto';
 import { Expose, Type } from 'class-transformer';
+import { LanguageDto } from '../../language/dto/language.dto';
 
 export class SubmissionInListDto {
   @ApiProperty({
@@ -21,9 +22,11 @@ export class SubmissionInListDto {
   @ApiProperty({
     description: 'Language used for the submission',
     example: 'JavaScript',
+    type: LanguageDto,
   })
   @Expose()
-  language: string;
+  @Type(() => LanguageDto)
+  language: LanguageDto;
 
   @ApiProperty({
     description: 'Runtime of the submission in milliseconds',
