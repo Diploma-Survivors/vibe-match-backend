@@ -17,8 +17,8 @@ import { SubmissionStatus } from '../enums/submission-status.enum';
 @Index('idx_submission_user', ['user']) // search submissions by user
 @Index('idx_submission_contest_problem', ['contestParticipation', 'problem']) // search submisisons of 1 user in a contest participation by problem
 export class Submission {
-  @PrimaryGeneratedColumn('uuid', { name: 'submission_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'submission_id' })
+  id: number;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })

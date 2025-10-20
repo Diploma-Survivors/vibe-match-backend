@@ -11,6 +11,7 @@ import { DataSource } from 'typeorm';
 import * as process from 'node:process';
 import { SubmissionStatus } from '../../../src/modules/submission/enums/submission-status.enum';
 import { SubmissionEvent } from '../../../src/modules/submission/enums/submission-event.enum';
+import { initializeTransactionalContext } from 'typeorm-transactional';
 
 describe('SubmissionController (e2e)', () => {
   let app: INestApplication;
@@ -21,6 +22,7 @@ describe('SubmissionController (e2e)', () => {
   const port: string = process.env.PORT!;
 
   beforeAll(async () => {
+    initializeTransactionalContext();
     moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -58,6 +60,7 @@ describe('SubmissionController (e2e)', () => {
     });
 
     const problem = problemRepo.create({
+      authorId: 1,
       title: 'Sum of Two Numbers (No-Mock E2E)',
       description: 'Read two integers and print their sum.',
       inputDescription: 'Two integers A and B separated by space.',

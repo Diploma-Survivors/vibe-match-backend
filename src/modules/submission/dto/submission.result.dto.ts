@@ -44,7 +44,7 @@ export class SubmissionResultDto {
     description: 'Results for each test case',
     type: [TestResultDto],
   })
-  results: TestResultDto[];
+  results?: TestResultDto[];
 
   @ApiProperty({
     description: 'Description for the submission result',

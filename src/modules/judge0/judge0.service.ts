@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import {
   Judge0BatchResponse,
+  Judge0Response,
   Judge0SubmissionPayload,
 } from './judge0.interface';
 
@@ -71,6 +72,35 @@ export class Judge0Service {
     } catch (error) {
       this.logger.error(`Failed to create batch submission: ${error}`);
       throw error;
+    }
+  }
+
+  /**
+   * Fetches the full details of a single submission from Judge0.
+   * @param token The token of the submission to fetch.
+   * @returns A promise that resolves to the full submission details.
+   */
+  async getSubmissionDetails(token: string): Promise<Judge0Response> {
+    const url = `${this.judge0Url}/submissions/${token}?base64_encoded=true&fields=token,stdout,time,memory,stderr,compile_output,message,status,expected_output,stdin`;
+    this.logger.log(`Fetching submission details from: ${url}`);
+    try {
+      const response = await axios.get<Judge0Response>(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RapidAPI-Key': this.rapidKey,
+          'X-RapidAPI-Host': this.rapidHost,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch submission details for token ${token}`,
+        error,
+      );
+      throw new HttpException(
+        'Failed to get submission details from Judge0',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
