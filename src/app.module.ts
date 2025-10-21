@@ -28,6 +28,7 @@ import { SubmissionModule } from './modules/submission/submission.module';
 import { UserCourseModule } from './modules/user-course/user-course.module';
 import { UserModule } from './modules/user/user.module';
 import { RedisModule } from './shared/redis/redis.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -66,6 +67,26 @@ import { RedisModule } from './shared/redis/redis.module';
       }),
       inject: [ConfigService],
       isGlobal: true,
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('redis.host');
+        const portFromConfig = config.get<number>('redis.port');
+        const password = config.get<string>('redis.password');
+
+        const port = Number.isInteger(portFromConfig)
+          ? portFromConfig!
+          : parseInt(process.env.REDIS_PORT ?? '6379', 10);
+        return {
+          connection: {
+            host,
+            port,
+            password: password || undefined,
+            maxRetriesPerRequest: null,
+          },
+        };
+      },
     }),
     AuthModule,
     UserModule,

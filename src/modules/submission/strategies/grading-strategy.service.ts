@@ -21,6 +21,8 @@ export class GradingStrategyService {
     private readonly submissionRepository: Repository<Submission>,
     @InjectRepository(Problem)
     private readonly problemRepository: Repository<Problem>,
+    @InjectRepository(LtiLaunchSession)
+    private readonly ltiSessionRepository: Repository<LtiLaunchSession>,
   ) {}
 
   async validateSubmission(
@@ -40,6 +42,16 @@ export class GradingStrategyService {
       problem.submissionStrategy || SubmissionStrategyEnum.BEST_SCORE;
     const strategy = this.strategyFactory.create(strategyType);
 
+    // Get resourceLinkId for activity-based counting
+    let resourceLinkId: string | undefined;
+    if (ltiSessionId) {
+      const session = await this.ltiSessionRepository.findOne({
+        where: { id: ltiSessionId },
+        select: ['resourceLinkId'],
+      });
+      resourceLinkId = session?.resourceLinkId;
+    }
+
     const previousSubmissions = await this.findPreviousSubmissions(
       userId,
       problemId,
@@ -53,13 +65,22 @@ export class GradingStrategyService {
       ltiSession: null,
     };
 
+    this.logger.warn(`🔍 VALIDATION (Per-Activity):
+        User: ${userId}
+        Problem: ${problemId}  
+        LTI Session: ${ltiSessionId || 'NONE'}
+        Resource Link: ${resourceLinkId || 'NONE'}
+        Previous Count: ${previousSubmissions.length}
+        Max Attempts: ${problem.maxAttempts}
+      `);
+      
     await strategy.validateSubmission(context);
   }
 
 
   async executeStrategy(submissionId: string): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
-      where: { id: submissionId },
+      where: { id: Number.parseInt(submissionId) },
       relations: ['user', 'problem', 'ltiLaunchSession'],
     });
 
@@ -77,7 +98,7 @@ export class GradingStrategyService {
       submission.user.id,
       submission.problem.id,
       submission.ltiLaunchSession?.id,
-      submission.id,
+      submission.id.toString(),
     );
 
     const context: StrategyContext = {
@@ -103,14 +124,22 @@ export class GradingStrategyService {
   ): Promise<Submission[]> {
     const query = this.submissionRepository
       .createQueryBuilder('submission')
-      .where('submission.user_id = :userId', { userId })
+      .leftJoin('submission.ltiLaunchSession', 'session')
+          .where('submission.user_id = :userId', { userId })
       .andWhere('submission.problem_id = :problemId', { problemId })
       .orderBy('submission.created_at', 'ASC');
 
     if (ltiSessionId) {
-      query.andWhere('submission.lti_launch_session_id = :ltiSessionId', {
-        ltiSessionId,
+      const currentSession = await this.ltiSessionRepository.findOne({
+        where: { id: ltiSessionId },
+        select: ['resourceLinkId'],
       });
+      
+      if (currentSession?.resourceLinkId) {
+        query.andWhere('session.resource_link_id = :resourceLinkId', {
+          resourceLinkId: currentSession.resourceLinkId,
+        });
+      }
     }
 
     if (excludeSubmissionId) {

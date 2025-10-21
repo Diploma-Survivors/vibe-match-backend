@@ -116,7 +116,7 @@ export class AgsService {
         },
       );
 
-      const tokenResponse = response.data as AgsAccessTokenResponse;
+      const tokenResponse = response.data;
       this.tokenCache = {
         token: tokenResponse.access_token,
         expiresAt: now + tokenResponse.expires_in,
@@ -215,7 +215,7 @@ export class AgsService {
   ): Promise<boolean> {
     try {
       const submission = await this.submissionRepository.findOne({
-        where: { id: submissionId },
+        where: { id: Number.parseInt(submissionId) },
         relations: ['ltiLaunchSession', 'problem', 'user'],
       });
 
@@ -240,7 +240,7 @@ export class AgsService {
         return false;
       }
 
-      if (!session.agsScopes || !session.agsScopes.includes(AgsScope.SCORE)) {
+      if (!session.agsScopes?.includes(AgsScope.SCORE)) {
         this.logger.warn(
           `LTI session ${session.id} does not have AGS SCORE scope`,
         );
@@ -262,7 +262,7 @@ export class AgsService {
       const strategyResult =
         await this.gradingStrategyService.executeStrategy(submissionId);
 
-      if (!strategyResult || !strategyResult.shouldSendGrade) {
+      if (!strategyResult?.shouldSendGrade) {
         this.logger.debug(
           `Strategy determined not to send grade for submission ${submissionId}`,
         );

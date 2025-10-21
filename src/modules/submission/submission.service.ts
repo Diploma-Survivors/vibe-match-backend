@@ -1,14 +1,17 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { ConfigService } from '@nestjs/config';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS } from '../../shared/redis/redis.module';
 import { Base64Util } from '../../shared/util/base64.util';
@@ -37,6 +40,12 @@ import {
   SubmissionStatus,
 } from './enums/submission-status.enum';
 import { RedisKeys } from './helpers/redis-keys.helper';
+import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
+import { SubmissionDetailDto } from './dto/detail-submission.dto';
+import { plainToInstance } from 'class-transformer';
+import { CountSubmissionField } from './interfaces/count-submission-field';
+import { RoleEnum } from '../user/enums/role.enum';
+import { ResultDescription } from './dto/result-description.dto';
 
 @Injectable()
 export class SubmissionService {
@@ -64,8 +73,7 @@ export class SubmissionService {
     private readonly gradingStrategyService: GradingStrategyService,
     @Inject(REDIS)
     private readonly redis: Redis,
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
+    private readonly submissionCursorService: SubmissionCursorService,
   ) {}
 
   async run(
@@ -112,129 +120,154 @@ export class SubmissionService {
       }),
     );
 
-    return this.submitBatch(submission.id, dto, problem, true, file);
+    return this.submitBatch(submission.id.toString(), dto, problem, true, file);
   }
-  //
-  // async submitToContest(
-  //   contestId: string,
-  //   createSubmissionDto: CreateSubmissionDto,
-  //   user: JwtPayload,
-  //   file?: Express.Multer.File,
-  // ): Promise<{ submissionId: string }> {
-  //   const savedUser = await this.findUserOrFail(user.userId);
-  //   // Validate contest
-  //   const contest = await this.contestRepository.findOne({
-  //     where: { id: contestId },
-  //     relations: ['contestProblems', 'contestProblems.problem'],
-  //   });
-  //   if (!contest) throw new NotFoundException('Contest not found');
-  //
-  //   const now = new Date();
-  //   if (now < contest.startTime)
-  //     throw new BadRequestException('Contest not started yet');
-  //   if (now > contest.endTime)
-  //     throw new BadRequestException('Contest already ended');
-  //
-  //   // Validate participation
-  //   const contestParticipation = await this.contestParticipationRepo.findOne({
-  //     where: { id: createSubmissionDto.contestParticipationId },
-  //   });
-  //   if (!contestParticipation) {
-  //     throw new NotFoundException('User is not registered in the contest');
-  //   }
-  //
-  //   // Validate problem in contest
-  //   const problem = await this.findProblemOrFail(createSubmissionDto.problemId);
-  //   const contestProblem = contest.contestProblems.find(
-  //     (cp) => cp.problem.id === createSubmissionDto.problemId,
-  //   );
-  //   if (!contestProblem) {
-  //     throw new BadRequestException('Problem not in contest');
-  //   }
-  //   const language = await this.findLanguageOrFail(
-  //     createSubmissionDto.languageId,
-  //   );
-  //
-  //   // All validations passed, proceed to create submission
-  //   let fileUrl: string | null = null;
-  //   const isMultiFile = createSubmissionDto.languageId === 89;
-  //   if (isMultiFile) {
-  //     fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
-  //   }
-  //
-  //   const submission = await this.submissionRepository.save(
-  //     this.submissionRepository.create({
-  //       sourceCode: createSubmissionDto.sourceCode,
-  //       user: savedUser,
-  //       problem,
-  //       contestParticipation,
-  //       language,
-  //       fileUrl,
-  //     }),
-  //   );
-  //
-  //   return this.submitBatch(
-  //     submission.id,
-  //     createSubmissionDto,
-  //     problem,
-  //     true,
-  //     file,
-  //   );
-  // }
 
-  // async getDetailSubmissionById(
-  //   submissionId: string,
-  //   user: JwtPayload,
-  // ): Promise<SubmissionDetailDto> {
-  //   const submission = await this.submissionRepository.findOne({
-  //     where: { id: submissionId },
-  //     relations: ['user', 'language'],
-  //   });
-  //   if (!submission) throw new NotFoundException('Submission not found');
-  //   if (
-  //     submission.user.id !== user.userId &&
-  //     !(
-  //       user.roles.includes(RoleEnum.ADMIN) ||
-  //       user.roles.includes(RoleEnum.INSTRUCTOR)
-  //     )
-  //   ) {
-  //     throw new HttpException(
-  //       'You are not allowed to view this submission',
-  //       HttpStatus.FORBIDDEN,
-  //     );
-  //   }
-  //
-  //   return {
-  //     id: submissionId,
-  //     status: submission.status,
-  //     score: submission.score,
-  //     runtime: submission.runtime,
-  //     memory: submission.memory,
-  //     sourceCode: submission.sourceCode,
-  //     createdAt: submission.createdAt,
-  //     totalTests: submission.totalTests,
-  //     passedTests: submission.passedTests,
-  //     language: submission.language,
-  //     contestParticipationId: submission.contestParticipation?.id,
-  //     resultDescription: submission.resultDescription,
-  //     user: {
-  //       id: submission.user.id,
-  //       firstName: submission.user.firstName ? submission.user.firstName : '',
-  //       lastName: submission.user.lastName ? submission.user.lastName : '',
-  //     },
-  //   };
-  // }
+  async submitToContest(
+    contestId: number,
+    createSubmissionDto: CreateSubmissionDto,
+    user: JwtPayload,
+    file?: Express.Multer.File,
+  ): Promise<{ submissionId: string }> {
+    const savedUser = await this.findUserOrFail(user.userId);
+    // Validate contest
+    const contest = await this.contestRepository.findOne({
+      where: { id: contestId },
+      relations: ['contestProblems', 'contestProblems.problem'],
+    });
+    if (!contest) throw new NotFoundException('Contest not found');
 
-  // async getListSubmissionOfUserInOneProblem(
-  //   problemId: string,
-  //   user: JwtPayload,
-  //   query: SubmissionsCursorQueryDto,
-  // ) {
-  //   return this.findSubmissionWithPagination(query, {
-  //     joins: [],
-  //     filterFn: (qb) => this.applyFubmissionFilter(qb, currentUser.courseId!),
-  //   });
-  // }
+    const now = new Date();
+    if (now < contest.startTime)
+      throw new BadRequestException('Contest not started yet');
+    if (now > contest.endTime)
+      throw new BadRequestException('Contest already ended');
+
+    // Validate participation
+    const contestParticipation = await this.contestParticipationRepo.findOne({
+      where: { id: createSubmissionDto.contestParticipationId },
+    });
+    if (!contestParticipation) {
+      throw new NotFoundException('User is not registered in the contest');
+    }
+
+    // Validate problem in contest
+    const problem = await this.findProblemOrFail(createSubmissionDto.problemId);
+    const contestProblem = contest.contestProblems.find(
+      (cp) => cp.problem.id === createSubmissionDto.problemId,
+    );
+    if (!contestProblem) {
+      throw new BadRequestException('Problem not in contest');
+    }
+    const language = await this.findLanguageOrFail(
+      createSubmissionDto.languageId,
+    );
+
+    // All validations passed, proceed to create submission
+    let fileUrl: string | null = null;
+    const isMultiFile = createSubmissionDto.languageId === 89;
+    if (isMultiFile) {
+      fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
+    }
+
+    const submission = await this.submissionRepository.save(
+      this.submissionRepository.create({
+        sourceCode: createSubmissionDto.sourceCode,
+        user: savedUser,
+        problem,
+        contestParticipation,
+        language,
+        fileUrl,
+      }),
+    );
+
+    return this.submitBatch(
+      submission.id.toString(),
+      createSubmissionDto,
+      problem,
+      true,
+      file,
+    );
+  }
+
+  async getDetailSubmissionById(
+    submissionId: number,
+    user: JwtPayload,
+  ): Promise<SubmissionDetailDto> {
+    const submission = await this.submissionRepository.findOne({
+      where: { id: submissionId },
+      relations: ['user', 'language'],
+    });
+    if (!submission) throw new NotFoundException('Submission not found');
+    if (
+      submission.user.id !== user.userId &&
+      !(
+        user.roles.includes(RoleEnum.ADMIN) ||
+        user.roles.includes(RoleEnum.INSTRUCTOR)
+      )
+    ) {
+      throw new HttpException(
+        'You are not allowed to view this submission',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return plainToInstance(SubmissionDetailDto, submission, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  async getListSubmissionOfUserInOneProblem(
+    problemId: number,
+    user: JwtPayload,
+    query: SubmissionsCursorQueryDto,
+  ) {
+    const queryBuilder = this.submissionRepository
+      .createQueryBuilder('submission')
+      .innerJoinAndSelect('submission.user', 'user')
+      .innerJoinAndSelect('submission.language', 'language')
+      .where('submission.problem_id = :problemId', { problemId }) // only use problem_id for join no need to innerJoinAndSelect
+      .andWhere('user.id = :userId', { userId: user.userId });
+
+    const countSubmissionsField: CountSubmissionField = {
+      userId: user.userId,
+      problemId: problemId,
+    };
+
+    return this.submissionCursorService.paginateSubmissions(
+      queryBuilder,
+      query,
+      countSubmissionsField,
+    );
+  }
+
+  async getByContestParticipationAndProblem(
+    contestParticipationId: number,
+    problemId: number,
+    query: SubmissionsCursorQueryDto,
+    user: JwtPayload,
+  ) {
+    const queryBuilder = this.submissionRepository
+      .createQueryBuilder('submission')
+      .innerJoinAndSelect('submission.problem', 'problem')
+      .innerJoinAndSelect('submission.user', 'user')
+      .innerJoinAndSelect('submission.language', 'language')
+      .where('problem.id = :problemId', { problemId })
+      .andWhere('contest.id = :contestId', { contestParticipationId })
+      .andWhere('user.id = :userId', { userId: user.userId });
+
+    const countSubmissionsField: CountSubmissionField = {
+      userId: user.userId,
+      problemId: Number(problemId),
+      contestParticipationId: Number(contestParticipationId),
+    };
+
+    return this.submissionCursorService.paginateSubmissions(
+      queryBuilder,
+      query,
+      countSubmissionsField,
+    );
+  }
 
   async submitBatch(
     submissionId: string,
@@ -501,10 +534,11 @@ export class SubmissionService {
       stderr: Base64Util.decodeBase64(judge0Response.stderr),
       token: judge0Response.token,
       expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
+      stdin: Base64Util.decodeBase64(judge0Response.stdin),
     };
   }
 
-  async buildSubmissionResult(
+  async buildSubmissionResultForRunMode(
     results: TestResultDto[],
     problemId: number,
   ): Promise<SubmissionResultDto> {
@@ -521,7 +555,7 @@ export class SubmissionService {
       sumRuntime,
       sumMemory,
       firstNonAcceptedResult,
-    } = this.calStats(results);
+    } = this.calStats(results, problem);
     const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
@@ -536,7 +570,7 @@ export class SubmissionService {
     };
   }
 
-  calStats(results: TestResultDto[]) {
+  calStats(results: TestResultDto[], problem: Problem) {
     let overallStatus = SubmissionStatus.ACCEPTED;
     const totalTests: number = results.length;
     let passedTests: number = 0;
@@ -551,10 +585,16 @@ export class SubmissionService {
       } else {
         // only set the first not accepted status
         overallStatus = result.status;
-        if (!firstNonAcceptedResult) {
+        if (firstNonAcceptedResult == null) {
           firstNonAcceptedResult = result;
         }
       }
+    }
+    if (firstNonAcceptedResult != null) {
+      firstNonAcceptedResult = this.checkIfTimeLimitExceed(
+        firstNonAcceptedResult,
+        problem,
+      );
     }
     return {
       overallStatus,
@@ -566,163 +606,129 @@ export class SubmissionService {
     };
   }
 
-  generateResult(firstNonAcceptedResult: TestResultDto | null): string {
+  /**
+   * Builds the final result for a SUBMIT mode submission.
+   * Fetches detailed info for the first wrong answer and omits the full results array.
+   */
+  async buildSubmissionResultForSubmitMode(
+    results: TestResultDto[],
+    problemId: number,
+  ): Promise<SubmissionResultDto> {
+    const problem = await this.findProblemOrFail(problemId);
+    const {
+      overallStatus,
+      passedTests,
+      totalTests,
+      sumRuntime,
+      sumMemory,
+      firstNonAcceptedResult,
+    } = this.calStats(results, problem);
+
+    // If the first error is a Wrong Answer, fetch details to get stdin/expected_output
+    if (
+      firstNonAcceptedResult &&
+      firstNonAcceptedResult.status === SubmissionStatus.WRONG_ANSWER
+    ) {
+      this.logger.log(
+        `[Submit] Wrong answer found. Fetching details for token: ${firstNonAcceptedResult.token}`,
+      );
+      try {
+        const detailedResult = await this.judge0Service.getSubmissionDetails(
+          firstNonAcceptedResult.token,
+        );
+        // Enrich the result object with the fetched data
+        firstNonAcceptedResult.expectedOutput = Base64Util.decodeBase64(
+          detailedResult.expected_output,
+        );
+        firstNonAcceptedResult.stdin = Base64Util.decodeBase64(
+          detailedResult.stdin,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to enrich submission data for token ${firstNonAcceptedResult.token}`,
+          error,
+        );
+      }
+    }
+
+    const score = (problem.maxScore * passedTests) / totalTests;
+
+    return {
+      status: overallStatus,
+      totalTests,
+      passedTests,
+      // NOTE: We do NOT include the 'results' array for submit mode
+      score: Math.round(score * 100) / 100,
+      runtime: sumRuntime,
+      memory: sumMemory,
+      resultDescription: this.generateResult(firstNonAcceptedResult),
+    };
+  }
+
+  generateResult(
+    firstNonAcceptedResult: TestResultDto | null,
+  ): ResultDescription {
     if (!firstNonAcceptedResult) {
-      return 'All test cases passed';
+      return {
+        message: 'All test cases passed',
+      };
     }
     switch (firstNonAcceptedResult.status) {
       case SubmissionStatus.WRONG_ANSWER:
-        return `
-        Expected output: ${firstNonAcceptedResult.expectedOutput || 'N/A'}
-        Actual output: ${firstNonAcceptedResult.stdout || 'N/A'}
-        `;
+        return {
+          message: 'Wrong answer',
+          input: firstNonAcceptedResult.stdin || 'N/A',
+          expectedOutput: firstNonAcceptedResult.expectedOutput || 'N/A',
+          actualOutput: firstNonAcceptedResult.stdout || 'N/A',
+        };
       case SubmissionStatus.TIME_LIMIT_EXCEEDED:
-        return `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
+        return {
+          message: `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.SIGSEGV:
-        return `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`;
+        return {
+          message: `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.SIGXFSZ:
-        return `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
+        return {
+          message: `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.SIGFPE:
-        return `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`;
+        return {
+          message: `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.SIGABRT:
-        return `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`;
+        return {
+          message: `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.NZEC:
-        return `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`;
+        return {
+          message: `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.RUNTIME_ERROR:
-        return `Runtime error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
+        return {
+          message: `Runtime error\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       case SubmissionStatus.COMPILATION_ERROR:
-        return `Compilation error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
+        return {
+          message: `Compilation error\n ${firstNonAcceptedResult.stderr || ''}`,
+        };
       default:
-        return 'Unknown error occurred';
+        return {
+          message: 'Unknown error occurred',
+        };
     }
   }
-  //
-  // private async findSubmissionWithPagination(
-  //   query: SubmissionsCursorQueryDto,
-  //   config: {
-  //     joins: string[];
-  //     filterFn: (qb: SelectQueryBuilder<Problem>) => void;
-  //   },
-  // ) {
-  //   const pagination = this.validateAndGetPagination(query);
-  //   const sortConfig = this.buildSortConfiguration(
-  //     query,
-  //     pagination.isBackward,
-  //   );
-  //
-  //   const ids = await this.findSubmissionIds(
-  //     query,
-  //     pagination.limit,
-  //     sortConfig,
-  //     config,
-  //   );
-  //
-  //   const items = await this.findProblemByIds(ids, sortConfig);
-  //   return this.buildPaginatedResult(
-  //     items,
-  //     pagination.limit,
-  //     pagination.isBackward,
-  //     query,
-  //   );
-  // }
-  //
-  // private validateAndGetPagination(query: PaginationCursorDto) {
-  //   const isBackward = !!query?.before && !query?.after;
-  //   const limit = isBackward ? query?.last : query?.first;
-  //
-  //   if (!limit || limit > this.MAX_PAGE_SIZE) {
-  //     throw new BadRequestException(
-  //       `Limit must be between 1 and ${this.MAX_PAGE_SIZE}`,
-  //     );
-  //   }
-  //
-  //   return { limit, isBackward };
-  // }
-  //
-  // private buildSortConfiguration(
-  //   query: SubmissionsCursorQueryDto,
-  //   isBackward: boolean,
-  // ) {
-  //   const sortBy = query?.sortBy;
-  //   const naturalOrder: 'ASC' | 'DESC' =
-  //     query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
-  //   const operator = this.determineCursorOperator(query, naturalOrder);
-  //
-  //   // Reverse sort order for backward pagination
-  //   const reversedOrder: 'ASC' | 'DESC' =
-  //     naturalOrder === 'ASC' ? 'DESC' : 'ASC';
-  //   const sortOrder: 'ASC' | 'DESC' = isBackward ? reversedOrder : naturalOrder;
-  //
-  //   return { sortBy, sortOrder, operator };
-  // }
-  //
-  // private determineCursorOperator(
-  //   query: PaginationCursorDto,
-  //   naturalOrder: 'ASC' | 'DESC',
-  // ): '>' | '<' {
-  //   if (query?.after) {
-  //     return naturalOrder === 'ASC' ? '>' : '<';
-  //   }
-  //
-  //   if (query?.before) {
-  //     return naturalOrder === 'ASC' ? '<' : '>';
-  //   }
-  //
-  //   return '>';
-  // }
-  //
-  // private async findSubmissionIds(
-  //   query: SubmissionsCursorQueryDto,
-  //   limit: number,
-  //   sortConfig: {
-  //     sortBy:  ;
-  //     sortOrder: 'ASC' | 'DESC';
-  //     operator: '<' | '>';
-  //   },
-  //   config: {
-  //     joins: string[];
-  //     filterFn: (qb: SelectQueryBuilder<Problem>) => void;
-  //   },
-  // ) {
-  //   const queryBuilder = this.buildBaseQuery(config.joins);
-  //
-  //   config.filterFn(queryBuilder);
-  //   this.applyMatchFilters(queryBuilder, query);
-  //
-  //   await this.applyCursorPagination(queryBuilder, query, sortConfig);
-  //
-  //   queryBuilder
-  //     .select('submission.id', 'id')
-  //     .addSelect(`submission.${sortConfig.sortBy}`, sortConfig.sortBy)
-  //     .distinct(true)
-  //     .limit(limit + 1);
-  //
-  //   const items = await queryBuilder.getRawMany<{
-  //     id: string;
-  //     [key: string]: any;
-  //   }>();
-  //   this.logger.debug(`Found submission IDs: ${JSON.stringify(items)}`);
-  //
-  //   return items.map((item) => item.id);
-  // }
-  //
-  // private buildBaseQuery(joins: string[]) {
-  //   const queryBuilder = this.dataSource.createQueryBuilder(
-  //     Submission,
-  //     'submission',
-  //   );
-  //
-  //   const joinMap: Record<string, string> = {
-  //     submissionProblem: 'submission.problem',
-  //     submissionContestParticipation: 'submission.user',
-  //   };
-  //
-  //   for (const join of joins) {
-  //     if (joinMap[join]) {
-  //       queryBuilder.leftJoin(joinMap[join], join);
-  //     }
-  //   }
-  //
-  //   return queryBuilder;
-  // }
+
+  private checkIfTimeLimitExceed(
+    testResult: TestResultDto,
+    problem: Problem,
+  ): TestResultDto {
+    if (testResult.status === SubmissionStatus.RUNTIME_ERROR) {
+      if (testResult.time > problem.timeLimitMs) {
+        testResult.status = SubmissionStatus.TIME_LIMIT_EXCEEDED;
+      }
+    }
+    return testResult;
+  }
 }
