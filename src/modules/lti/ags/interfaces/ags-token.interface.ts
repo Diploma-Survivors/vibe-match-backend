@@ -9,4 +9,3 @@ export interface AgsTokenCache {
   token: string;
   expiresAt: number;
 }
-

@@ -4,4 +4,3 @@ export enum AgsScope {
   SCORE = 'https://purl.imsglobal.org/spec/lti-ags/scope/score',
   RESULT_READONLY = 'https://purl.imsglobal.org/spec/lti-ags/scope/result.readonly',
 }
-

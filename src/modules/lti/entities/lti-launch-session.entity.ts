@@ -64,4 +64,3 @@ export class LtiLaunchSession {
   })
   expiresAt: Date;
 }
-

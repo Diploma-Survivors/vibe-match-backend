@@ -10,7 +10,7 @@ import { StrategyContext } from './interfaces/grading-strategy.interface';
  */
 @Injectable()
 export class SingleSubmissionStrategy extends BaseGradingStrategy {
-
+  // eslint-disable-next-line @typescript-eslint/require-await
   async validateSubmission(context: StrategyContext): Promise<void> {
     const { previousSubmissions, problem } = context;
 
@@ -23,18 +23,18 @@ export class SingleSubmissionStrategy extends BaseGradingStrategy {
     }
   }
 
-  async shouldSendGrade(context: StrategyContext): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async shouldSendGrade(): Promise<boolean> {
     return true;
   }
 
-
+  // eslint-disable-next-line @typescript-eslint/require-await
   async calculateScore(context: StrategyContext): Promise<number> {
     return context.submission.score;
   }
 
-  async getComment(context: StrategyContext): Promise<string> {
-    const baseComment = await super.getComment(context);
+  getComment(context: StrategyContext): string {
+    const baseComment = super.getComment(context);
     return `[Single Submission Mode]\n${baseComment}`;
   }
 }
-

@@ -17,6 +17,7 @@ import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { GradingStrategyService } from './strategies/grading-strategy.service';
 import { Contest } from '../contests/entities/contest.entity';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import {
   Judge0BatchResponse,
   Judge0Response,
@@ -152,7 +153,7 @@ export class SubmissionService {
         language,
         fileUrl,
         ltiLaunchSession: user.ltiSessionId
-          ? ({ id: user.ltiSessionId } as any)
+          ? ({ id: user.ltiSessionId } as LtiLaunchSession)
           : null,
       }),
     );

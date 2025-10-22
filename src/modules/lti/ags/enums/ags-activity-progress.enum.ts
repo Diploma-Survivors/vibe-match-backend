@@ -5,4 +5,3 @@ export enum AgsActivityProgress {
   SUBMITTED = 'Submitted',
   COMPLETED = 'Completed',
 }
-

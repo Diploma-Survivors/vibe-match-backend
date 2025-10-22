@@ -5,4 +5,3 @@ export enum AgsGradingProgress {
   FAILED = 'Failed',
   NOT_READY = 'NotReady',
 }
-

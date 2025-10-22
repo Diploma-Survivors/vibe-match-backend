@@ -76,4 +76,3 @@ export class UpdateSubmissionsAgs1730000002000 implements MigrationInterface {
     await queryRunner.dropColumn('submission', 'lti_launch_session_id');
   }
 }
-

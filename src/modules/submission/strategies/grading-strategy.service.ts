@@ -47,6 +47,7 @@ export class GradingStrategyService {
     );
 
     const context: StrategyContext = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       submission: null as any,
       previousSubmissions,
       problem,
@@ -55,7 +56,6 @@ export class GradingStrategyService {
 
     await strategy.validateSubmission(context);
   }
-
 
   async executeStrategy(submissionId: string): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
@@ -94,7 +94,6 @@ export class GradingStrategyService {
     return strategy.execute(context);
   }
 
-
   private async findPreviousSubmissions(
     userId: number,
     problemId: number,
@@ -122,4 +121,3 @@ export class GradingStrategyService {
     return query.getMany();
   }
 }
-

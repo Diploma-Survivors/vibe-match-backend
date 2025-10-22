@@ -35,10 +35,9 @@ export class GradingStrategyFactory {
 
       default:
         this.logger.warn(
-          `Unknown strategy: ${strategyType}. Defaulting to BEST_SCORE`,
+          `Unknown strategy: ${String(strategyType)}. Defaulting to BEST_SCORE`,
         );
         return this.bestScoreStrategy;
     }
   }
 }
-
