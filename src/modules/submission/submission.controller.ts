@@ -37,7 +37,6 @@ import * as judge0Interface from '../judge0/judge0.interface';
 import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
 import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
-import { SubmissionResultDto } from './dto/submission.result.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
@@ -124,20 +123,7 @@ export class SubmissionController {
   }
 
   @Get('/problem/:problemId')
-  @ApiResponse({
-    type: () => [SubmissionResultDto],
-    status: HttpStatus.OK,
-    description: 'List of submissions has been retrieved successfully.',
-  })
   @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Unauthorized',
-  })
-  @ApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'You are not allowed to view submissions of this problem.',
-  })
   @ApiPaginatedSubmissionsResponse()
   @UseGuards(JwtAuthGuard)
   async getByProblem(
@@ -153,21 +139,7 @@ export class SubmissionController {
   }
 
   @Get('/contest-participation/:contestParticipationId/problem/:problemId')
-  @ApiResponse({
-    type: () => [SubmissionResultDto],
-    status: HttpStatus.OK,
-    description: 'List of submissions has been retrieved successfully.',
-  })
   @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Unauthorized',
-  })
-  @ApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description:
-      'You are not allowed to view submissions of this problem in this contest.',
-  })
   @ApiPaginatedSubmissionsResponse()
   @UseGuards(JwtAuthGuard)
   async getByContestAndProblem(
