@@ -1,5 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { StoragesModule } from '../storages/storages.module';
+import { SubmissionModule } from '../submission/submission.module';
+import { UserModule } from '../user/user.module';
+import { CourseProblem } from './entities/course-problem.entity';
+import { ProblemTag } from './entities/problem-tag.entity';
+import { ProblemTopic } from './entities/problem-topic.entity';
 import { Problem } from './entities/problem.entity';
 import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsController } from './problems.controller';
@@ -15,7 +21,15 @@ import { TopicsModule } from './topics/topics.module';
     TopicsModule,
     TagsModule,
     TestcasesModule,
-    TypeOrmModule.forFeature([Problem]),
+    UserModule,
+    SubmissionModule,
+    StoragesModule,
+    TypeOrmModule.forFeature([
+      Problem,
+      CourseProblem,
+      ProblemTag,
+      ProblemTopic,
+    ]),
   ],
   exports: [ProblemsService],
 })

@@ -23,6 +23,9 @@ import { Transactional } from 'typeorm-transactional';
 import { SelectQueryBuilder } from 'typeorm/browser';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
+import { StoragesService } from '../storages/storages.service';
+import { SubmissionService } from '../submission/submission.service';
+import { UserService } from '../user/user.service';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import {
@@ -30,6 +33,8 @@ import {
   ProblemsCursorQueryDto,
 } from './dto/problems-cursor-query.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
+import { ProblemTag } from './entities/problem-tag.entity';
+import { ProblemTopic } from './entities/problem-topic.entity';
 import { Problem } from './entities/problem.entity';
 import { ProblemType } from './enums/problem-type.enum';
 import { SortBy } from './enums/sort-by.enum';
@@ -49,13 +54,86 @@ export class ProblemsService {
   constructor(
     @InjectRepository(Problem)
     private readonly problemsRepository: Repository<Problem>,
+    @InjectRepository(ProblemTag)
+    private readonly problemTagsRepository: Repository<ProblemTag>,
+    @InjectRepository(ProblemTopic)
+    private readonly problemTopicsRepository: Repository<ProblemTopic>,
     private readonly tagsService: TagsService,
     private readonly topicsService: TopicsService,
     private readonly testcasesService: TestcasesService,
+    private readonly userService: UserService,
+    private readonly submissionService: SubmissionService,
+    private readonly storagesService: StoragesService,
   ) {}
 
   getQueryBuilder(): SelectQueryBuilder<Problem> {
     return this.problemsRepository.createQueryBuilder('problem');
+  }
+
+  async getDetailProblemForInstructor(id: number, currentUser: JwtPayload) {
+    const queryBuilder = this.getQueryBuilder();
+
+    const problem = await queryBuilder
+      .leftJoin('problem.courseProblems', 'courseProblem')
+      .where('problem.id = :id', { id })
+      .andWhere('courseProblem.courseId = :courseId', {
+        courseId: currentUser.courseId,
+      })
+      .select(['problem'])
+      .distinct(true)
+      .getOne();
+
+    if (!problem) {
+      throw new ForbiddenException('You do not have access to this problem');
+    }
+
+    const author = await this.userService.findOne({
+      where: { id: problem.authorId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+
+    if (!author) {
+      throw new BadRequestException('Author not found');
+    }
+
+    const tags = await this.tagsService.find({
+      where: { problemTags: { problemId: problem.id } },
+      select: ['id', 'name'],
+    });
+
+    const topics = await this.topicsService.find({
+      where: { problemTopics: { problemId: problem.id } },
+      select: ['id', 'name'],
+    });
+
+    const testcase = await this.testcasesService.findTestcaseOne({
+      where: { problemId: problem.id },
+      select: ['id', 'fileUrl'],
+    });
+
+    if (!testcase) {
+      throw new BadRequestException('Testcase not found');
+    }
+
+    const testcaseSamples = await this.testcasesService.findTestcaseSamples({
+      where: { problemId: problem.id },
+      select: ['id', 'input', 'output'],
+    });
+
+    const quickStats =
+      await this.submissionService.getStatisticsByProblemId(id);
+
+    const detailProblem = {
+      ...problem,
+      author,
+      tags,
+      topics,
+      testcase,
+      testcaseSamples,
+      quickStats,
+    };
+
+    return detailProblem;
   }
 
   @Transactional()
@@ -575,17 +653,110 @@ export class ProblemsService {
     return problem;
   }
 
-  async updateById(id: number, updateProblemDto: UpdateProblemDto) {
+  @Transactional()
+  async updateById(
+    id: number,
+    updateProblemDto: UpdateProblemDto,
+    currentUser: JwtPayload,
+    testcaseFile?: Express.Multer.File,
+  ) {
+    const problem = await this.findById(id, {
+      id: true,
+      authorId: true,
+    });
+    if (!problem || problem.authorId !== currentUser.userId) {
+      throw new ForbiddenException('You do not have access to this problem');
+    }
+
+    const { tags, topics, testcaseSamples, ...restDto } = updateProblemDto;
+
     await this.problemsRepository.update(id, {
-      ...updateProblemDto,
-      problemTags: updateProblemDto.tags?.map((tagId) => ({
-        tag: { id: tagId },
-      })),
-      problemTopics: updateProblemDto.topics?.map((topicId) => ({
-        topic: { id: topicId },
-      })),
+      ...restDto,
       testcase: undefined,
     });
+
+    if (tags) {
+      const existingTags = await this.problemTagsRepository.find({
+        where: { problemId: id },
+      });
+      const toDeleteTags = existingTags.filter((t) => !tags.includes(t.tagId));
+      const toAddTags = tags.filter(
+        (tagId) => !existingTags.some((t) => t.tagId === tagId),
+      );
+
+      if (toDeleteTags.length > 0) {
+        await this.problemTagsRepository.delete(toDeleteTags);
+      }
+
+      if (toAddTags.length > 0) {
+        const newProblemTags = toAddTags.map((tagId) =>
+          this.problemTagsRepository.create({ problemId: id, tagId }),
+        );
+        await this.problemTagsRepository.save(newProblemTags);
+      }
+    }
+
+    if (topics) {
+      const existingTopics = await this.problemTopicsRepository.find({
+        where: { problemId: id },
+      });
+      const toDeleteTopics = existingTopics.filter(
+        (t) => !topics.includes(t.topicId),
+      );
+      const toAddTopics = topics.filter(
+        (topicId) => !existingTopics.some((t) => t.topicId === topicId),
+      );
+
+      if (toDeleteTopics.length > 0) {
+        await this.problemTopicsRepository.delete(toDeleteTopics);
+      }
+
+      if (toAddTopics.length > 0) {
+        const newProblemTopics = toAddTopics.map((topicId) =>
+          this.problemTopicsRepository.create({ problemId: id, topicId }),
+        );
+        await this.problemTopicsRepository.save(newProblemTopics);
+      }
+    }
+
+    if (testcaseSamples) {
+      await Promise.all(
+        testcaseSamples.map(async (sample) => {
+          if (sample?.id) {
+            await this.testcasesService.updateTestcaseSample(
+              { id: sample.id, problemId: id },
+              { input: sample.input, output: sample.output },
+            );
+          } else {
+            await this.testcasesService.createTestcaseSample({
+              problemId: id,
+              input: sample.input,
+              output: sample.output,
+            });
+          }
+        }),
+      );
+    }
+
+    if (!testcaseFile) {
+      return;
+    }
+
+    const existingTestcase = await this.testcasesService.findTestcaseOne({
+      where: { problemId: id },
+      select: ['id', 'fileUrl'],
+    });
+    if (!existingTestcase) {
+      throw new BadRequestException('Testcase not found');
+    }
+
+    const keyS3 = this.storagesService.getKeyFromUrl(existingTestcase.fileUrl);
+    await this.testcasesService.uploadAndSaveFileTestcase(
+      testcaseFile,
+      currentUser,
+      id,
+      keyS3,
+    );
   }
 
   async update(

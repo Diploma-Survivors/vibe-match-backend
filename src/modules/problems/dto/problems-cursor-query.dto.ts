@@ -43,6 +43,7 @@ class QueryProblemsFilterDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsArray()
   @IsInt({ each: true })
   @Expose({ name: 'topicIds' })
@@ -55,6 +56,7 @@ class QueryProblemsFilterDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsArray()
   @IsInt({ each: true })
   @Expose({ name: 'tagIds' })
