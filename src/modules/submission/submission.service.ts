@@ -74,6 +74,51 @@ export class SubmissionService {
     private readonly submissionCursorService: SubmissionCursorService,
   ) {}
 
+  async getStatisticsByProblemId(problemId: number) {
+    const totalSubmissions = await this.submissionRepository.count({
+      where: { problemId },
+    });
+
+    const totalAcceptedSubmissions = await this.submissionRepository.count({
+      where: {
+        problemId,
+        status: SubmissionStatus.ACCEPTED,
+      },
+    });
+
+    const acceptanceRate = totalSubmissions
+      ? (totalAcceptedSubmissions / totalSubmissions) * 100
+      : 0;
+
+    const { attemptedUsers } = (await this.submissionRepository
+      .createQueryBuilder('submission')
+      .where('submission.problemId = :problemId', { problemId })
+      .select('COUNT(DISTINCT submission.userId)', 'attemptedUsers')
+      .getRawOne()) as { attemptedUsers: number };
+
+    const { solvedUsers } = (await this.submissionRepository
+      .createQueryBuilder('submission')
+      .where('submission.problemId = :problemId', { problemId })
+      .andWhere('submission.status = :status', {
+        status: SubmissionStatus.ACCEPTED,
+      })
+      .select('COUNT(DISTINCT submission.userId)', 'solvedUsers')
+      .getRawOne()) as { solvedUsers: number };
+
+    const averageAttempts = attemptedUsers
+      ? totalSubmissions / attemptedUsers
+      : 0;
+
+    return {
+      totalSubmissions,
+      totalAcceptedSubmissions,
+      acceptanceRate,
+      attemptedUsers,
+      solvedUsers,
+      averageAttempts,
+    };
+  }
+
   async run(
     dto: CreateSubmissionDto,
     file?: Express.Multer.File,

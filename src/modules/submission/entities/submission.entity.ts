@@ -21,9 +21,15 @@ export class Submission {
   @PrimaryGeneratedColumn('increment', { name: 'submission_id' })
   id: number;
 
+  @Column({ name: 'user_id' })
+  userId: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @Column({ name: 'problem_id' })
+  problemId: number;
 
   @ManyToOne(() => Problem)
   @JoinColumn({ name: 'problem_id' })

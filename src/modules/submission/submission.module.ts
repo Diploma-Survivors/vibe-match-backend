@@ -45,5 +45,6 @@ import { SubmissionQueue } from './enums/submission-event.enum';
     SubmissionCursorService,
     StoragesService,
   ],
+  exports: [SubmissionService],
 })
 export class SubmissionModule {}
