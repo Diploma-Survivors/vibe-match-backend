@@ -11,7 +11,7 @@ import { StrategyContext } from './interfaces/grading-strategy.interface';
  */
 @Injectable()
 export class BestScoreStrategy extends BaseGradingStrategy {
-
+  // eslint-disable-next-line @typescript-eslint/require-await
   async validateSubmission(context: StrategyContext): Promise<void> {
     const { previousSubmissions, problem } = context;
 
@@ -24,6 +24,7 @@ export class BestScoreStrategy extends BaseGradingStrategy {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async shouldSendGrade(context: StrategyContext): Promise<boolean> {
     const { submission, previousSubmissions } = context;
 
@@ -48,15 +49,15 @@ export class BestScoreStrategy extends BaseGradingStrategy {
     return shouldSend;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async calculateScore(context: StrategyContext): Promise<number> {
     return context.submission.score;
   }
 
-
-  async getComment(context: StrategyContext): Promise<string> {
+  getComment(context: StrategyContext): string {
     const { submission, previousSubmissions, problem } = context;
     const attemptNumber = previousSubmissions.length + 1;
-    const baseComment = await super.getComment(context);
+    const baseComment = super.getComment(context);
 
     return [
       `[Best Score Mode - Attempt ${attemptNumber}]`,
@@ -66,4 +67,3 @@ export class BestScoreStrategy extends BaseGradingStrategy {
     ].join('\n');
   }
 }
-

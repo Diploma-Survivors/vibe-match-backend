@@ -24,4 +24,3 @@ export enum SubmissionStrategyEnum {
    */
   AVERAGE_SCORE = 'AVERAGE_SCORE',
 }
-

@@ -6,7 +6,6 @@ import * as jose from 'jose';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Problem } from '../../problems/entities/problem.entity';
-import { SubmissionResultDto } from '../../submission/dto/submission.result.dto';
 import { Submission } from '../../submission/entities/submission.entity';
 import { GradingStrategyService } from '../../submission/strategies/grading-strategy.service';
 import { KeysService } from '../keys.service';
@@ -75,7 +74,10 @@ export class AgsService {
       this.configService.get<number>('lti.ags.tokenExpiryBuffer') ?? 60;
     const now = Math.floor(Date.now() / 1000);
 
-    if (this.tokenCache && this.tokenCache.expiresAt > now + tokenExpiryBuffer) {
+    if (
+      this.tokenCache &&
+      this.tokenCache.expiresAt > now + tokenExpiryBuffer
+    ) {
       this.logger.debug('Using cached AGS access token');
       return this.tokenCache.token;
     }
@@ -97,8 +99,10 @@ export class AgsService {
 
     try {
       this.logger.debug(`Requesting token from: ${accessTokenUrl}`);
-      this.logger.debug(`JWT assertion (first 50 chars): ${clientAssertion.substring(0, 50)}...`);
-      
+      this.logger.debug(
+        `JWT assertion (first 50 chars): ${clientAssertion.substring(0, 50)}...`,
+      );
+
       const response = await axios.post<AgsAccessTokenResponse>(
         accessTokenUrl,
         new URLSearchParams({
@@ -130,7 +134,9 @@ export class AgsService {
           `Failed to obtain AGS access token: ${error.message}`,
         );
         this.logger.error(`Status: ${error.response?.status}`);
-        this.logger.error(`Response data: ${JSON.stringify(error.response?.data)}`);
+        this.logger.error(
+          `Response data: ${JSON.stringify(error.response?.data)}`,
+        );
         this.logger.error(`Request URL: ${accessTokenUrl}`);
       } else {
         this.logger.error(
@@ -146,11 +152,11 @@ export class AgsService {
     scoreDto: SendScoreDto,
   ): Promise<boolean> {
     const accessToken = await this.getAccessToken();
-    
+
     // Parse URL and insert /scores before query string
     const url = new URL(lineitemUrl);
     const scoresUrl = `${url.origin}${url.pathname}/scores${url.search}`;
-    
+
     const requestTimeout =
       this.configService.get<number>('lti.ags.requestTimeout') ?? 10000;
 
@@ -189,30 +195,7 @@ export class AgsService {
     }
   }
 
-
-  private formatComment(finalResult: SubmissionResultDto): string {
-    const statusLine = `Status: ${finalResult.status} (${finalResult.passedTests}/${finalResult.totalTests} tests passed)`;
-    const runtimeLine = `Runtime: ${finalResult.runtime?.toFixed(3)}s`;
-    const memoryLine = `Memory: ${finalResult.memory?.toFixed(2)}KB`;
-
-    if (finalResult.resultDescription) {
-      return [
-        statusLine,
-        runtimeLine,
-        memoryLine,
-        '',
-        'Details:',
-        finalResult.resultDescription,
-      ].join('\n');
-    }
-
-    return [statusLine, runtimeLine, memoryLine].join('\n');
-  }
-
-  async sendGradeForSubmission(
-    submissionId: string,
-    finalResult: SubmissionResultDto,
-  ): Promise<boolean> {
+  async sendGradeForSubmission(submissionId: string): Promise<boolean> {
     try {
       const submission = await this.submissionRepository.findOne({
         where: { id: Number.parseInt(submissionId) },
@@ -234,9 +217,7 @@ export class AgsService {
       const session = submission.ltiLaunchSession;
 
       if (!session.agsLineitemUrl) {
-        this.logger.warn(
-          `LTI session ${session.id} has no AGS lineitem URL`,
-        );
+        this.logger.warn(`LTI session ${session.id} has no AGS lineitem URL`);
         return false;
       }
 
@@ -294,4 +275,3 @@ export class AgsService {
     }
   }
 }
-

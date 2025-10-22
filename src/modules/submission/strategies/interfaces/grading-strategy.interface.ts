@@ -2,7 +2,6 @@ import { Submission } from '../../entities/submission.entity';
 import { Problem } from '../../../problems/entities/problem.entity';
 import { LtiLaunchSession } from '../../../lti/entities/lti-launch-session.entity';
 
-
 export interface StrategyContext {
   submission: Submission;
   previousSubmissions: Submission[];
@@ -23,8 +22,7 @@ export interface IGradingStrategy {
 
   calculateScore(context: StrategyContext): Promise<number>;
 
-  getComment(context: StrategyContext): Promise<string>;
+  getComment(context: StrategyContext): string;
 
   execute(context: StrategyContext): Promise<StrategyResult | null>;
 }
-

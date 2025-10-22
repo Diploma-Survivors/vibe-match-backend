@@ -140,9 +140,9 @@ export class CallbackProcessor implements OnModuleInit {
 
     await this.publishFinalize(submissionId, finalResult);
 
-    // Send grade to Moodle 
+    // Send grade to Moodle
     if (isSubmit) {
-      await this.sendGradeToMoodleIfApplicable(submissionId, finalResult);
+      await this.sendGradeToMoodleIfApplicable(submissionId);
     }
   }
 
@@ -324,7 +324,6 @@ export class CallbackProcessor implements OnModuleInit {
 
   private async sendGradeToMoodleIfApplicable(
     submissionId: string,
-    finalResult: SubmissionResultDto,
   ): Promise<void> {
     try {
       const submission = await this.submissionRepository.findOne({
@@ -349,10 +348,8 @@ export class CallbackProcessor implements OnModuleInit {
         return;
       }
 
-      const success = await this.agsService.sendGradeForSubmission(
-        submissionId,
-        finalResult,
-      );
+      const success =
+        await this.agsService.sendGradeForSubmission(submissionId);
 
       if (success) {
         submission.agsGradeSent = true;

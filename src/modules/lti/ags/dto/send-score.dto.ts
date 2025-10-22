@@ -10,4 +10,3 @@ export class SendScoreDto {
   activityProgress: AgsActivityProgress;
   gradingProgress: AgsGradingProgress;
 }
-

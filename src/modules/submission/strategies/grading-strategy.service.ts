@@ -59,6 +59,7 @@ export class GradingStrategyService {
     );
 
     const context: StrategyContext = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       submission: null as any,
       previousSubmissions,
       problem,
@@ -73,10 +74,9 @@ export class GradingStrategyService {
         Previous Count: ${previousSubmissions.length}
         Max Attempts: ${problem.maxAttempts}
       `);
-      
+
     await strategy.validateSubmission(context);
   }
-
 
   async executeStrategy(submissionId: string): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
@@ -115,7 +115,6 @@ export class GradingStrategyService {
     return strategy.execute(context);
   }
 
-
   private async findPreviousSubmissions(
     userId: number,
     problemId: number,
@@ -125,7 +124,7 @@ export class GradingStrategyService {
     const query = this.submissionRepository
       .createQueryBuilder('submission')
       .leftJoin('submission.ltiLaunchSession', 'session')
-          .where('submission.user_id = :userId', { userId })
+      .where('submission.user_id = :userId', { userId })
       .andWhere('submission.problem_id = :problemId', { problemId })
       .orderBy('submission.created_at', 'ASC');
 
@@ -134,7 +133,7 @@ export class GradingStrategyService {
         where: { id: ltiSessionId },
         select: ['resourceLinkId'],
       });
-      
+
       if (currentSession?.resourceLinkId) {
         query.andWhere('session.resource_link_id = :resourceLinkId', {
           resourceLinkId: currentSession.resourceLinkId,
@@ -151,4 +150,3 @@ export class GradingStrategyService {
     return query.getMany();
   }
 }
-

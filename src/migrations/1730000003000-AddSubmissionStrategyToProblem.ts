@@ -82,4 +82,3 @@ export class AddSubmissionStrategyToProblem1730000003000
     await queryRunner.dropColumn('problems', 'submission_strategy');
   }
 }
-

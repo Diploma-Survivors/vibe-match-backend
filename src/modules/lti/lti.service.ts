@@ -27,8 +27,10 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { AssignmentContentType } from 'src/common/enums/assignment-content-type.enum';
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
+import { Contest } from '../contests/entities/contest.entity';
 import { ContestsService } from '../contests/contests.service';
 import { Course } from '../course/entities/course.entity';
+import { Problem } from '../problems/entities/problem.entity';
 import { ProblemType } from '../problems/enums/problem-type.enum';
 import { ProblemsService } from '../problems/problems.service';
 import { User } from '../user/entities/user.entity';
@@ -759,8 +761,8 @@ export class LtiService {
     const session = this.ltiLaunchSessionRepository.create({
       user: { id: params.userId } as User,
       ltiUserId: params.ltiUserId,
-      problem: params.problemId ? ({ id: params.problemId } as any) : null,
-      contest: params.contestId ? ({ id: params.contestId } as any) : null,
+      problem: params.problemId ? ({ id: params.problemId } as Problem) : null,
+      contest: params.contestId ? ({ id: params.contestId } as Contest) : null,
       resourceLinkId: params.resourceLinkId,
       contextId: params.contextId,
       agsLineitemUrl: params.agsLineitemUrl,

@@ -125,4 +125,3 @@ export class CreateLtiLaunchSessions1730000001000
     await queryRunner.dropTable('lti_launch_sessions');
   }
 }
-
