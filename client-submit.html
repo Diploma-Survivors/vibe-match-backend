@@ -5,212 +5,222 @@
   <meta charset="utf-8">
   <title>SSE Demo - Submit</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 50px auto;
-      padding: 20px;
-    }
+      body {
+          font-family: Arial, sans-serif;
+          max-width: 800px;
+          margin: 50px auto;
+          padding: 20px;
+      }
 
-    #messages {
-      border: 1px solid #ccc;
-      padding: 15px;
-      min-height: 200px;
-      background: #f9f9f9;
-      border-radius: 5px;
-      margin-top: 20px;
-    }
+      #messages {
+          border: 1px solid #ccc;
+          padding: 15px;
+          min-height: 200px;
+          background: #f9f9f9;
+          border-radius: 5px;
+          margin-top: 20px;
+      }
 
-    .message {
-      padding: 8px;
-      margin: 5px 0;
-      background: white;
-      border-left: 3px solid #007bff;
-      border-radius: 3px;
-    }
+      .message {
+          padding: 8px;
+          margin: 5px 0;
+          background: white;
+          border-left: 3px solid #007bff;
+          border-radius: 3px;
+      }
 
-    .message pre {
-      margin: 0;
-    }
+      .message pre {
+          margin: 0;
+      }
 
-    .error {
-      border-left-color: #dc3545;
-      color: #dc3545;
-    }
+      .error {
+          border-left-color: #dc3545;
+          color: #dc3545;
+      }
 
-    .success {
-      border-left-color: #28a745;
-      color: #28a745;
-    }
+      .success {
+          border-left-color: #28a745;
+          color: #28a745;
+      }
 
-    button {
-      padding: 10px 20px;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-    }
+      button {
+          padding: 10px 20px;
+          background: #007bff;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 16px;
+      }
 
-    button:hover {
-      background: #0056b3;
-    }
+      button:hover {
+          background: #0056b3;
+      }
 
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
+      button:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+      }
   </style>
 </head>
 
 <body>
-  <h1>Server-Sent Events Demo (Submit)</h1>
-  <button id="submitBtn" onclick="submitAndListen()">Submit & Listen</button>
-  <div id="messages"></div>
+<h1>Server-Sent Events Demo (Submit)</h1>
+<button id="submitBtn" onclick="submitAndListen()">Submit & Listen</button>
+<div id="messages"></div>
 
-  <script>
-    const messages = document.getElementById("messages");
-    const submitBtn = document.getElementById("submitBtn");
-    let currentEventSource = null;
+<script>
+  const messages = document.getElementById("messages");
+  const submitBtn = document.getElementById("submitBtn");
+  let currentEventSource = null;
 
-    function addMessage(text, type = 'info') {
-      const p = document.createElement("p");
-      p.className = `message ${type}`;
-      p.textContent = text;
-      messages.appendChild(p);
-      messages.scrollTop = messages.scrollHeight;
+  function addMessage(text, type = 'info') {
+    const p = document.createElement("p");
+    p.className = `message ${type}`;
+    p.textContent = text;
+    messages.appendChild(p);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function addJson(data, type = 'info', prefix = '') {
+    const p = document.createElement('p');
+    p.className = `message ${type}`;
+    if (prefix) {
+      const span = document.createElement('span');
+      span.textContent = prefix + '\n';
+      p.appendChild(span);
+    }
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(data, null, 2);
+    p.appendChild(pre);
+    messages.appendChild(p);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  // Hàm gửi API và lắng nghe SSE
+  async function submitAndListen() {
+    // Disable button để tránh spam
+    submitBtn.disabled = true;
+    messages.innerHTML = '';
+
+    // Đóng connection cũ nếu có
+    if (currentEventSource) {
+      currentEventSource.close();
+      currentEventSource = null;
     }
 
-    function addJson(data, type = 'info', prefix = '') {
-      const p = document.createElement('p');
-      p.className = `message ${type}`;
-      if (prefix) {
-        const span = document.createElement('span');
-        span.textContent = prefix + '\n';
-        p.appendChild(span);
+    // Body gửi lên API (submit: chỉ cần languageId và sourceCode)
+    const body = {
+      languageId: 52,
+      problemId: 1,
+      // testcaseSamples: [
+      //   {
+      //     input: "2 3\n",
+      //     output: "5\n"
+      //   },
+      //   {
+      //     input: "10 20\n",
+      //     output: "30\n"
+      //   }
+      // ],
+      sourceCode: `#include <iostream>\n\nint main() {\n    int soThuNhat, soThuHai, tong;\n\n    std::cin >> soThuNhat;\n\n    std::cin >> soThuHai;\n    tong = soThuNhat + soThuHai;\n\n    std::cout << tong << std::endl;\n\n    return 0;\n}`
+    };
+
+    addMessage("Đang gửi code lên server (submit)...");
+
+    // Gửi API lấy submissionId
+    let submissionId = null;
+    try {
+      const res = await fetch("http://localhost:3000/v1/submissions/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImNvdXJzZUlkIjoxLCJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiQWRtaW4iLCJsYXN0TmFtZSI6IlVzZXIiLCJyb2xlcyI6WyJJTlNUUlVDVE9SIl0sInN1YiI6IjIiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0Ojg4ODgiLCJpYXQiOjE3NjA5NjE1ODUsImV4cCI6MTc2MDk2NTE4NSwiYXVkIjoibG9jYWxob3N0OjMwMDAifQ.SOzWDtfhQrOj3TZwocBHD5GF2dVwEHH9FZDbGYCER_g"
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(data, null, 2);
-      p.appendChild(pre);
-      messages.appendChild(p);
-      messages.scrollTop = messages.scrollHeight;
-    }
 
-    // Hàm gửi API và lắng nghe SSE
-    async function submitAndListen() {
-      // Disable button để tránh spam
-      submitBtn.disabled = true;
-      messages.innerHTML = '';
+      const data = await res.json();
+      console.log("Response:", data);
 
-      // Đóng connection cũ nếu có
-      if (currentEventSource) {
-        currentEventSource.close();
-        currentEventSource = null;
-      }
-
-      // Body gửi lên API (submit: chỉ cần languageId và sourceCode)
-      const body = {
-        languageId: 52,
-        problemId: 1,
-        sourceCode: `#include <iostream>\n\nint main() {\n    int soThuNhat, soThuHai, tong;\n\n    std::cin >> soThuNhat;\n\n    std::cin >> soThuHai;\n    tong = soThuNhat + soThuHai;\n\n    std::cout << tong << std::endl;\n\n    return 0;\n}`
-      };
-
-      addMessage("Đang gửi code lên server (submit)...");
-
-      // Gửi API lấy submissionId
-      let submissionId = null;
-      try {
-        const res = await fetch("http://localhost:3000/v1/submissions/submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImNvdXJzZUlkIjoxLCJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiQWRtaW4iLCJsYXN0TmFtZSI6IlVzZXIiLCJyb2xlcyI6WyJJTlNUUlVDVE9SIl0sInN1YiI6IjIiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0Ojg4ODgiLCJpYXQiOjE3NjA3MTY4MDMsImV4cCI6MTc2MTA3NjgwMywiYXVkIjoibG9jYWxob3N0OjMwMDAifQ.baRUo0iB3qOMlRkpkkXIFacHHewU_0PUWWRpjDHeUFE"
-          },
-          body: JSON.stringify(body)
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-
-        const data = await res.json();
-        console.log("Response:", data);
-
-        if (data && data.data && data.data.submissionId) {
-          submissionId = data.data.submissionId;
-          addMessage(`✓ Submission ID: ${submissionId}`, 'success');
-        } else {
-          addMessage("❌ Không lấy được submissionId từ response!", 'error');
-          submitBtn.disabled = false;
-          return;
-        }
-      } catch (err) {
-        addMessage(`❌ Lỗi gửi API: ${err.message}`, 'error');
-        console.error(err);
+      if (data && data.data && data.data.submissionId) {
+        submissionId = data.data.submissionId;
+        addMessage(`✓ Submission ID: ${submissionId}`, 'success');
+      } else {
+        addMessage("❌ Không lấy được submissionId từ response!", 'error');
         submitBtn.disabled = false;
         return;
       }
+    } catch (err) {
+      addMessage(`❌ Lỗi gửi API: ${err.message}`, 'error');
+      console.error(err);
+      submitBtn.disabled = false;
+      return;
+    }
 
-      // Kết nối SSE với submissionId
-      const sseUrl = `http://localhost:3000/v1/submissions/${submissionId}/stream`;
-      addMessage(`Đang kết nối SSE: ${sseUrl}`);
+    // Kết nối SSE với submissionId
+    const sseUrl = `http://localhost:3000/v1/submissions/${submissionId}/stream`;
+    addMessage(`Đang kết nối SSE: ${sseUrl}`);
 
-      currentEventSource = new EventSource(sseUrl);
+    currentEventSource = new EventSource(sseUrl);
 
-      currentEventSource.onopen = function () {
-        addMessage("✓ SSE connection opened", 'success');
-      };
+    currentEventSource.onopen = function () {
+      addMessage("✓ SSE connection opened", 'success');
+    };
 
-      currentEventSource.onmessage = function (event) {
-        console.log("SSE message:", event.data);
-        try {
-          // Thử parse JSON nếu data là JSON
-          const jsonData = JSON.parse(event.data);
-          addJson(jsonData, 'info', '📨');
-        } catch {
-          // Nếu không phải JSON thì hiển thị text thường
-          addMessage(`📨 ${event.data}`);
-        }
-      };
+    currentEventSource.onmessage = function (event) {
+      console.log("SSE message:", event.data);
+      try {
+        // Thử parse JSON nếu data là JSON
+        const jsonData = JSON.parse(event.data);
+        addJson(jsonData, 'info', '📨');
+      } catch {
+        // Nếu không phải JSON thì hiển thị text thường
+        addMessage(`📨 ${event.data}`);
+      }
+    };
 
-      // Lắng nghe các event type khác nếu server gửi
-      currentEventSource.addEventListener('status', function (event) {
-        addMessage(`📊 Status: ${event.data}`);
-      });
+    // Lắng nghe các event type khác nếu server gửi
+    currentEventSource.addEventListener('status', function (event) {
+      addMessage(`📊 Status: ${event.data}`);
+    });
 
-      currentEventSource.addEventListener('result', function (event) {
-        try {
-          const jsonData = JSON.parse(event.data);
-          addJson(jsonData, 'success', '✅ Result:');
-        } catch {
-          addMessage(`✅ Result: ${event.data}`, 'success');
-        }
-      });
+    currentEventSource.addEventListener('result', function (event) {
+      try {
+        const jsonData = JSON.parse(event.data);
+        addJson(jsonData, 'success', '✅ Result:');
+      } catch {
+        addMessage(`✅ Result: ${event.data}`, 'success');
+      }
+    });
 
-      currentEventSource.addEventListener('error_event', function (event) {
-        addMessage(`⚠️ Error: ${event.data}`, 'error');
-      });
+    currentEventSource.addEventListener('error_event', function (event) {
+      addMessage(`⚠️ Error: ${event.data}`, 'error');
+    });
 
-      currentEventSource.onerror = function (err) {
-        console.error("SSE error:", err);
-        addMessage("❌ SSE connection error hoặc đã đóng", 'error');
+    currentEventSource.onerror = function (err) {
+      console.error("SSE error:", err);
+      addMessage("❌ SSE connection error hoặc đã đóng", 'error');
+      currentEventSource.close();
+      currentEventSource = null;
+      submitBtn.disabled = false;
+    };
+
+    // Tự động đóng connection sau 30 giây
+    setTimeout(() => {
+      if (currentEventSource) {
+        addMessage("⏱️ Timeout - đóng connection");
         currentEventSource.close();
         currentEventSource = null;
         submitBtn.disabled = false;
-      };
-
-      // Tự động đóng connection sau 30 giây
-      setTimeout(() => {
-        if (currentEventSource) {
-          addMessage("⏱️ Timeout - đóng connection");
-          currentEventSource.close();
-          currentEventSource = null;
-          submitBtn.disabled = false;
-        }
-      }, 30000);
-    }
-  </script>
+      }
+    }, 30000);
+  }
+</script>
 </body>
 
 </html>
