@@ -68,7 +68,9 @@ services:
   judge0-server:
     image: judge0/judge0:1.13.1
     volumes:
-      - ./judge0.conf:/judge0.conf:ro
+      - ./src/modules/judge0/judge0-v1.13.1/judge0.conf:/judge0.conf:ro
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     ports:
       - '2358:2358'
     privileged: true
@@ -82,7 +84,9 @@ services:
     image: judge0/judge0:1.13.1
     command: ['./scripts/workers']
     volumes:
-      - ./judge0.conf:/judge0.conf:ro
+      - ./src/modules/judge0/judge0-v1.13.1/judge0.conf:/judge0.conf:ro
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     privileged: true
     <<: *default-logging
     depends_on:
