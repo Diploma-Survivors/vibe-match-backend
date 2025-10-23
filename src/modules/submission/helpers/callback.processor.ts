@@ -148,8 +148,8 @@ export class CallbackProcessor implements OnModuleInit {
 
   private async scheduleFinalizeJob(submissionId: string, isSubmit: boolean) {
     const jobName = isSubmit
-      ? SubmissionJob.FINALIZE_SUBMIT
-      : SubmissionJob.FINALIZE_RUN;
+      ? SubmissionJob.FINALIZE_RUN
+      : SubmissionJob.FINALIZE_SUBMIT;
     await this.finalizeQueue.add(
       jobName,
       { submissionId },
