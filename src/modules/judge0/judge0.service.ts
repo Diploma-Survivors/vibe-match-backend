@@ -1,4 +1,8 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import {
@@ -103,9 +107,8 @@ export class Judge0Service {
         `Failed to fetch submission details for token ${token}`,
         error,
       );
-      throw new HttpException(
+      throw new InternalServerErrorException(
         'Failed to get submission details from Judge0',
-        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
