@@ -35,7 +35,6 @@ import { RoleEnum } from '../user/enums/role.enum';
 import { SubmissionConstants } from './constants/submission.constant';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { SubmissionDetailDto } from './dto/detail-submission.dto';
-import { ResultDescription } from './dto/result-description.dto';
 import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
 import { SubmissionResultDto } from './dto/submission.result.dto';
 import { Submission } from './entities/submission.entity';
@@ -694,58 +693,31 @@ export class SubmissionService {
     };
   }
 
-  generateResult(
-    firstNonAcceptedResult: TestResultDto | null,
-  ): ResultDescription {
+  generateResult(firstNonAcceptedResult: TestResultDto | null): string {
     if (!firstNonAcceptedResult) {
-      return {
-        message: 'All test cases passed',
-      };
+      return 'All test cases passed';
     }
     switch (firstNonAcceptedResult.status) {
       case SubmissionStatus.WRONG_ANSWER:
-        return {
-          message: 'Wrong answer',
-          input: firstNonAcceptedResult.stdin || 'N/A',
-          expectedOutput: firstNonAcceptedResult.expectedOutput || 'N/A',
-          actualOutput: firstNonAcceptedResult.stdout || 'N/A',
-        };
+        return `Input: ${firstNonAcceptedResult.stdin || 'N/A'}\nExpected output: ${firstNonAcceptedResult.expectedOutput || 'N/A'}\nActual output: ${firstNonAcceptedResult.stdout || 'N/A'}`;
       case SubmissionStatus.TIME_LIMIT_EXCEEDED:
-        return {
-          message: `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGSEGV:
-        return {
-          message: `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGXFSZ:
-        return {
-          message: `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGFPE:
-        return {
-          message: `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGABRT:
-        return {
-          message: `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.NZEC:
-        return {
-          message: `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.RUNTIME_ERROR:
-        return {
-          message: `Runtime error\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Runtime error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
       case SubmissionStatus.COMPILATION_ERROR:
-        return {
-          message: `Compilation error\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Compilation error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
       default:
-        return {
-          message: 'Unknown error occurred',
-        };
+        return 'Unknown error occurred';
     }
   }
 

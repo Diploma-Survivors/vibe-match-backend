@@ -12,7 +12,6 @@ import { Language } from '../../language/entities/language.entity';
 import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
-import { ResultDescription } from '../dto/result-description.dto';
 
 @Entity()
 @Index('idx_submission_user', ['user']) // search submissions by user
@@ -81,10 +80,6 @@ export class Submission {
   @Column({ nullable: true })
   note: string;
 
-  @Column({
-    name: 'result_description',
-    type: 'json',
-    nullable: true,
-  })
-  resultDescription: ResultDescription;
+  @Column({ name: 'result_description', type: 'text', nullable: true })
+  resultDescription: string;
 }
