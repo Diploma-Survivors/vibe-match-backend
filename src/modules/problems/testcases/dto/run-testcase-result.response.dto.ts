@@ -9,12 +9,6 @@ export class TestResultDto {
   stdout?: string;
 
   @ApiProperty({
-    description: 'Stdin input provided to the program',
-    example: '5 3',
-  })
-  stdin?: string;
-
-  @ApiProperty({
     description: 'Error output if any',
     example: 'Error: Segmentation fault',
   })

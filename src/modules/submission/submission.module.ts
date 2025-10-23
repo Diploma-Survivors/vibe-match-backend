@@ -10,14 +10,14 @@ import { CallbackProcessor } from './helpers/callback.processor';
 import { SubmissionFinalizeProcessor } from './events/submission-finalizer.processor';
 import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
+import { ConfigService } from '@nestjs/config';
 import { Language } from '../language/entities/language.entity';
 import { User } from '../user/entities/user.entity';
 import { StoragesService } from '../storages/storages.service';
 import { Module } from '@nestjs/common';
+import { SubmissionQueue } from './enums/submission-event.enum';
 import { Contest } from '../contests/entities/contest.entity';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
-import { SubmissionCursorService } from './helpers/submission-cursor.service';
-import { SubmissionQueue } from './enums/submission-event.enum';
 
 @Module({
   imports: [
@@ -31,6 +31,26 @@ import { SubmissionQueue } from './enums/submission-event.enum';
     ]),
     Judge0Module,
     RedisModule,
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('redis.host');
+        const portFromConfig = config.get<number>('redis.port');
+        const password = config.get<string>('redis.password');
+
+        const port = Number.isInteger(portFromConfig)
+          ? portFromConfig!
+          : parseInt(process.env.REDIS_PORT ?? '6379', 10);
+        return {
+          connection: {
+            host,
+            port,
+            password: password || undefined,
+            maxRetriesPerRequest: null,
+          },
+        };
+      },
+    }),
     BullModule.registerQueue({
       name: SubmissionQueue.FINALIZE,
     }),
@@ -42,7 +62,6 @@ import { SubmissionQueue } from './enums/submission-event.enum';
     CallbackProcessor,
     SubmissionService,
     SubmissionsSseService,
-    SubmissionCursorService,
     StoragesService,
   ],
 })

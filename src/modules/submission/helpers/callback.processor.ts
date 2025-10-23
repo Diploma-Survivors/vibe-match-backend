@@ -88,14 +88,6 @@ export class CallbackProcessor implements OnModuleInit {
       payload,
     );
 
-    this.logger.log('Callback handled', {
-      submissionId,
-      index,
-      added,
-      received,
-      total,
-    });
-
     if (added && received >= total) {
       await this.tryLockAndScheduleFinalize(submissionId, isSubmit);
     }
@@ -105,7 +97,6 @@ export class CallbackProcessor implements OnModuleInit {
     submissionId: string,
     isSubmit: boolean,
   ): Promise<void> {
-    this.logger.log('Finalizer started', { submissionId, isSubmit });
     const metaKey = this.redisKeys.meta(submissionId);
     const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
     const seenKey = this.redisKeys.seen(submissionId);
@@ -116,24 +107,13 @@ export class CallbackProcessor implements OnModuleInit {
     await this.cleanupRedisKeys(submissionId, [metaKey, resultsIKey, seenKey]);
 
     const testResults = this.aggregateTestResults(results);
-    let finalResult: SubmissionResultDto;
+    const finalResult = await this.submissionService.buildSubmissionResult(
+      testResults,
+      +meta.problemId,
+    );
 
     if (isSubmit) {
-      finalResult =
-        await this.submissionService.buildSubmissionResultForSubmitMode(
-          testResults,
-          +meta.problemId,
-        );
-      await this.updateSubmissionEntity(
-        Number.parseInt(submissionId),
-        finalResult,
-      );
-    } else {
-      finalResult =
-        await this.submissionService.buildSubmissionResultForRunMode(
-          testResults,
-          +meta.problemId,
-        );
+      await this.updateSubmissionEntity(submissionId, finalResult);
     }
 
     await this.publishFinalize(submissionId, finalResult);
@@ -146,48 +126,31 @@ export class CallbackProcessor implements OnModuleInit {
     const lockKey = this.redisKeys.doneLock(submissionId);
     const lock = await this.redis.set(lockKey, '1', 'EX', 600, 'NX');
     if (lock === 'OK') {
-      this.logger.log(
-        `[${submissionId}] Lock acquired. Calling scheduleFinalizeJob.`,
-      );
       await this.scheduleFinalizeJob(submissionId, isSubmit);
-    } else {
-      this.logger.warn(
-        `[${submissionId}] Lock is already held, skipping finalize scheduling.`,
-      );
     }
   }
 
   private async scheduleFinalizeJob(submissionId: string, isSubmit: boolean) {
-    this.logger.log(
-      `[${submissionId}] Inside scheduleFinalizeJob. Preparing to add to queue.`,
-    );
     const jobName = isSubmit
       ? SubmissionJob.FINALIZE_SUBMIT
       : SubmissionJob.FINALIZE_RUN;
-    try {
-      await this.finalizeQueue.add(
-        jobName,
-        { submissionId },
-        {
-          jobId: `finalize-${submissionId}`, // Add a string prefix
-          attempts: this.configService.get<number>('submission.job.attempts'),
-          backoff: this.configService.get<object>(
-            'submission.job.backoff',
-          ) as BackoffOptions,
-          removeOnComplete: this.configService.get<boolean>(
-            'submission.job.removeOnComplete',
-          ),
-          removeOnFail: this.configService.get<number>(
-            'submission.job.removeOnFail',
-          ),
-        },
-      );
-    } catch (error) {
-      this.logger.error(
-        `[${submissionId}] FAILED to add job to finalizeQueue`,
-        error,
-      );
-    }
+    await this.finalizeQueue.add(
+      jobName,
+      { submissionId },
+      {
+        jobId: submissionId,
+        attempts: this.configService.get<number>('submission.job.attempts'),
+        backoff: this.configService.get<object>(
+          'submission.job.backoff',
+        ) as BackoffOptions,
+        removeOnComplete: this.configService.get<boolean>(
+          'submission.job.removeOnComplete',
+        ),
+        removeOnFail: this.configService.get<number>(
+          'submission.job.removeOnFail',
+        ),
+      },
+    );
   }
 
   private aggregateTestResults(
@@ -200,7 +163,7 @@ export class CallbackProcessor implements OnModuleInit {
   }
 
   private async updateSubmissionEntity(
-    submissionId: number,
+    submissionId: string,
     finalResult: SubmissionResultDto,
   ) {
     const savedSubmission = await this.submissionRepository.findOne({
