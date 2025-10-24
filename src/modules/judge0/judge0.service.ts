@@ -83,13 +83,19 @@ export class Judge0Service {
   async getSubmissionDetails(token: string): Promise<Judge0Response> {
     const url = `${this.judge0Url}/submissions/${token}?base64_encoded=true&fields=token,stdout,time,memory,stderr,compile_output,message,status,expected_output,stdin`;
     this.logger.log(`Fetching submission details from: ${url}`);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (this.judge0UseCe) {
+      headers['X-RapidAPI-Key'] = this.rapidKey;
+      headers['X-RapidAPI-Host'] = this.rapidHost;
+    }
+
     try {
       const response = await axios.get<Judge0Response>(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RapidAPI-Key': this.rapidKey,
-          'X-RapidAPI-Host': this.rapidHost,
-        },
+        headers,
       });
       return response.data;
     } catch (error) {
