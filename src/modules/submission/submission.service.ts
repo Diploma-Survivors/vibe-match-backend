@@ -7,10 +7,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { plainToInstance } from 'class-transformer';
 import Redis from 'ioredis';
+import { join } from 'node:path';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS } from '../../shared/redis/redis.module';
@@ -26,12 +27,17 @@ import {
 } from '../judge0/judge0.interface';
 import { Judge0Service } from '../judge0/judge0.service';
 import { Language } from '../language/entities/language.entity';
+import { Language as LanguageEnum } from '../language/enums/language.enum';
 import { Problem } from '../problems/entities/problem.entity';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { StoragesService } from '../storages/storages.service';
 import { User } from '../user/entities/user.entity';
+import { RoleEnum } from '../user/enums/role.enum';
 import { SubmissionConstants } from './constants/submission.constant';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { SubmissionDetailDto } from './dto/detail-submission.dto';
+import { ResultDescription } from './dto/result-description.dto';
+import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
 import { SubmissionResultDto } from './dto/submission.result.dto';
 import { Submission } from './entities/submission.entity';
 import {
@@ -39,12 +45,8 @@ import {
   SubmissionStatus,
 } from './enums/submission-status.enum';
 import { RedisKeys } from './helpers/redis-keys.helper';
-import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
-import { SubmissionDetailDto } from './dto/detail-submission.dto';
-import { plainToInstance } from 'class-transformer';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { CountSubmissionField } from './interfaces/count-submission-field';
-import { RoleEnum } from '../user/enums/role.enum';
-import { ResultDescription } from './dto/result-description.dto';
 
 @Injectable()
 export class SubmissionService {
@@ -138,7 +140,8 @@ export class SubmissionService {
     const language = await this.findLanguageOrFail(dto.languageId);
 
     let fileUrl: string | null = null;
-    const isMultiFile = dto.languageId === 89;
+    const isMultiFile =
+      dto.languageId === Number(LanguageEnum.MULTI_FILE_PROGRAM);
     if (isMultiFile) {
       fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
     }
@@ -448,8 +451,7 @@ export class SubmissionService {
     // const bucket = url.hostname.split('.')[0];
     // const key = url.pathname.substring(1);
 
-    const url =
-      'C:\\DiplomaSurvivors\\vibe-match-backend\\src\\modules\\submission\\testcase.txt';
+    const url = join(__dirname, 'testcase.txt'); // please add testcase.txt in nest-cli.json "assets" array to test locally which will be copied to dist/ when build
 
     const items: Judge0SubmissionPayload[] = [];
     let i = 0;
@@ -559,16 +561,21 @@ export class SubmissionService {
 
   buildTestResult(judge0Response: Judge0Response): TestResultDto {
     const stdout = Base64Util.decodeBase64(judge0Response.stdout);
+    const stderr = Base64Util.decodeBase64(judge0Response.stderr);
+    const expectedOutput = Base64Util.decodeBase64(
+      judge0Response.expected_output,
+    );
+    const stdin = Base64Util.decodeBase64(judge0Response.stdin);
 
     return {
-      stdout: stdout,
+      stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0StatusMap[judge0Response.status.id],
-      stderr: Base64Util.decodeBase64(judge0Response.stderr),
+      stderr,
       token: judge0Response.token,
-      expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
-      stdin: Base64Util.decodeBase64(judge0Response.stdin),
+      expectedOutput,
+      stdin,
     };
   }
 
@@ -611,6 +618,7 @@ export class SubmissionService {
     let sumRuntime: number = 0;
     let sumMemory: number = 0;
     let firstNonAcceptedResult: TestResultDto | null = null;
+
     for (const result of results) {
       sumRuntime += Number(result.time) || 0;
       sumMemory += Number(result.memory) || 0;
@@ -619,9 +627,7 @@ export class SubmissionService {
       } else {
         // only set the first not accepted status
         overallStatus = result.status;
-        if (firstNonAcceptedResult == null) {
-          firstNonAcceptedResult = result;
-        }
+        firstNonAcceptedResult ??= result;
       }
     }
     if (firstNonAcceptedResult != null) {
@@ -630,6 +636,7 @@ export class SubmissionService {
         problem,
       );
     }
+
     return {
       overallStatus,
       passedTests,
