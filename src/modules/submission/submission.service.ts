@@ -45,6 +45,9 @@ import { plainToInstance } from 'class-transformer';
 import { CountSubmissionField } from './interfaces/count-submission-field';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ResultDescription } from './dto/result-description.dto';
+import { TestcaseParserUtil } from './helpers/parse-test-file-util';
+import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
+import { SelectQueryBuilder } from 'typeorm/browser';
 
 @Injectable()
 export class SubmissionService {
@@ -72,6 +75,7 @@ export class SubmissionService {
     @Inject(REDIS)
     private readonly redis: Redis,
     private readonly submissionCursorService: SubmissionCursorService,
+    private readonly parser: TestcaseParserUtil,
   ) {}
 
   async run(
@@ -217,6 +221,8 @@ export class SubmissionService {
       .where('submission.problem_id = :problemId', { problemId }) // only use problem_id for join no need to innerJoinAndSelect
       .andWhere('user.id = :userId', { userId: user.userId });
 
+    this.applyFilter(queryBuilder, query.filters);
+
     const countSubmissionsField: CountSubmissionField = {
       userId: user.userId,
       problemId: problemId,
@@ -227,6 +233,44 @@ export class SubmissionService {
       query,
       countSubmissionsField,
     );
+  }
+
+  applyFilter(
+    qb: SelectQueryBuilder<Submission>,
+    query?: QuerySubmissionsFilterDto,
+  ) {
+    if (!query) return;
+    if (query.status) {
+      if (
+        query.status == SubmissionStatus.RUNTIME_ERROR ||
+        query.status == SubmissionStatus.TIME_LIMIT_EXCEEDED ||
+        query.status == SubmissionStatus.SIGABRT ||
+        query.status == SubmissionStatus.SIGFPE ||
+        query.status == SubmissionStatus.SIGSEGV ||
+        query.status == SubmissionStatus.SIGXFSZ ||
+        query.status == SubmissionStatus.NZEC
+      ) {
+        qb.andWhere('submission.status IN (:...statuses)', {
+          statuses: [
+            SubmissionStatus.RUNTIME_ERROR,
+            SubmissionStatus.TIME_LIMIT_EXCEEDED,
+            SubmissionStatus.SIGABRT,
+            SubmissionStatus.SIGFPE,
+            SubmissionStatus.SIGSEGV,
+            SubmissionStatus.SIGXFSZ,
+            SubmissionStatus.NZEC,
+          ],
+        });
+        return;
+      }
+      qb.andWhere('submission.status = :status', { status: query.status });
+    }
+
+    if (query.languageId) {
+      qb.andWhere('language.id = :languageId', {
+        languageId: query.languageId,
+      });
+    }
   }
 
   async getByContestParticipationAndProblem(
@@ -243,6 +287,8 @@ export class SubmissionService {
       .where('problem.id = :problemId', { problemId })
       .andWhere('contest.id = :contestId', { contestParticipationId })
       .andWhere('user.id = :userId', { userId: user.userId });
+
+    this.applyFilter(queryBuilder, query.filters);
 
     const countSubmissionsField: CountSubmissionField = {
       userId: user.userId,
@@ -399,61 +445,24 @@ export class SubmissionService {
     sourceBase64?: string,
     additionalFilesBase64?: string,
   ): Promise<Judge0SubmissionPayload[]> {
-    // const url = new URL(String(problem.testcase.fileUrl));
-    // const bucket = url.hostname.split('.')[0];
-    // const key = url.pathname.substring(1);
-
-    const url =
-      'C:\\DiplomaSurvivors\\vibe-match-backend\\src\\modules\\submission\\testcase.txt';
-
-    const items: Judge0SubmissionPayload[] = [];
-    let i = 0;
-    let stage: 'header' | 'index' | 'input' | 'output' = 'header';
-    let input = '';
-    let output = '';
-
-    for await (const line of this.storagesService.streamLinesLocal(url)) {
-      if (stage === 'header') {
-        // First line is totalTest → skip or validate
-        stage = 'index';
-        continue;
-      }
-
-      if (stage === 'index') {
-        // line = testcase number (ignore, we use i++)
-        stage = 'input';
-        continue;
-      }
-
-      if (stage === 'input') {
-        input = line;
-        stage = 'output';
-        continue;
-      }
-
-      if (stage === 'output') {
-        output = line;
-
-        items.push(
-          this.buildJudge0Payload(
-            dto,
-            problem,
-            submissionId,
-            i,
-            input,
-            output,
-            true,
-            sourceBase64,
-            additionalFilesBase64,
-          ),
-        );
-
-        i++;
-        stage = 'index'; // reset for next testcase
-      }
-    }
-
-    return items;
+    return this.parser.buildItemsFromProblemFile(
+      submissionId,
+      dto,
+      problem,
+      this.buildJudge0Payload.bind(this) as (
+        dto: CreateSubmissionDto,
+        problem: Problem,
+        submissionId: string,
+        index: number,
+        stdinRaw: string | undefined,
+        expectedOutput: string | undefined,
+        isSubmit: boolean,
+        sourceBase64?: string,
+        additionalFilesBase64?: string,
+      ) => Judge0SubmissionPayload,
+      sourceBase64,
+      additionalFilesBase64,
+    );
   }
 
   private buildItemsFromDto(
@@ -524,6 +533,7 @@ export class SubmissionService {
       token: judge0Response.token,
       expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
       stdin: Base64Util.decodeBase64(judge0Response.stdin),
+      compileOutput: Base64Util.decodeBase64(judge0Response.compile_output),
     };
   }
 
@@ -701,6 +711,7 @@ export class SubmissionService {
       case SubmissionStatus.COMPILATION_ERROR:
         return {
           message: `Compilation error\n ${firstNonAcceptedResult.stderr || ''}`,
+          compileOutput: firstNonAcceptedResult.compileOutput || '',
         };
       default:
         return {

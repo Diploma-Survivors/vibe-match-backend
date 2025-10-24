@@ -23,8 +23,10 @@ import { map } from 'rxjs/operators';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
 import { ApiPaginatedSubmissionsResponse } from './decorators/api-paginated-submissions.decorator';
@@ -42,6 +44,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { string } from 'joi';
 import { SubmissionDetailDto } from './dto/detail-submission.dto';
+import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -66,7 +69,7 @@ export class SubmissionController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Unauthorized',
   })
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async run(
     @Body() dto: CreateSubmissionDto,
@@ -126,6 +129,13 @@ export class SubmissionController {
   @ApiBearerAuth()
   @ApiPaginatedSubmissionsResponse()
   @UseGuards(JwtAuthGuard)
+  @ApiQuery({
+    name: 'filters',
+    required: false,
+    style: 'deepObject',
+    explode: true,
+    schema: { $ref: getSchemaPath(QuerySubmissionsFilterDto) },
+  })
   async getByProblem(
     @Param('problemId') problemId: number,
     @Query() query: SubmissionsCursorQueryDto,

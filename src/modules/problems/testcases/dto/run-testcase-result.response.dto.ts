@@ -49,4 +49,10 @@ export class TestResultDto {
     example: '3\n',
   })
   expectedOutput?: string;
+
+  @ApiProperty({
+    description: 'Compilation output',
+    example: 'Error at line 8',
+  })
+  compileOutput?: string;
 }

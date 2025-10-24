@@ -18,6 +18,7 @@ import { Contest } from '../contests/entities/contest.entity';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { SubmissionQueue } from './enums/submission-event.enum';
+import { TestcaseParserUtil } from './helpers/parse-test-file-util';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SubmissionQueue } from './enums/submission-event.enum';
     SubmissionsSseService,
     SubmissionCursorService,
     StoragesService,
+    TestcaseParserUtil,
   ],
 })
 export class SubmissionModule {}

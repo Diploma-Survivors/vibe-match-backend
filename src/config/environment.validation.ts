@@ -68,4 +68,5 @@ export default Joi.object({
   RAPIDAPI_KEY: Joi.string().required(),
   RAPIDAPI_HOST: Joi.string().required(),
   JUDGE0_USE_CE: Joi.boolean().required(),
+  USE_AWS: Joi.boolean().required(),
 });

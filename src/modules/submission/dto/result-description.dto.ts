@@ -15,6 +15,7 @@ export class ResultDescription {
   })
   @Expose()
   input?: string;
+
   @ApiProperty({
     description: 'The expected output for the given input.',
     example: '15',
@@ -28,4 +29,18 @@ export class ResultDescription {
   })
   @Expose()
   actualOutput?: string;
+
+  @ApiProperty({
+    description: 'The standard error output, if any, from the submission.',
+    example: 'Runtime Error: Division by zero.',
+  })
+  @Expose()
+  stderr?: string;
+
+  @ApiProperty({
+    description: 'Compilation output',
+    example: 'Error at line 8',
+  })
+  @Expose()
+  compileOutput?: string;
 }
