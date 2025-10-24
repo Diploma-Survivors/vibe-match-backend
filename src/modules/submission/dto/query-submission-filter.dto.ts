@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional } from 'class-validator';
 import { SubmissionStatus } from '../enums/submission-status.enum';
+import { Transform } from 'class-transformer';
 
 export class QuerySubmissionsFilterDto {
   @ApiProperty({
@@ -18,7 +18,11 @@ export class QuerySubmissionsFilterDto {
     required: false,
   })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value !== undefined && value !== null && value !== ''
+      ? Number(value)
+      : undefined,
+  )
   @IsInt()
   languageId?: number;
 }

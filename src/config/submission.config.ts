@@ -17,4 +17,5 @@ export const submissionConfig = registerAs('submission', () => ({
     removeOnComplete: process.env.JOB_REMOVE_ON_COMPLETE === 'true',
     removeOnFail: parseInt(process.env.JOB_REMOVE_ON_FAIL ?? '50', 10),
   },
+  useAWS: process.env.USE_AWS,
 }));
