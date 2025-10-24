@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 import { SubmissionStatus } from '../enums/submission-status.enum';
+import { ResultDescription } from './result-description.dto';
 
 export class SubmissionResultDto {
   @ApiProperty({
@@ -44,5 +45,12 @@ export class SubmissionResultDto {
     description: 'Results for each test case',
     type: [TestResultDto],
   })
-  results: TestResultDto[];
+  results?: TestResultDto[];
+
+  @ApiProperty({
+    description: 'Description for the submission result',
+    example: 'All test cases passed',
+    type: ResultDescription,
+  })
+  resultDescription?: ResultDescription;
 }

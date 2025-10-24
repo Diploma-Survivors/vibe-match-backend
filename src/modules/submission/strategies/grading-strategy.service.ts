@@ -1,15 +1,15 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Submission } from '../entities/submission.entity';
-import { Problem } from '../../problems/entities/problem.entity';
 import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
+import { Problem } from '../../problems/entities/problem.entity';
+import { Submission } from '../entities/submission.entity';
+import { SubmissionStrategyEnum } from '../enums/submission-strategy.enum';
 import { GradingStrategyFactory } from './grading-strategy.factory';
 import {
   StrategyContext,
   StrategyResult,
 } from './interfaces/grading-strategy.interface';
-import { SubmissionStrategyEnum } from '../enums/submission-strategy.enum';
 
 @Injectable()
 export class GradingStrategyService {
@@ -78,7 +78,7 @@ export class GradingStrategyService {
     await strategy.validateSubmission(context);
   }
 
-  async executeStrategy(submissionId: string): Promise<StrategyResult | null> {
+  async executeStrategy(submissionId: number): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
       where: { id: submissionId },
       relations: ['user', 'problem', 'ltiLaunchSession'],
@@ -119,7 +119,7 @@ export class GradingStrategyService {
     userId: number,
     problemId: number,
     ltiSessionId?: string,
-    excludeSubmissionId?: string,
+    excludeSubmissionId?: number,
   ): Promise<Submission[]> {
     const query = this.submissionRepository
       .createQueryBuilder('submission')
