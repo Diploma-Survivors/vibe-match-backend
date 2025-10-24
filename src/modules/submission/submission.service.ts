@@ -1,17 +1,14 @@
 import {
-  BadRequestException,
   HttpException,
   HttpStatus,
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
-import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS } from '../../shared/redis/redis.module';
 import { Base64Util } from '../../shared/util/base64.util';
@@ -302,6 +299,7 @@ export class SubmissionService {
       countSubmissionsField,
     );
   }
+  
 
   async submitBatch(
     submissionId: string,
@@ -537,7 +535,7 @@ export class SubmissionService {
     };
   }
 
-  async buildSubmissionResultForRunMode(
+  async buildSubmissionResult(
     results: TestResultDto[],
     problemId: number,
   ): Promise<SubmissionResultDto> {
@@ -554,7 +552,7 @@ export class SubmissionService {
       sumRuntime,
       sumMemory,
       firstNonAcceptedResult,
-    } = this.calStats(results, problem);
+    } = this.calStats(results);
     const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
@@ -569,7 +567,7 @@ export class SubmissionService {
     };
   }
 
-  calStats(results: TestResultDto[], problem: Problem) {
+  calStats(results: TestResultDto[]) {
     let overallStatus = SubmissionStatus.ACCEPTED;
     const totalTests: number = results.length;
     let passedTests: number = 0;
@@ -584,17 +582,11 @@ export class SubmissionService {
       } else {
         // only set the first not accepted status
         overallStatus = result.status;
-        if (firstNonAcceptedResult == null) {
+        if (!firstNonAcceptedResult) {
           firstNonAcceptedResult = result;
         }
       }
     }
-    if (firstNonAcceptedResult != null) {
-      firstNonAcceptedResult = this.checkIfTimeLimitExceed(
-        firstNonAcceptedResult,
-        problem,
-      );
-    }
     return {
       overallStatus,
       passedTests,
@@ -605,130 +597,37 @@ export class SubmissionService {
     };
   }
 
-  /**
-   * Builds the final result for a SUBMIT mode submission.
-   * Fetches detailed info for the first wrong answer and omits the full results array.
-   */
-  async buildSubmissionResultForSubmitMode(
-    results: TestResultDto[],
-    problemId: number,
-  ): Promise<SubmissionResultDto> {
-    const problem = await this.findProblemOrFail(problemId);
-    const {
-      overallStatus,
-      passedTests,
-      totalTests,
-      sumRuntime,
-      sumMemory,
-      firstNonAcceptedResult,
-    } = this.calStats(results, problem);
-
-    // If the first error is a Wrong Answer, fetch details to get stdin/expected_output
-    if (
-      firstNonAcceptedResult &&
-      firstNonAcceptedResult.status === SubmissionStatus.WRONG_ANSWER
-    ) {
-      this.logger.log(
-        `[Submit] Wrong answer found. Fetching details for token: ${firstNonAcceptedResult.token}`,
-      );
-      try {
-        const detailedResult = await this.judge0Service.getSubmissionDetails(
-          firstNonAcceptedResult.token,
-        );
-        // Enrich the result object with the fetched data
-        firstNonAcceptedResult.expectedOutput = Base64Util.decodeBase64(
-          detailedResult.expected_output,
-        );
-        firstNonAcceptedResult.stdin = Base64Util.decodeBase64(
-          detailedResult.stdin,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Failed to enrich submission data for token ${firstNonAcceptedResult.token}`,
-          error,
-        );
-      }
-    }
-
-    const score = (problem.maxScore * passedTests) / totalTests;
-
-    return {
-      status: overallStatus,
-      totalTests,
-      passedTests,
-      // NOTE: We do NOT include the 'results' array for submit mode
-      score: Math.round(score * 100) / 100,
-      runtime: sumRuntime,
-      memory: sumMemory,
-      resultDescription: this.generateResult(firstNonAcceptedResult),
-    };
-  }
-
-  generateResult(
-    firstNonAcceptedResult: TestResultDto | null,
-  ): ResultDescription {
+  generateResult(firstNonAcceptedResult: TestResultDto | null): string {
     if (!firstNonAcceptedResult) {
-      return {
-        message: 'All test cases passed',
-      };
+      return 'All test cases passed';
     }
     switch (firstNonAcceptedResult.status) {
       case SubmissionStatus.WRONG_ANSWER:
-        return {
-          message: 'Wrong answer',
-          input: firstNonAcceptedResult.stdin || 'N/A',
-          expectedOutput: firstNonAcceptedResult.expectedOutput || 'N/A',
-          actualOutput: firstNonAcceptedResult.stdout || 'N/A',
-        };
+        return `
+        Expected output: ${firstNonAcceptedResult.expectedOutput || 'N/A'}
+        Actual output: ${firstNonAcceptedResult.stdout || 'N/A'}
+        `;
       case SubmissionStatus.TIME_LIMIT_EXCEEDED:
-        return {
-          message: `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Time limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGSEGV:
-        return {
-          message: `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Segmentation fault\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGXFSZ:
-        return {
-          message: `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `File size limit exceeded\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGFPE:
-        return {
-          message: `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Floating point exception\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.SIGABRT:
-        return {
-          message: `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Abort signal from abort(3)\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.NZEC:
-        return {
-          message: `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Non-zero exit status\n ${firstNonAcceptedResult.stderr || ''}`;
       case SubmissionStatus.RUNTIME_ERROR:
-        return {
-          message: `Runtime error\n ${firstNonAcceptedResult.stderr || ''}`,
-        };
+        return `Runtime error: ${firstNonAcceptedResult.stderr || 'N/A'}`;
       case SubmissionStatus.COMPILATION_ERROR:
         return {
           message: `Compilation error\n ${firstNonAcceptedResult.stderr || ''}`,
           compileOutput: firstNonAcceptedResult.compileOutput || '',
         };
       default:
-        return {
-          message: 'Unknown error occurred',
-        };
+        return 'Unknown error occurred';
     }
-  }
-
-  private checkIfTimeLimitExceed(
-    testResult: TestResultDto,
-    problem: Problem,
-  ): TestResultDto {
-    if (testResult.status === SubmissionStatus.RUNTIME_ERROR) {
-      if (testResult.time > problem.timeLimitMs) {
-        testResult.status = SubmissionStatus.TIME_LIMIT_EXCEEDED;
-      }
-    }
-    return testResult;
   }
 }
