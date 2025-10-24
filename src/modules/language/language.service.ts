@@ -6,9 +6,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Language } from './entities/language.entity';
 
-// Relative imports
+// Shared/Common
 import { CACHE_TTL } from 'src/common/constants/cache.constants';
 import { Cacheable } from 'src/common/decorators/cacheable.decorator';
+
+// Relative imports
 import { Language } from './entities/language.entity';
 
 @Injectable()
