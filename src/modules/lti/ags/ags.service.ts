@@ -195,7 +195,7 @@ export class AgsService {
   async sendGradeForSubmission(submissionId: string): Promise<boolean> {
     try {
       const submission = await this.submissionRepository.findOne({
-        where: { id: Number.parseInt(submissionId) },
+        where: { id: submissionId },
         relations: ['ltiLaunchSession', 'problem', 'user'],
       });
 

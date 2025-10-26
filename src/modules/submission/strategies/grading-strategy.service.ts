@@ -80,7 +80,7 @@ export class GradingStrategyService {
 
   async executeStrategy(submissionId: string): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
-      where: { id: Number.parseInt(submissionId) },
+      where: { id: submissionId },
       relations: ['user', 'problem', 'ltiLaunchSession'],
     });
 
@@ -98,7 +98,7 @@ export class GradingStrategyService {
       submission.user.id,
       submission.problem.id,
       submission.ltiLaunchSession?.id,
-      submission.id.toString(),
+      submission.id,
     );
 
     const context: StrategyContext = {
@@ -143,7 +143,7 @@ export class GradingStrategyService {
 
     if (excludeSubmissionId) {
       query.andWhere('submission.id != :excludeSubmissionId', {
-        excludeSubmissionId: Number.parseInt(excludeSubmissionId),
+        excludeSubmissionId,
       });
     }
 

@@ -289,7 +289,7 @@ export class CallbackProcessor implements OnModuleInit {
   ): Promise<void> {
     try {
       const submission = await this.submissionRepository.findOne({
-        where: { id: Number.parseInt(submissionId) },
+        where: { id: submissionId },
         relations: ['ltiLaunchSession', 'problem'],
       });
 
