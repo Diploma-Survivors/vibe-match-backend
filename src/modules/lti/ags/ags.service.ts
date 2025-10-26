@@ -5,7 +5,6 @@ import axios, { AxiosError } from 'axios';
 import * as jose from 'jose';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { Problem } from '../../problems/entities/problem.entity';
 import { Submission } from '../../submission/entities/submission.entity';
 import { GradingStrategyService } from '../../submission/strategies/grading-strategy.service';
 import { KeysService } from '../keys.service';
@@ -29,8 +28,6 @@ export class AgsService {
     private readonly gradingStrategyService: GradingStrategyService,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
-    @InjectRepository(Problem)
-    private readonly problemRepository: Repository<Problem>,
   ) {}
 
   async generateClientAssertionJwt(): Promise<string> {
@@ -228,18 +225,6 @@ export class AgsService {
         return false;
       }
 
-      const problem =
-        (await this.problemRepository.findOne({
-          where: { id: submission.problem.id },
-        })) ?? null;
-
-      if (!problem) {
-        this.logger.warn(
-          `Problem ${submission.problem.id} not found for submission ${submissionId}`,
-        );
-        return false;
-      }
-
       const strategyResult =
         await this.gradingStrategyService.executeStrategy(submissionId);
 
@@ -253,7 +238,7 @@ export class AgsService {
       const scoreDto: SendScoreDto = {
         userId: session.ltiUserId,
         scoreGiven: strategyResult.scoreToSend,
-        scoreMaximum: problem.maxScore,
+        scoreMaximum: submission.problem.maxScore,
         comment: strategyResult.comment,
         timestamp: new Date().toISOString(),
         activityProgress: AgsActivityProgress.COMPLETED,

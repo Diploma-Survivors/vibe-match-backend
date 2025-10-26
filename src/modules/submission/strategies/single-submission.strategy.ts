@@ -10,15 +10,13 @@ import { StrategyContext } from './interfaces/grading-strategy.interface';
  */
 @Injectable()
 export class SingleSubmissionStrategy extends BaseGradingStrategy {
+  readonly MAXIMUM_SUBMISSIONS = 1;
   // eslint-disable-next-line @typescript-eslint/require-await
   async validateSubmission(context: StrategyContext): Promise<void> {
-    const { previousSubmissions, problem } = context;
-
-    const maxAttempts = problem.maxAttempts ?? 1;
-
-    if (previousSubmissions.length >= maxAttempts) {
+    const { previousSubmissions } = context;
+    if (previousSubmissions.length >= this.MAXIMUM_SUBMISSIONS) {
       throw new ForbiddenException(
-        `You have already submitted a solution. Only ${maxAttempts} submission is allowed for this problem.`,
+        `You have already submitted a solution. Only ${this.MAXIMUM_SUBMISSIONS} submission is allowed for this problem.`,
       );
     }
   }

@@ -6,7 +6,6 @@ import { UserModule } from '../../modules/user/user.module';
 import { RedisModule } from '../../shared/redis/redis.module';
 import { ContestsModule } from '../contests/contests.module';
 import { CourseModule } from '../course/course.module';
-import { Problem } from '../problems/entities/problem.entity';
 import { ProblemsModule } from '../problems/problems.module';
 import { Submission } from '../submission/entities/submission.entity';
 import { SubmissionModule } from '../submission/submission.module';
@@ -19,7 +18,7 @@ import { LtiService } from './lti.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([LtiLaunchSession, Submission, Problem]),
+    TypeOrmModule.forFeature([LtiLaunchSession, Submission]),
     UserModule,
     AuthModule,
     RedisModule,
