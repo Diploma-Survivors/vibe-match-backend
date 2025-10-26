@@ -10,6 +10,7 @@ import { CallbackProcessor } from './helpers/callback.processor';
 import { SubmissionFinalizeProcessor } from './events/submission-finalizer.processor';
 import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
+import { ConfigService } from '@nestjs/config';
 import { Language } from '../language/entities/language.entity';
 import { User } from '../user/entities/user.entity';
 import { StoragesService } from '../storages/storages.service';
@@ -25,7 +26,6 @@ import { SingleSubmissionStrategy } from './strategies/single-submission.strateg
 import { BestScoreStrategy } from './strategies/best-score.strategy';
 import { LatestScoreStrategy } from './strategies/latest-score.strategy';
 import { AverageScoreStrategy } from './strategies/average-score.strategy';
-import { SubmissionCursorService } from './helpers/submission-cursor.service';
 
 @Module({
   imports: [
@@ -41,6 +41,26 @@ import { SubmissionCursorService } from './helpers/submission-cursor.service';
     Judge0Module,
     RedisModule,
     forwardRef(() => LtiModule),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('redis.host');
+        const portFromConfig = config.get<number>('redis.port');
+        const password = config.get<string>('redis.password');
+
+        const port = Number.isInteger(portFromConfig)
+          ? portFromConfig!
+          : Number.parseInt(process.env.REDIS_PORT ?? '6379', 10);
+        return {
+          connection: {
+            host,
+            port,
+            password: password || undefined,
+            maxRetriesPerRequest: null,
+          },
+        };
+      },
+    }),
     BullModule.registerQueue({
       name: SubmissionQueue.FINALIZE,
     }),
@@ -52,7 +72,6 @@ import { SubmissionCursorService } from './helpers/submission-cursor.service';
     CallbackProcessor,
     SubmissionService,
     SubmissionsSseService,
-    SubmissionCursorService,
     StoragesService,
     GradingStrategyService,
     GradingStrategyFactory,
