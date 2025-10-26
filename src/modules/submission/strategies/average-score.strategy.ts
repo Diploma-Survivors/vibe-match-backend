@@ -31,30 +31,15 @@ export class AverageScoreStrategy extends BaseGradingStrategy {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async calculateScore(context: StrategyContext): Promise<number> {
-    const { submission, previousSubmissions } = context;
-
-    const allScores = [
-      ...previousSubmissions.map((s) => s.score),
-      submission.score,
-    ];
-
-    const sum = allScores.reduce((total, score) => total + score, 0);
-    const average = sum / allScores.length;
-
-    return Math.round(average * 100) / 100;
+    return this.computeAverage(context);
   }
 
   getComment(context: StrategyContext): string {
-    const { submission, previousSubmissions, problem } = context;
+    const { previousSubmissions, problem } = context;
     const attemptNumber = previousSubmissions.length + 1;
 
-    const allScores = [
-      ...previousSubmissions.map((s) => s.score),
-      submission.score,
-    ];
-
-    const sum = allScores.reduce((total, score) => total + score, 0);
-    const average = Math.round((sum / allScores.length) * 100) / 100;
+    const allScores = this.getAllScores(context);
+    const average = this.computeAverage(context);
     const baseComment = super.getComment(context);
 
     return [
@@ -64,5 +49,17 @@ export class AverageScoreStrategy extends BaseGradingStrategy {
       '',
       baseComment,
     ].join('\n');
+  }
+
+  private getAllScores(context: StrategyContext): number[] {
+    const { submission, previousSubmissions } = context;
+    return [...previousSubmissions.map((s) => s.score), submission.score];
+  }
+
+  private computeAverage(context: StrategyContext): number {
+    const allScores = this.getAllScores(context);
+    const sum = allScores.reduce((total, score) => total + score, 0);
+    const average = sum / allScores.length;
+    return Math.round(average * 100) / 100;
   }
 }
