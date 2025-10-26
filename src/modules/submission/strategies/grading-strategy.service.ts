@@ -114,7 +114,7 @@ export class GradingStrategyService {
 
     if (excludeSubmissionId) {
       query.andWhere('submission.id != :excludeSubmissionId', {
-        excludeSubmissionId: Number.parseInt(excludeSubmissionId),
+        excludeSubmissionId,
       });
     }
 

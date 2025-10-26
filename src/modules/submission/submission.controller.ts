@@ -10,6 +10,7 @@ import {
   Query,
   Sse,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -22,6 +23,7 @@ import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SubmissionConstants } from './constants/submission.constant';
 import * as judge0Interface from '../judge0/judge0.interface';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
@@ -50,6 +52,7 @@ export class SubmissionController {
   }
 
   @Post('submit')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async submit(
     @Body() dto: CreateSubmissionDto,
