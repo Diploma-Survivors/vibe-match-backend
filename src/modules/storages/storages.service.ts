@@ -73,11 +73,17 @@ export class StoragesService {
       if (!key) throw new Error('Missing S3 key');
       const command = new GetObjectCommand({ Bucket: bucketOrPath, Key: key });
       const response = await this.client.send(command);
-      const chunks: Buffer[] = [];
-      for await (const chunk of response.Body as any) chunks.push(chunk);
+
+      const chunks: Uint8Array[] = [];
+      const body = response.Body as unknown as AsyncIterable<Uint8Array>;
+      for await (const chunk of body) {
+        chunks.push(chunk);
+      }
+
       return Buffer.concat(chunks);
     }
 
+    // local
     return fs.readFile(bucketOrPath);
   }
 
