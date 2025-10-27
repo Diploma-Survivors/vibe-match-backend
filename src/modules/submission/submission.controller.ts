@@ -2,10 +2,7 @@ import {
   Body,
   ClassSerializerInterceptor,
   Controller,
-  Get,
   HttpCode,
-  HttpStatus,
-  Logger,
   MessageEvent,
   Param,
   Post,
@@ -13,7 +10,6 @@ import {
   Query,
   Sse,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -34,8 +30,10 @@ import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SubmissionConstants } from './constants/submission.constant';
 import * as judge0Interface from '../judge0/judge0.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
 import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
@@ -50,7 +48,6 @@ import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
 @Controller('submissions')
 @UseInterceptors(ClassSerializerInterceptor)
 export class SubmissionController {
-  logger = new Logger(SubmissionController.name);
   constructor(
     private readonly submissionService: SubmissionService,
     private readonly submissionsSseService: SubmissionsSseService,
@@ -79,17 +76,6 @@ export class SubmissionController {
   }
 
   @Post('submit')
-  @ApiResponse({
-    type: () => string,
-    status: HttpStatus.OK,
-    description: 'Code has been submitted successfully.',
-  })
-  @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Unauthorized',
-  })
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async submit(
     @Body() dto: CreateSubmissionDto,
@@ -201,9 +187,7 @@ export class SubmissionController {
     this.submissionCallbackProcessor
       .handleCallback(submissionId, Number(tcid), result, false)
       .catch(() => {
-        this.logger.error(
-          'Failed to process run callback for submission ' + submissionId,
-        );
+        /* processor logs errors */
       });
   }
 
