@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { REDIS } from '../../../shared/redis/redis.module';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Judge0Response } from '../../judge0/judge0.interface';
+import { AgsService } from '../../lti/ags/ags.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 import { SubmissionConstants } from '../constants/submission.constant';
 import { SubmissionResultDto } from '../dto/submission.result.dto';
@@ -66,6 +67,7 @@ export class CallbackProcessor implements OnModuleInit {
     @InjectRepository(ContestParticipation)
     private readonly contestParticipationRepository: Repository<ContestParticipation>,
     private readonly configService: ConfigService,
+    private readonly agsService: AgsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -117,6 +119,11 @@ export class CallbackProcessor implements OnModuleInit {
     }
 
     await this.publishFinalize(submissionId, finalResult);
+
+    // Send grade to Moodle
+    if (isSubmit) {
+      await this.sendGradeToMoodleIfApplicable(submissionId);
+    }
   }
 
   private async tryLockAndScheduleFinalize(
@@ -275,5 +282,52 @@ export class CallbackProcessor implements OnModuleInit {
       JSON.stringify({ submissionId, payload }),
     );
     this.logger.log(`Published finalize for ${submissionId}`);
+  }
+
+  private async sendGradeToMoodleIfApplicable(
+    submissionId: string,
+  ): Promise<void> {
+    try {
+      const submission = await this.submissionRepository.findOne({
+        where: { id: submissionId },
+        relations: ['ltiLaunchSession', 'problem'],
+      });
+
+      if (!submission?.ltiLaunchSession) {
+        this.logger.debug(
+          `Submission ${submissionId} has no LTI context, skip AGS`,
+        );
+        return;
+      }
+
+      if (submission.agsGradeSent) {
+        this.logger.warn(`Grade already sent for submission ${submissionId}`);
+        return;
+      }
+
+      if (new Date() > submission.ltiLaunchSession.expiresAt) {
+        this.logger.warn(`LTI session expired for submission ${submissionId}`);
+        return;
+      }
+
+      const success =
+        await this.agsService.sendGradeForSubmission(submissionId);
+
+      if (success) {
+        submission.agsGradeSent = true;
+        submission.agsGradeSentAt = new Date();
+        await this.submissionRepository.save(submission);
+        this.logger.log(`Grade sent to Moodle for submission ${submissionId}`);
+      }
+    } catch (error) {
+      // Log error but don't throw - grade passback failure shouldn't break submission
+      this.logger.error(
+        `Failed to send grade to Moodle for submission ${submissionId}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.submissionRepository.update(submissionId, {
+        agsError: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }

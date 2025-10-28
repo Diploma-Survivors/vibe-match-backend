@@ -15,7 +15,9 @@ import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
 import { Contest } from '../contests/entities/contest.entity';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import {
   Judge0BatchResponse,
   Judge0Response,
@@ -60,6 +62,7 @@ export class SubmissionService {
     private readonly storagesService: StoragesService,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
+    private readonly gradingStrategyService: GradingStrategyService,
     @Inject(REDIS)
     private readonly redis: Redis,
     @InjectDataSource()
@@ -84,6 +87,13 @@ export class SubmissionService {
     const savedUser = await this.findUserOrFail(user.userId);
     const language = await this.findLanguageOrFail(dto.languageId);
 
+    // Validate submission against problem's strategy
+    await this.gradingStrategyService.validateSubmission(
+      user.userId,
+      dto.problemId,
+      user.ltiSessionId,
+    );
+
     let fileUrl: string | null = null;
     const isMultiFile = dto.languageId === 89;
     if (isMultiFile) {
@@ -97,6 +107,9 @@ export class SubmissionService {
         problem,
         language,
         fileUrl,
+        ltiLaunchSession: user.ltiSessionId
+          ? ({ id: user.ltiSessionId } as LtiLaunchSession)
+          : null,
       }),
     );
 
@@ -366,11 +379,7 @@ export class SubmissionService {
     sourceBase64?: string,
     additionalFilesBase64?: string,
   ): Promise<Judge0SubmissionPayload[]> {
-    // const url = new URL(String(problem.testcase.fileUrl));
-    // const bucket = url.hostname.split('.')[0];
-    // const key = url.pathname.substring(1);
-
-    const url = './testcase.txt';
+    const url = 'src/modules/submission/testcase.txt';
 
     const items: Judge0SubmissionPayload[] = [];
     let i = 0;
@@ -539,9 +548,7 @@ export class SubmissionService {
       } else {
         // only set the first not accepted status
         overallStatus = result.status;
-        if (!firstNonAcceptedResult) {
-          firstNonAcceptedResult = result;
-        }
+        firstNonAcceptedResult ??= result;
       }
     }
     return {

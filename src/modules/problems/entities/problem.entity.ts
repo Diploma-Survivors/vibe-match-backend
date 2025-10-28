@@ -14,6 +14,7 @@ import {
 } from 'typeorm';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
+import { SubmissionStrategyEnum } from '../../submission/enums/submission-strategy.enum';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
 import { CourseProblem } from './course-problem.entity';
@@ -100,6 +101,29 @@ export class Problem {
     nullable: true,
   })
   contestProblems: ContestProblem[] | null;
+
+  @Column({
+    type: 'enum',
+    enum: SubmissionStrategyEnum,
+    default: SubmissionStrategyEnum.BEST_SCORE,
+    name: 'submission_strategy',
+  })
+  submissionStrategy: SubmissionStrategyEnum;
+
+  //NULL = unlimited attempts
+  @Column({
+    name: 'max_attempts',
+    type: 'int',
+    nullable: true,
+  })
+  maxAttempts: number | null;
+
+  @Column({
+    name: 'show_submission_count',
+    type: 'boolean',
+    default: true,
+  })
+  showSubmissionCount: boolean;
 
   @CreateDateColumn({
     name: 'created_at',

@@ -50,4 +50,15 @@ export const ltiConfig = registerAs('lti', () => ({
       process.env.LTI_FRONTEND_INSTRUCTOR_SET_COOKIES_URL ||
       'http://localhost:3002/api/proxy/signin',
   },
+  ags: {
+    tokenExpiryBuffer: Number.parseInt(
+      process.env.LTI_AGS_TOKEN_EXPIRY_BUFFER || '60',
+    ), // Request new token 60s before expiry
+    requestTimeout: Number.parseInt(
+      process.env.LTI_AGS_REQUEST_TIMEOUT || '10000',
+    ), // 10 seconds
+    retryAttempts: Number.parseInt(process.env.LTI_AGS_RETRY_ATTEMPTS || '3'),
+    retryDelay: Number.parseInt(process.env.LTI_AGS_RETRY_DELAY || '2000'), // 2 seconds
+    sessionTtl: Number.parseInt(process.env.LTI_AGS_SESSION_TTL || '86400'), // 24 hours
+  },
 }));

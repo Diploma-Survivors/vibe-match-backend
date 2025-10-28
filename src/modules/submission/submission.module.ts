@@ -14,10 +14,18 @@ import { ConfigService } from '@nestjs/config';
 import { Language } from '../language/entities/language.entity';
 import { User } from '../user/entities/user.entity';
 import { StoragesService } from '../storages/storages.service';
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SubmissionQueue } from './enums/submission-event.enum';
 import { Contest } from '../contests/entities/contest.entity';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { LtiModule } from '../lti/lti.module';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
+import { GradingStrategyFactory } from './strategies/grading-strategy.factory';
+import { SingleSubmissionStrategy } from './strategies/single-submission.strategy';
+import { BestScoreStrategy } from './strategies/best-score.strategy';
+import { LatestScoreStrategy } from './strategies/latest-score.strategy';
+import { AverageScoreStrategy } from './strategies/average-score.strategy';
 
 @Module({
   imports: [
@@ -28,9 +36,11 @@ import { ContestParticipation } from '../contests/entities/contest-participation
       User,
       Contest,
       ContestParticipation,
+      LtiLaunchSession,
     ]),
     Judge0Module,
     RedisModule,
+    forwardRef(() => LtiModule),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
@@ -40,7 +50,7 @@ import { ContestParticipation } from '../contests/entities/contest-participation
 
         const port = Number.isInteger(portFromConfig)
           ? portFromConfig!
-          : parseInt(process.env.REDIS_PORT ?? '6379', 10);
+          : Number.parseInt(process.env.REDIS_PORT ?? '6379', 10);
         return {
           connection: {
             host,
@@ -63,6 +73,13 @@ import { ContestParticipation } from '../contests/entities/contest-participation
     SubmissionService,
     SubmissionsSseService,
     StoragesService,
+    GradingStrategyService,
+    GradingStrategyFactory,
+    SingleSubmissionStrategy,
+    BestScoreStrategy,
+    LatestScoreStrategy,
+    AverageScoreStrategy,
   ],
+  exports: [GradingStrategyService],
 })
 export class SubmissionModule {}
