@@ -13,6 +13,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
+import { ProblemStatus } from '../enums/problem-status.enum';
 import { ProblemType } from '../enums/problem-type.enum';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
@@ -64,6 +65,13 @@ export class Problem {
     enum: ProblemType,
   })
   type: ProblemType;
+
+  @Column('enum', {
+    name: 'status',
+    enum: ProblemStatus,
+    default: ProblemStatus.PRIVATE,
+  })
+  status: ProblemStatus;
 
   @OneToMany(() => CourseProblem, (courseProblem) => courseProblem.problem, {
     cascade: true,

@@ -2,6 +2,7 @@ import { BadRequestException, Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, plainToInstance, Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEnum,
   IsInt,
@@ -118,9 +119,13 @@ export class CreateProblemDto {
     type: 'array',
     items: { type: 'int' },
     name: 'tagIds',
+    maxItems: 4,
   })
   @JsonArrayTransform('tagIds')
   @IsArray()
+  @ArrayMaxSize(4, {
+    message: 'A maximum of 4 tags can be associated with a problem',
+  })
   @IsInt({ each: true })
   @Expose({ name: 'tagIds' })
   tags: number[];
@@ -131,9 +136,13 @@ export class CreateProblemDto {
     type: 'array',
     items: { type: 'int' },
     name: 'topicIds',
+    maxItems: 3,
   })
   @JsonArrayTransform('topicIds')
   @IsArray()
+  @ArrayMaxSize(3, {
+    message: 'A maximum of 3 topics can be associated with a problem',
+  })
   @IsInt({ each: true })
   @Expose({ name: 'topicIds' })
   topics: number[];

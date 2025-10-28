@@ -11,7 +11,6 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import Redis from 'ioredis';
-import { join } from 'node:path';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS } from '../../shared/redis/redis.module';
@@ -447,11 +446,7 @@ export class SubmissionService {
     sourceBase64?: string,
     additionalFilesBase64?: string,
   ): Promise<Judge0SubmissionPayload[]> {
-    // const url = new URL(String(problem.testcase.fileUrl));
-    // const bucket = url.hostname.split('.')[0];
-    // const key = url.pathname.substring(1);
-
-    const url = join(__dirname, 'testcase.txt'); // please add testcase.txt in nest-cli.json "assets" array to test locally which will be copied to dist/ when build
+    const url = 'src/modules/submission/testcase.txt';
 
     const items: Judge0SubmissionPayload[] = [];
     let i = 0;
@@ -561,21 +556,15 @@ export class SubmissionService {
 
   buildTestResult(judge0Response: Judge0Response): TestResultDto {
     const stdout = Base64Util.decodeBase64(judge0Response.stdout);
-    const stderr = Base64Util.decodeBase64(judge0Response.stderr);
-    const expectedOutput = Base64Util.decodeBase64(
-      judge0Response.expected_output,
-    );
-    const stdin = Base64Util.decodeBase64(judge0Response.stdin);
 
     return {
-      stdout,
+      stdout: stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0StatusMap[judge0Response.status.id],
-      stderr,
+      stderr: Base64Util.decodeBase64(judge0Response.stderr),
       token: judge0Response.token,
-      expectedOutput,
-      stdin,
+      expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
     };
   }
 
@@ -618,7 +607,6 @@ export class SubmissionService {
     let sumRuntime: number = 0;
     let sumMemory: number = 0;
     let firstNonAcceptedResult: TestResultDto | null = null;
-
     for (const result of results) {
       sumRuntime += Number(result.time) || 0;
       sumMemory += Number(result.memory) || 0;
