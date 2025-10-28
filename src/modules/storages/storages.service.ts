@@ -86,7 +86,6 @@ export class StoragesService {
       return Buffer.concat(chunks);
     }
 
-    // local
     return fs.readFile(bucketOrPath);
   }
 
