@@ -4,7 +4,6 @@ import { IsEnum, IsOptional, ValidateNested } from 'class-validator';
 import { PaginationCursorDto } from '../../../common/pagination/dtos/pagination-cursor.dto';
 import { SortOrder } from '../../../common/pagination/enums/sort-order.enum';
 import { QuerySubmissionsFilterDto } from './query-submission-filter.dto';
-import { SortBy } from '../enums/submission-search.enum';
 
 export class SubmissionsCursorQueryDto extends PaginationCursorDto {
   @ApiProperty({
@@ -17,16 +16,7 @@ export class SubmissionsCursorQueryDto extends PaginationCursorDto {
   @IsEnum(SortOrder)
   sortOrder: SortOrder = SortOrder.DESC;
 
-  @ApiProperty({
-    enum: SortBy,
-    default: SortBy.CREATED_AT,
-    description: 'Field to sort by',
-    example: SortBy.CREATED_AT,
-    required: false,
-  })
-  @IsOptional()
-  @IsEnum(SortBy)
-  sortBy: SortBy = SortBy.CREATED_AT;
+  readonly sortBy = 'createdAt';
 
   @ApiProperty({
     type: () => QuerySubmissionsFilterDto,

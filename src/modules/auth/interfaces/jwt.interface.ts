@@ -10,4 +10,5 @@ export interface JwtPayload extends JoseJwtPayload {
   roles: RoleEnum[];
   sub?: string;
   iss?: string;
+  ltiSessionId?: string;
 }

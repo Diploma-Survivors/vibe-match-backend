@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Language } from '../../language/entities/language.entity';
+import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
@@ -18,8 +19,8 @@ import { ResultDescription } from '../dto/result-description.dto';
 @Index('idx_submission_user', ['user']) // search submissions by user
 @Index('idx_submission_contest_problem', ['contestParticipation', 'problem']) // search submisisons of 1 user in a contest participation by problem
 export class Submission {
-  @PrimaryGeneratedColumn('increment', { name: 'submission_id' })
-  id: number;
+  @PrimaryGeneratedColumn('uuid', { name: 'submission_id' })
+  id: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
@@ -81,4 +82,17 @@ export class Submission {
     nullable: true,
   })
   resultDescription: ResultDescription;
+
+  @ManyToOne(() => LtiLaunchSession, { nullable: true })
+  @JoinColumn({ name: 'lti_launch_session_id' })
+  ltiLaunchSession: LtiLaunchSession | null;
+
+  @Column({ name: 'ags_grade_sent', type: 'boolean', default: false })
+  agsGradeSent: boolean;
+
+  @Column({ name: 'ags_grade_sent_at', type: 'timestamp', nullable: true })
+  agsGradeSentAt: Date | null;
+
+  @Column({ name: 'ags_error', type: 'text', nullable: true })
+  agsError: string | null;
 }
