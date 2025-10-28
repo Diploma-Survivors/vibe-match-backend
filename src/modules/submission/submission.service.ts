@@ -381,7 +381,7 @@ export class SubmissionService {
     );
 
     return {
-      stdout,
+      stdout: stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0StatusMap[judge0Response.status.id],
@@ -423,7 +423,6 @@ export class SubmissionService {
     let sumRuntime: number = 0;
     let sumMemory: number = 0;
     let firstNonAcceptedResult: TestResultDto | null = null;
-
     for (const result of results) {
       sumRuntime += Number(result.time) || 0;
       sumMemory += Number(result.memory) || 0;
