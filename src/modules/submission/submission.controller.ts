@@ -50,6 +50,7 @@ import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
 @Controller('submissions')
 @UseInterceptors(ClassSerializerInterceptor)
 export class SubmissionController {
+  logger = new Logger(SubmissionController.name);
   constructor(
     private readonly submissionService: SubmissionService,
     private readonly submissionsSseService: SubmissionsSseService,
@@ -78,6 +79,16 @@ export class SubmissionController {
   }
 
   @Post('submit')
+  @ApiResponse({
+    type: () => string,
+    status: HttpStatus.OK,
+    description: 'Code has been submitted successfully.',
+  })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async submit(
@@ -190,7 +201,9 @@ export class SubmissionController {
     this.submissionCallbackProcessor
       .handleCallback(submissionId, Number(tcid), result, false)
       .catch(() => {
-        /* processor logs errors */
+        this.logger.error(
+          'Failed to process run callback for submission ' + submissionId,
+        );
       });
   }
 
