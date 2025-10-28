@@ -2,7 +2,10 @@ import {
   Body,
   ClassSerializerInterceptor,
   Controller,
+  Get,
   HttpCode,
+  HttpStatus,
+  Logger,
   MessageEvent,
   Param,
   Post,
@@ -31,11 +34,8 @@ import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SubmissionConstants } from './constants/submission.constant';
 import * as judge0Interface from '../judge0/judge0.interface';
-import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
 import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
