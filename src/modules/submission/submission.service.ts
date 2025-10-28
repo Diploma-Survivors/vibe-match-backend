@@ -1,23 +1,24 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { ConfigService } from '@nestjs/config';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { REDIS } from '../../shared/redis/redis.module';
 import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
-import { GradingStrategyService } from './strategies/grading-strategy.service';
 import { Contest } from '../contests/entities/contest.entity';
-import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import {
   Judge0BatchResponse,
   Judge0Response,
@@ -47,6 +48,9 @@ import { ResultDescription } from './dto/result-description.dto';
 import { TestcaseParserUtil } from './helpers/parse-test-file-util';
 import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
 import { SelectQueryBuilder } from 'typeorm/browser';
+import { TimeUtil } from '../../shared/util/time.util';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 
 @Injectable()
 export class SubmissionService {
