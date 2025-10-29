@@ -10,10 +10,10 @@ import {
   encodeCursor,
 } from '../../../common/utils/cursor-query.util';
 import { Submission } from '../entities/submission.entity';
-import { SubmissionCursorFieldsDto } from '../dto/submission-cursor-fields.dto';
 import { SubmissionsCursorQueryDto } from '../dto/submission-cursor-query.dto';
 import { SubmissionInListDto } from '../dto/get-submissions-response.dto';
 import { CountSubmissionField } from '../interfaces/count-submission-field';
+import { SubmissionCursorFieldsDto } from '../dto/submission-cursor-fields.dto';
 
 @Injectable()
 export class SubmissionCursorService {

@@ -52,5 +52,5 @@ export class SubmissionResultDto {
     example: 'All test cases passed',
     type: ResultDescription,
   })
-  resultDescription: ResultDescription;
+  resultDescription?: ResultDescription;
 }

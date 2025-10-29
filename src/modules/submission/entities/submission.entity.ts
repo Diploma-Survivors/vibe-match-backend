@@ -13,6 +13,7 @@ import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
 import { ResultDescription } from '../dto/result-description.dto';
+import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 
 @Entity()
 @Index('idx_submission_user', ['user']) // search submissions by user
@@ -81,4 +82,17 @@ export class Submission {
     nullable: true,
   })
   resultDescription: ResultDescription;
+
+  @ManyToOne(() => LtiLaunchSession, { nullable: true })
+  @JoinColumn({ name: 'lti_launch_session_id' })
+  ltiLaunchSession: LtiLaunchSession | null;
+
+  @Column({ name: 'ags_grade_sent', type: 'boolean', default: false })
+  agsGradeSent: boolean;
+
+  @Column({ name: 'ags_grade_sent_at', type: 'timestamp', nullable: true })
+  agsGradeSentAt: Date | null;
+
+  @Column({ name: 'ags_error', type: 'text', nullable: true })
+  agsError: string | null;
 }

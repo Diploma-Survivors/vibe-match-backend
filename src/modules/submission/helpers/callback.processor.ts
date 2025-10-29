@@ -15,6 +15,7 @@ import { Submission } from '../entities/submission.entity';
 import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
 import { SubmissionService } from '../submission.service';
 import { RedisKeys } from './redis-keys.helper';
+import { AgsService } from '../../lti/ags/ags.service';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
@@ -66,6 +67,7 @@ export class CallbackProcessor implements OnModuleInit {
     @InjectRepository(ContestParticipation)
     private readonly contestParticipationRepository: Repository<ContestParticipation>,
     private readonly configService: ConfigService,
+    private readonly agsService: AgsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -105,38 +107,55 @@ export class CallbackProcessor implements OnModuleInit {
     submissionId: string,
     isSubmit: boolean,
   ): Promise<void> {
-    this.logger.log('Finalizer started', { submissionId, isSubmit });
-    const metaKey = this.redisKeys.meta(submissionId);
-    const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
-    const seenKey = this.redisKeys.seen(submissionId);
+    try {
+      this.logger.log('Finalizer started', { submissionId, isSubmit });
 
-    const meta = await this.redis.hgetall(metaKey);
-    const results = await this.redis.hgetall(resultsIKey);
+      const metaKey = this.redisKeys.meta(submissionId);
+      const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
+      const seenKey = this.redisKeys.seen(submissionId);
 
-    await this.cleanupRedisKeys(submissionId, [metaKey, resultsIKey, seenKey]);
+      const meta = await this.redis.hgetall(metaKey);
+      const results = await this.redis.hgetall(resultsIKey);
 
-    const testResults = this.aggregateTestResults(results);
-    let finalResult: SubmissionResultDto;
+      await this.cleanupRedisKeys(submissionId, [
+        metaKey,
+        resultsIKey,
+        seenKey,
+      ]);
 
-    if (isSubmit) {
-      finalResult =
-        await this.submissionService.buildSubmissionResultForSubmitMode(
-          testResults,
-          +meta.problemId,
+      const testResults = this.aggregateTestResults(results);
+      let finalResult: SubmissionResultDto;
+
+      if (isSubmit) {
+        finalResult =
+          await this.submissionService.buildSubmissionResultForSubmitMode(
+            testResults,
+            +meta.problemId,
+          );
+        await this.updateSubmissionEntity(
+          Number.parseInt(submissionId),
+          finalResult,
         );
-      await this.updateSubmissionEntity(
-        Number.parseInt(submissionId),
-        finalResult,
-      );
-    } else {
-      finalResult =
-        await this.submissionService.buildSubmissionResultForRunMode(
-          testResults,
-          +meta.problemId,
-        );
+      } else {
+        finalResult =
+          await this.submissionService.buildSubmissionResultForRunMode(
+            testResults,
+            +meta.problemId,
+          );
+      }
+
+      await this.publishFinalize(submissionId, finalResult);
+
+      if (isSubmit) {
+        await this.sendGradeToMoodleIfApplicable(parseInt(submissionId));
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(`Finalizer failed: ${error.message}`, error.stack);
+      } else {
+        this.logger.error('Finalizer failed with unknown error', error);
+      }
     }
-
-    await this.publishFinalize(submissionId, finalResult);
   }
 
   private async tryLockAndScheduleFinalize(
@@ -214,7 +233,7 @@ export class CallbackProcessor implements OnModuleInit {
     savedSubmission.passedTests = finalResult.passedTests;
     savedSubmission.runtime = finalResult.runtime;
     savedSubmission.memory = finalResult.memory;
-    savedSubmission.resultDescription = finalResult.resultDescription;
+    savedSubmission.resultDescription = finalResult.resultDescription!;
 
     await this.submissionRepository.save(savedSubmission);
   }
@@ -313,5 +332,52 @@ export class CallbackProcessor implements OnModuleInit {
       JSON.stringify({ submissionId, payload }),
     );
     this.logger.log(`Published finalize for ${submissionId}`);
+  }
+
+  private async sendGradeToMoodleIfApplicable(
+    submissionId: number,
+  ): Promise<void> {
+    try {
+      const submission = await this.submissionRepository.findOne({
+        where: { id: submissionId },
+        relations: ['ltiLaunchSession', 'problem'],
+      });
+
+      if (!submission?.ltiLaunchSession) {
+        this.logger.debug(
+          `Submission ${submissionId} has no LTI context, skip AGS`,
+        );
+        return;
+      }
+
+      if (submission.agsGradeSent) {
+        this.logger.warn(`Grade already sent for submission ${submissionId}`);
+        return;
+      }
+
+      if (new Date() > submission.ltiLaunchSession.expiresAt) {
+        this.logger.warn(`LTI session expired for submission ${submissionId}`);
+        return;
+      }
+
+      const success =
+        await this.agsService.sendGradeForSubmission(submissionId);
+
+      if (success) {
+        submission.agsGradeSent = true;
+        submission.agsGradeSentAt = new Date();
+        await this.submissionRepository.save(submission);
+        this.logger.log(`Grade sent to Moodle for submission ${submissionId}`);
+      }
+    } catch (error) {
+      // Log error but don't throw - grade passback failure shouldn't break submission
+      this.logger.error(
+        `Failed to send grade to Moodle for submission ${submissionId}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.submissionRepository.update(submissionId, {
+        agsError: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }

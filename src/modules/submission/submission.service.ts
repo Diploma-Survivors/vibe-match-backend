@@ -48,12 +48,13 @@ import { ResultDescription } from './dto/result-description.dto';
 import { TestcaseParserUtil } from './helpers/parse-test-file-util';
 import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
 import { SelectQueryBuilder } from 'typeorm/browser';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
 
 @Injectable()
 export class SubmissionService {
   private static readonly REDIS_TTL_SECONDS = 3600; // 1 hour
   private readonly logger = new Logger(SubmissionService.name);
-  private readonly MAX_PAGE_SIZE = 100;
 
   constructor(
     @InjectRepository(Submission)
@@ -72,6 +73,7 @@ export class SubmissionService {
     private readonly storagesService: StoragesService,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
+    private readonly gradingStrategyService: GradingStrategyService,
     @Inject(REDIS)
     private readonly redis: Redis,
     private readonly submissionCursorService: SubmissionCursorService,
@@ -96,6 +98,13 @@ export class SubmissionService {
     const savedUser = await this.findUserOrFail(user.userId);
     const language = await this.findLanguageOrFail(dto.languageId);
 
+    // Validate submission against problem's strategy
+    await this.gradingStrategyService.validateSubmission(
+      user.userId,
+      dto.problemId,
+      user.ltiSessionId,
+    );
+
     let fileUrl: string | null = null;
     const isMultiFile = dto.languageId === 89;
     if (isMultiFile) {
@@ -109,6 +118,9 @@ export class SubmissionService {
         problem,
         language,
         fileUrl,
+        ltiLaunchSession: user.ltiSessionId
+          ? ({ id: user.ltiSessionId } as LtiLaunchSession)
+          : null,
       }),
     );
 
@@ -438,7 +450,7 @@ export class SubmissionService {
     };
   }
 
-  private async buildItemsFromProblemFile(
+  private buildItemsFromProblemFile(
     submissionId: string,
     dto: CreateSubmissionDto,
     problem: Problem,
@@ -547,14 +559,8 @@ export class SubmissionService {
     if (!problem) {
       throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
     }
-    const {
-      overallStatus,
-      passedTests,
-      totalTests,
-      sumRuntime,
-      sumMemory,
-      firstNonAcceptedResult,
-    } = this.calStats(results, problem);
+    const { overallStatus, passedTests, totalTests, sumRuntime, sumMemory } =
+      this.calStats(results, problem);
     const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
@@ -565,7 +571,6 @@ export class SubmissionService {
       score: Math.round(score * 100) / 100, // Round to 2 decimal places
       runtime: sumRuntime,
       memory: sumMemory,
-      resultDescription: this.generateResult(firstNonAcceptedResult),
     };
   }
 

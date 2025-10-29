@@ -3,14 +3,18 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Expose, plainToInstance, Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
+  IsOptional,
   IsPositive,
   MaxLength,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { JsonArrayTransform } from '../decorators/json-transform.decorator';
+import { SubmissionStrategyEnum } from '../../submission/enums/submission-strategy.enum';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
 import { TESTCASE_FILE_FIELD_NAME } from '../testcases/constants/testcases.constant';
@@ -146,6 +150,44 @@ export class CreateProblemDto {
     name: TESTCASE_FILE_FIELD_NAME,
   })
   testcase: string;
+
+  @ApiProperty({
+    description: 'Submission strategy for this problem',
+    example: SubmissionStrategyEnum.BEST_SCORE,
+    enum: SubmissionStrategyEnum,
+    required: false,
+    default: SubmissionStrategyEnum.BEST_SCORE,
+  })
+  @IsOptional()
+  @IsEnum(SubmissionStrategyEnum, {
+    message: 'Submission strategy must be a valid enum value',
+  })
+  submissionStrategy?: SubmissionStrategyEnum;
+
+  @ApiProperty({
+    description:
+      'Maximum number of submission attempts allowed (null = unlimited)',
+    example: 5,
+    minimum: 1,
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Max attempts must be an integer' })
+  @Min(1, { message: 'Max attempts must be at least 1' })
+  maxAttempts?: number | null;
+
+  @ApiProperty({
+    description: 'Whether to show submission count to students',
+    example: true,
+    required: false,
+    default: true,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean({ message: 'Show submission count must be a boolean' })
+  showSubmissionCount?: boolean;
 
   @ApiProperty({
     description: 'The sample test cases associated with the problem',

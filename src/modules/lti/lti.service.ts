@@ -5,6 +5,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
 import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
@@ -25,8 +27,10 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { AssignmentContentType } from 'src/common/enums/assignment-content-type.enum';
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
+import { Contest } from '../contests/entities/contest.entity';
 import { ContestsService } from '../contests/contests.service';
 import { Course } from '../course/entities/course.entity';
+import { Problem } from '../problems/entities/problem.entity';
 import { ProblemType } from '../problems/enums/problem-type.enum';
 import { ProblemsService } from '../problems/problems.service';
 import { User } from '../user/entities/user.entity';
@@ -38,6 +42,7 @@ import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
 import { ContentItemType } from './enums/content-item-type.enum';
 import { LtiMessageType } from './enums/lti-message-type.enum';
 import { KeysService } from './keys.service';
+import { LtiLaunchSession } from './entities/lti-launch-session.entity';
 
 const LTI_STATE_TTL_SECONDS = 300;
 const LTI_DEEP_LINKING_TIMEOUT_MS = 10 * 60 * 1000;
@@ -65,6 +70,8 @@ export class LtiService {
     private readonly keysService: KeysService,
     private readonly problemsService: ProblemsService,
     private readonly contestService: ContestsService,
+    @InjectRepository(LtiLaunchSession)
+    private readonly ltiLaunchSessionRepository: Repository<LtiLaunchSession>,
   ) {
     // Initialize the frontend URL mappings from configuration
     this.frontendAssignmentsPath.set(AssignmentContentType.PROBLEM, {
@@ -200,8 +207,40 @@ export class LtiService {
     // Process the course information and enroll the user if course context is provided
     const course = await this.processCourseAndEnrollUser(claims, user);
 
+    // Extract AGS endpoint from claims and save LTI launch session if present
+    const agsEndpoint = claims.agsEndpoint;
+    let ltiSession: LtiLaunchSession | null = null;
+
+    if (agsEndpoint) {
+      this.logger.log(
+        `AGS endpoint detected - Lineitem: ${agsEndpoint.lineitem || 'NULL'}, Scopes: ${agsEndpoint.scope?.join(',') || 'NONE'}`,
+      );
+    } else {
+      this.logger.warn(
+        `No AGS endpoint in LTI claims - Activity may not be configured to accept grades`,
+      );
+    }
+
+    if (agsEndpoint && (problemId || contestId)) {
+      ltiSession = await this.saveLtiLaunchSession({
+        userId: user.id,
+        ltiUserId: claims.sub,
+        problemId: problemId || null,
+        contestId: contestId || null,
+        resourceLinkId: claims.resourceLink.id,
+        contextId: claims.context.id,
+        agsLineitemUrl: agsEndpoint.lineitem,
+        agsScopes: agsEndpoint.scope,
+        deploymentId: claims.deploymentId,
+        platformIssuer: claims.iss,
+      });
+      this.logger.log(
+        `LTI launch session created: ${ltiSession.id} for user ${user.id}`,
+      );
+    }
+
     // Issue JWT tokens for the user
-    const tokens = await this.issueTokens(user, claims, course);
+    const tokens = await this.issueTokens(user, claims, course, ltiSession?.id);
 
     const contentType = problemId
       ? AssignmentContentType.PROBLEM
@@ -444,12 +483,14 @@ export class LtiService {
    * @param user The user object
    * @param claims The LTI claims
    * @param course The course object (optional)
+   * @param ltiSessionId The LTI launch session ID (optional)
    * @returns The generated JWT tokens
    */
   private issueTokens(
     user: User,
     claims: IdTokenPayloadDto,
     course?: Course | null,
+    ltiSessionId?: string,
   ) {
     return this.generateTokensForUser({
       userId: user.id,
@@ -460,6 +501,7 @@ export class LtiService {
       roles: user.roles,
       sub: claims.sub,
       iss: claims.iss,
+      ltiSessionId: ltiSessionId || undefined,
     });
   }
 
@@ -697,5 +739,43 @@ export class LtiService {
         `JWT verification failed: ${(error as Error).message}`,
       );
     }
+  }
+
+  private async saveLtiLaunchSession(params: {
+    userId: number;
+    ltiUserId: string;
+    problemId: number | null;
+    contestId: number | null;
+    resourceLinkId: string;
+    contextId: string;
+    agsLineitemUrl: string | null;
+    agsScopes: string[] | null;
+    deploymentId: string;
+    platformIssuer: string;
+  }): Promise<LtiLaunchSession> {
+    const sessionTtl =
+      this.configService.get<number>('lti.ags.sessionTtl') ?? 86400; // Default: 24 hours
+    const expiresAt = new Date();
+    expiresAt.setSeconds(expiresAt.getSeconds() + sessionTtl);
+
+    const session = this.ltiLaunchSessionRepository.create({
+      user: { id: params.userId } as User,
+      ltiUserId: params.ltiUserId,
+      problem: params.problemId ? ({ id: params.problemId } as Problem) : null,
+      contest: params.contestId ? ({ id: params.contestId } as Contest) : null,
+      resourceLinkId: params.resourceLinkId,
+      contextId: params.contextId,
+      agsLineitemUrl: params.agsLineitemUrl,
+      agsScopes: params.agsScopes,
+      deploymentId: params.deploymentId,
+      platformIssuer: params.platformIssuer,
+      expiresAt,
+    });
+
+    const savedSession = await this.ltiLaunchSessionRepository.save(session);
+    this.logger.log(
+      `LTI launch session created: ${savedSession.id} for user ${params.userId}`,
+    );
+    return savedSession;
   }
 }

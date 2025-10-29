@@ -1,10 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CallbackProcessor } from '../helpers/callback.processor';
 import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
 
 @Processor(SubmissionQueue.FINALIZE)
+@Injectable()
 export class SubmissionFinalizeProcessor extends WorkerHost {
   private readonly logger = new Logger(SubmissionFinalizeProcessor.name);
 
