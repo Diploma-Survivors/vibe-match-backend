@@ -9,7 +9,6 @@ import {
 } from 'typeorm';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Language } from '../../language/entities/language.entity';
-import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { ResultDescription } from '../dto/result-description.dto';
