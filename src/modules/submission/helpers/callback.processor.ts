@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { REDIS } from '../../../shared/redis/redis.module';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Judge0Response } from '../../judge0/judge0.interface';
+import { AgsService } from '../../lti/ags/ags.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 import { SubmissionConstants } from '../constants/submission.constant';
 import { SubmissionResultDto } from '../dto/submission.result.dto';
@@ -15,7 +16,6 @@ import { Submission } from '../entities/submission.entity';
 import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
 import { SubmissionService } from '../submission.service';
 import { RedisKeys } from './redis-keys.helper';
-import { AgsService } from '../../lti/ags/ags.service';
 
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)

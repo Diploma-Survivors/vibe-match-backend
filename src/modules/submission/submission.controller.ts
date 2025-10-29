@@ -38,9 +38,9 @@ import { string } from 'joi';
 import { memoryStorage } from 'multer';
 
 // Shared/Common
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { SkipTransformResponse } from 'src/common/decorators/skip-transform.decorator';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 // Relative imports
 import * as judge0Interface from '../judge0/judge0.interface';

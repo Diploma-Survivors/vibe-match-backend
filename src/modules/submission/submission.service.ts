@@ -10,11 +10,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { SubmissionCursorService } from './helpers/submission-cursor.service';
 
 // Third-party
+import { plainToInstance } from 'class-transformer';
 import Redis from 'ioredis';
 import { Repository } from 'typeorm';
+import { SelectQueryBuilder } from 'typeorm/browser';
 import { v4 as uuidv4 } from 'uuid';
 
 // Shared/Common
@@ -24,8 +25,6 @@ import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
 
 // Relative imports
-import { plainToInstance } from 'class-transformer';
-import { SelectQueryBuilder } from 'typeorm/browser';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { Contest } from '../contests/entities/contest.entity';
@@ -37,6 +36,7 @@ import {
 import { Judge0Service } from '../judge0/judge0.service';
 import { isMultiFileProgram } from '../language/constants/language.constants';
 import { Language } from '../language/entities/language.entity';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import { Problem } from '../problems/entities/problem.entity';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { StoragesService } from '../storages/storages.service';
@@ -56,13 +56,14 @@ import {
 } from './enums/submission-status.enum';
 import { TestcaseParserUtil } from './helpers/parse-test-file-util';
 import { RedisKeys } from './helpers/redis-keys.helper';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { CountSubmissionField } from './interfaces/count-submission-field';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
 
 @Injectable()
 export class SubmissionService {
   private static readonly REDIS_TTL_SECONDS = CACHE_TTL.ONE_HOUR;
   private readonly logger = new Logger(SubmissionService.name);
-  private readonly MAX_PAGE_SIZE = 100;
 
   constructor(
     @InjectRepository(Submission)
@@ -81,6 +82,7 @@ export class SubmissionService {
     private readonly storagesService: StoragesService,
     private readonly judge0Service: Judge0Service,
     private readonly redisKeys: RedisKeys,
+    private readonly gradingStrategyService: GradingStrategyService,
     @Inject(REDIS)
     private readonly redis: Redis,
     private readonly submissionCursorService: SubmissionCursorService,
@@ -105,6 +107,13 @@ export class SubmissionService {
     const savedUser = await this.findUserOrFail(user.userId);
     const language = await this.findLanguageOrFail(dto.languageId);
 
+    // Validate submission against problem's strategy
+    await this.gradingStrategyService.validateSubmission(
+      user.userId,
+      dto.problemId,
+      user.ltiSessionId,
+    );
+
     let fileUrl: string | null = null;
     const isMultiFile = isMultiFileProgram(dto.languageId);
     if (isMultiFile) {
@@ -118,6 +127,9 @@ export class SubmissionService {
         problem,
         language,
         fileUrl,
+        ltiLaunchSession: user.ltiSessionId
+          ? ({ id: user.ltiSessionId } as LtiLaunchSession)
+          : null,
       }),
     );
 
@@ -447,7 +459,7 @@ export class SubmissionService {
     };
   }
 
-  private async buildItemsFromProblemFile(
+  private buildItemsFromProblemFile(
     submissionId: string,
     dto: CreateSubmissionDto,
     problem: Problem,
