@@ -78,7 +78,7 @@ export class GradingStrategyService {
     await strategy.validateSubmission(context);
   }
 
-  async executeStrategy(submissionId: string): Promise<StrategyResult | null> {
+  async executeStrategy(submissionId: number): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
       where: { id: submissionId },
       relations: ['user', 'problem', 'ltiLaunchSession'],
@@ -119,7 +119,7 @@ export class GradingStrategyService {
     userId: number,
     problemId: number,
     ltiSessionId?: string,
-    excludeSubmissionId?: string,
+    excludeSubmissionId?: number,
   ): Promise<Submission[]> {
     const query = this.submissionRepository
       .createQueryBuilder('submission')

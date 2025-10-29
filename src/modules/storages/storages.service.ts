@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import * as readline from 'node:readline';
 import { FileUploadOptions } from './interfaces/file-update-options.interface';
 import * as fs from 'fs/promises';
+import { Readable } from 'node:stream';
 
 @Injectable()
 export class StoragesService {
@@ -71,10 +72,17 @@ export class StoragesService {
   async readFile(bucketOrPath: string, key?: string): Promise<Buffer> {
     if (this.useAWS) {
       if (!key) throw new Error('Missing S3 key');
+
       const command = new GetObjectCommand({ Bucket: bucketOrPath, Key: key });
       const response = await this.client.send(command);
-      const chunks: Buffer[] = [];
-      for await (const chunk of response.Body as any) chunks.push(chunk);
+
+      const stream = response.Body as Readable;
+      const chunks: Uint8Array[] = [];
+
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
       return Buffer.concat(chunks);
     }
 

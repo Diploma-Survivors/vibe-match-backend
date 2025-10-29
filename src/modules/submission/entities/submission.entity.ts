@@ -14,6 +14,7 @@ import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
 import { ResultDescription } from '../dto/result-description.dto';
+import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 
 @Entity()
 @Index('idx_submission_user', ['user']) // search submissions by user

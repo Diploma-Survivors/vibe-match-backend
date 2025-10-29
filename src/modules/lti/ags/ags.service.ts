@@ -192,7 +192,7 @@ export class AgsService {
     }
   }
 
-  async sendGradeForSubmission(submissionId: string): Promise<boolean> {
+  async sendGradeForSubmission(submissionId: number): Promise<boolean> {
     try {
       const submission = await this.submissionRepository.findOne({
         where: { id: submissionId },
