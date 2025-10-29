@@ -44,6 +44,10 @@ export class CreateSubmissionDto {
   @IsOptional()
   readonly contestParticipationId?: number;
 
+  @ApiProperty({
+    description: 'Test case samples for the submission',
+    type: [CreateTestcaseSampleDto],
+  })
   @Transform(({ value }) => {
     let parsed: unknown = value;
 

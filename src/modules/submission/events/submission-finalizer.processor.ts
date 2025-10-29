@@ -15,6 +15,7 @@ export class SubmissionFinalizeProcessor extends WorkerHost {
 
   // BullMQ pattern: single entrypoint for all jobs in this queue
   async process(job: Job<{ submissionId: string }>): Promise<void> {
+    this.logger.log(`Processing job ${job.id}`);
     if (job.name === (SubmissionJob.FINALIZE_RUN as string)) {
       const { submissionId } = job.data;
       await this.callbackProcessor.finalizer(submissionId, false);
