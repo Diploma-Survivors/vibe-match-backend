@@ -1,5 +1,8 @@
+// NestJS
 import { BadRequestException, Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
+
+// Third-party
 import { Expose, plainToInstance, Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -14,10 +17,13 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { JsonArrayTransform } from '../decorators/json-transform.decorator';
+
+// Relative imports
 import { SubmissionStrategyEnum } from '../../submission/enums/submission-strategy.enum';
+import { JsonArrayTransform } from '../decorators/json-transform.decorator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
+import { ProblemVisibility } from '../enums/problem-visibility.enum';
 import { TESTCASE_FILE_FIELD_NAME } from '../testcases/constants/testcases.constant';
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
 
@@ -112,10 +118,18 @@ export class CreateProblemDto {
   @ApiProperty({
     description: 'The type of the problem',
     example: ProblemType.STANDALONE,
-    enum: [ProblemType.STANDALONE, ProblemType.CONTEST],
+    enum: ProblemType,
   })
-  @IsEnum([ProblemType.STANDALONE, ProblemType.CONTEST])
-  type: Exclude<ProblemType, ProblemType.HYBRID>;
+  @IsEnum(ProblemType)
+  type: ProblemType;
+
+  @ApiProperty({
+    description: 'The visibility of the problem',
+    example: ProblemVisibility.PUBLIC,
+    enum: ProblemVisibility,
+  })
+  @IsEnum(ProblemVisibility)
+  visibility: ProblemVisibility;
 
   @ApiProperty({
     description: 'The IDs of the tags associated with the problem',

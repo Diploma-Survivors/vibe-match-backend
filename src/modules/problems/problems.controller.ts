@@ -1,3 +1,4 @@
+// NestJS
 import {
   Body,
   ClassSerializerInterceptor,
@@ -23,6 +24,8 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+
+// Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -30,6 +33,8 @@ import {
   CursorEdgeDto,
   PaginationCursorResponseDto,
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
+
+// Relative imports
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
@@ -170,18 +175,6 @@ export class ProblemsController {
       query,
       user,
     );
-  }
-
-  @Get('selectable-for-assignment')
-  @ApiOperation({
-    summary: 'Get list problems for assignment creation',
-    description:
-      'Get list problems that instructors can select to add to an assignment',
-  })
-  @ApiPaginatedProblemsResponse()
-  @ApiInstructorAuth()
-  async findSelectableForAssignment(@Query() query: ProblemsCursorQueryDto) {
-    return await this.problemsService.findProblemsForAssignmentCreation(query);
   }
 
   @Get(':id/detail')
