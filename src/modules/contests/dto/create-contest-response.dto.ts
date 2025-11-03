@@ -1,9 +1,14 @@
+// NestJS
 import { ApiProperty } from '@nestjs/swagger';
+
+// Third-party
 import { Exclude } from 'class-transformer';
+
+// Relative imports
 import { Course } from 'src/modules/course/entities/course.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { ContestProblem } from '../entities/contest-problem.entity';
-import { ContestStatus } from '../enums/contest-status.enum';
+import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
 
 export class CreateContestResponseDto {
   @ApiProperty({
@@ -37,18 +42,26 @@ export class CreateContestResponseDto {
   endTime: Date;
 
   @ApiProperty({
+    description:
+      'Late deadline time of the contest in ISO 8601 format (null means no late submissions allowed)',
+    example: new Date().toISOString(),
+    nullable: true,
+  })
+  lateDeadline: Date | null;
+
+  @ApiProperty({
     description: 'Duration of the contest in minutes',
     example: 120,
     nullable: true,
   })
-  durationMinutes: number;
+  durationMinutes: number | null;
 
   @ApiProperty({
-    description: 'Status of the contest',
-    example: ContestStatus.PRIVATE,
-    enum: ContestStatus,
+    description: 'The enforcement policy for the contest deadline',
+    example: DeadlineEnforcement.STRICT,
+    enum: DeadlineEnforcement,
   })
-  status: ContestStatus;
+  deadlineEnforcement: DeadlineEnforcement;
 
   @Exclude()
   courseId: number;

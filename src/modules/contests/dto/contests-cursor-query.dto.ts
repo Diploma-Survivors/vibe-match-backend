@@ -1,4 +1,7 @@
+// NestJS
 import { ApiProperty } from '@nestjs/swagger';
+
+// Third-party
 import { Type } from 'class-transformer';
 import {
   IsDate,
@@ -9,36 +12,16 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
+
+// Shared/Common
 import { PaginationCursorDto } from 'src/common/pagination/dtos/pagination-cursor.dto';
+
+// Relative imports
 import { IsLessThan } from '../decorators/is-less-than.decorator';
+import { ContestStatus } from '../enums/contest-status.enum';
 import { SortBy } from '../enums/sort-by.enum';
 
 export class QueryContestsFilterDto {
-  @ApiProperty({
-    description: 'Filter contests have started after the specified start time',
-    example: new Date().toISOString(),
-    required: false,
-  })
-  @IsOptional()
-  @Type(() => Date)
-  @IsLessThan<Date>('endTime', {
-    messages: {
-      message: 'startTime must be less than endTime',
-    },
-  })
-  @IsDate()
-  startTime?: Date;
-
-  @ApiProperty({
-    description: 'Filter contests have ended before the specified end time',
-    example: new Date().toISOString(),
-    required: false,
-  })
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  endTime?: Date;
-
   @ApiProperty({
     description: 'Filter contests by minimum duration in minutes',
     example: 30,
@@ -65,6 +48,18 @@ export class QueryContestsFilterDto {
   @Type(() => Number)
   @IsPositive()
   maxDurationMinutes?: number;
+
+  @ApiProperty({
+    description: 'Filter contests by name containing the specified string',
+    enum: ContestStatus,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ContestStatus)
+  status?: ContestStatus;
+
+  courseId?: number;
+  authorId?: number;
 }
 
 export class ContestsCursorQueryDto extends PaginationCursorDto {

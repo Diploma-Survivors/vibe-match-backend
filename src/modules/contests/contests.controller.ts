@@ -1,3 +1,4 @@
+// NestJS
 import {
   Body,
   ClassSerializerInterceptor,
@@ -19,6 +20,8 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+
+// Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -26,6 +29,8 @@ import {
   CursorEdgeDto,
   PaginationCursorResponseDto,
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
+
+// Relative imports
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestsService } from './contests.service';
@@ -111,7 +116,7 @@ export class ContestsController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.STUDENT)
+  @Roles(RoleEnum.STUDENT, RoleEnum.INSTRUCTOR)
   async findContests(
     @Query() contestsCursorQueryDto: ContestsCursorQueryDto,
     @CurrentUser() currentUser: JwtPayload,

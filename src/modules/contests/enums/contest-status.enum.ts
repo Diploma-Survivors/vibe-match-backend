@@ -1,4 +1,5 @@
 export enum ContestStatus {
-  PRIVATE = 'private',
-  PUBLIC = 'public',
+  UPCOMING = 'upcoming',
+  ONGOING = 'ongoing',
+  ENDED = 'ended',
 }

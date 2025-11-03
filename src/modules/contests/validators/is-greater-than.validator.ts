@@ -8,11 +8,11 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-export const LESS_THAN_VALIDATOR = 'LESS_THAN_VALIDATOR';
+export const GREATER_THAN_VALIDATOR = 'GREATER_THAN_VALIDATOR';
 
-@ValidatorConstraint({ name: LESS_THAN_VALIDATOR, async: false })
+@ValidatorConstraint({ name: GREATER_THAN_VALIDATOR, async: false })
 @Injectable()
-export class IsLessThanValidator<T> implements ValidatorConstraintInterface {
+export class IsGreaterThanValidator<T> implements ValidatorConstraintInterface {
   validate(value: T, args: ValidationArguments): Promise<boolean> | boolean {
     if (!value) {
       return false;
@@ -24,10 +24,10 @@ export class IsLessThanValidator<T> implements ValidatorConstraintInterface {
       return true;
     }
 
-    return value < relatedValue;
+    return value > relatedValue;
   }
 
   defaultMessage(args?: ValidationArguments): string {
-    return `${args?.property} must be less than ${args?.constraints[0]}`;
+    return `${args?.property} must be greater than ${args?.constraints[0]}`;
   }
 }
