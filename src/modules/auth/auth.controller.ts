@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -41,6 +42,11 @@ export class AuthController {
     private readonly jwtAuthService: JwtAuthService,
   ) {}
 
+  /**
+   * Refreshes access and refresh tokens
+   * Rate limited to 5 requests per minute per user
+   */
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('refresh')
   @ApiOperation({
     summary: 'Refreshes access and refresh tokens',
