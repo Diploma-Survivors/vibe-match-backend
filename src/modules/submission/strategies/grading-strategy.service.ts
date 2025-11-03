@@ -1,15 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Submission } from '../entities/submission.entity';
 import { Problem } from '../../problems/entities/problem.entity';
-import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
+import { Submission } from '../entities/submission.entity';
+import { SubmissionStrategyEnum } from '../enums/submission-strategy.enum';
 import { GradingStrategyFactory } from './grading-strategy.factory';
 import {
   StrategyContext,
   StrategyResult,
 } from './interfaces/grading-strategy.interface';
-import { SubmissionStrategyEnum } from '../enums/submission-strategy.enum';
 
 @Injectable()
 export class GradingStrategyService {
