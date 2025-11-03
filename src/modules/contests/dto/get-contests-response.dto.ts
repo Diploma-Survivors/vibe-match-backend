@@ -1,4 +1,7 @@
+// NestJS
 import { ApiProperty } from '@nestjs/swagger';
+
+// Relative imports
 import { ContestStatus } from '../enums/contest-status.enum';
 
 export class GetContestsResponseDto {
@@ -29,12 +32,13 @@ export class GetContestsResponseDto {
   @ApiProperty({
     description: 'Duration of the contest in minutes',
     example: 120,
+    nullable: true,
   })
-  durationMinutes: number;
+  durationMinutes: number | null;
 
   @ApiProperty({
-    description: 'Current status of the contest',
-    example: ContestStatus.PUBLIC,
+    description: 'The current status of the contest',
+    example: ContestStatus.ONGOING,
     enum: ContestStatus,
   })
   status: ContestStatus;
