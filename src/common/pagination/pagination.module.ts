@@ -1,8 +1,13 @@
-import { Module } from '@nestjs/common';
-import { PaginationProvider } from './providers/pagination.provider';
+// NestJS
+import { Global, Module } from '@nestjs/common';
 
+// Relative imports
+import { PaginationProvider } from './providers/pagination.provider';
+import { CursorPaginationService } from './services/cursor-pagination.service';
+
+@Global()
 @Module({
-  providers: [PaginationProvider],
-  exports: [PaginationProvider],
+  providers: [PaginationProvider, CursorPaginationService],
+  exports: [PaginationProvider, CursorPaginationService],
 })
 export class PaginationModule {}
