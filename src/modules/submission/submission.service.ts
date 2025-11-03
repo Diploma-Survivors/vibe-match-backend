@@ -1,3 +1,4 @@
+// NestJS
 import {
   HttpException,
   HttpStatus,
@@ -7,25 +8,31 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+
+// Third-party
 import Redis from 'ioredis';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+
+// Shared/Common
+import { CACHE_TTL } from 'src/common/constants/cache.constants';
 import { REDIS } from '../../shared/redis/redis.module';
 import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
+
+// Relative imports
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
-import { GradingStrategyService } from './strategies/grading-strategy.service';
 import { Contest } from '../contests/entities/contest.entity';
-import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import {
   Judge0BatchResponse,
   Judge0Response,
   Judge0SubmissionPayload,
 } from '../judge0/judge0.interface';
 import { Judge0Service } from '../judge0/judge0.service';
+import { isMultiFileProgram } from '../language/constants/language.constants';
 import { Language } from '../language/entities/language.entity';
-import { Language as LanguageEnum } from '../language/enums/language.enum';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import { Problem } from '../problems/entities/problem.entity';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { StoragesService } from '../storages/storages.service';
@@ -39,10 +46,11 @@ import {
   SubmissionStatus,
 } from './enums/submission-status.enum';
 import { RedisKeys } from './helpers/redis-keys.helper';
+import { GradingStrategyService } from './strategies/grading-strategy.service';
 
 @Injectable()
 export class SubmissionService {
-  private static readonly REDIS_TTL_SECONDS = 3600; // 1 hour
+  private static readonly REDIS_TTL_SECONDS = CACHE_TTL.ONE_HOUR;
   private readonly logger = new Logger(SubmissionService.name);
   private readonly MAX_PAGE_SIZE = 100;
 
@@ -68,52 +76,7 @@ export class SubmissionService {
     private readonly redis: Redis,
   ) {}
 
-  async getStatisticsByProblemId(problemId: number) {
-    const totalSubmissions = await this.submissionRepository.count({
-      where: { problemId },
-    });
-
-    const totalAcceptedSubmissions = await this.submissionRepository.count({
-      where: {
-        problemId,
-        status: SubmissionStatus.ACCEPTED,
-      },
-    });
-
-    const acceptanceRate = totalSubmissions
-      ? (totalAcceptedSubmissions / totalSubmissions) * 100
-      : 0;
-
-    const { attemptedUsers } = (await this.submissionRepository
-      .createQueryBuilder('submission')
-      .where('submission.problemId = :problemId', { problemId })
-      .select('COUNT(DISTINCT submission.userId)', 'attemptedUsers')
-      .getRawOne()) as { attemptedUsers: number };
-
-    const { solvedUsers } = (await this.submissionRepository
-      .createQueryBuilder('submission')
-      .where('submission.problemId = :problemId', { problemId })
-      .andWhere('submission.status = :status', {
-        status: SubmissionStatus.ACCEPTED,
-      })
-      .select('COUNT(DISTINCT submission.userId)', 'solvedUsers')
-      .getRawOne()) as { solvedUsers: number };
-
-    const averageAttempts = attemptedUsers
-      ? totalSubmissions / attemptedUsers
-      : 0;
-
-    return {
-      totalSubmissions,
-      totalAcceptedSubmissions,
-      acceptanceRate,
-      attemptedUsers,
-      solvedUsers,
-      averageAttempts,
-    };
-  }
-
-  async run(
+  async executeTestRun(
     dto: CreateSubmissionDto,
     file?: Express.Multer.File,
   ): Promise<{ submissionId: string }> {
@@ -122,7 +85,7 @@ export class SubmissionService {
     return this.submitBatch(submissionId, dto, problem, false, file);
   }
 
-  async submit(
+  async submitForGrading(
     dto: CreateSubmissionDto,
     user: JwtPayload,
     file?: Express.Multer.File,
@@ -139,8 +102,7 @@ export class SubmissionService {
     );
 
     let fileUrl: string | null = null;
-    const isMultiFile =
-      dto.languageId === Number(LanguageEnum.MULTI_FILE_PROGRAM);
+    const isMultiFile = isMultiFileProgram(dto.languageId);
     if (isMultiFile) {
       fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
     }
@@ -176,7 +138,7 @@ export class SubmissionService {
     }
 
     // Prepare common encodings (source/additional files) and constants
-    const isMultiFile = dto.languageId === 89;
+    const isMultiFile = isMultiFileProgram(dto.languageId);
     const sourceBase64 =
       !isMultiFile && dto.sourceCode
         ? Base64Util.encodeBase64(dto.sourceCode)
@@ -413,15 +375,19 @@ export class SubmissionService {
 
   buildTestResult(judge0Response: Judge0Response): TestResultDto {
     const stdout = Base64Util.decodeBase64(judge0Response.stdout);
+    const stderr = Base64Util.decodeBase64(judge0Response.stderr);
+    const expectedOutput = Base64Util.decodeBase64(
+      judge0Response.expected_output,
+    );
 
     return {
-      stdout: stdout,
+      stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0StatusMap[judge0Response.status.id],
-      stderr: Base64Util.decodeBase64(judge0Response.stderr),
+      stderr,
       token: judge0Response.token,
-      expectedOutput: Base64Util.decodeBase64(judge0Response.expected_output),
+      expectedOutput,
     };
   }
 
@@ -435,14 +401,8 @@ export class SubmissionService {
     if (!problem) {
       throw new HttpException('Problem not found', HttpStatus.NOT_FOUND);
     }
-    const {
-      overallStatus,
-      passedTests,
-      totalTests,
-      sumRuntime,
-      sumMemory,
-      firstNonAcceptedResult,
-    } = this.calStats(results);
+    const { overallStatus, passedTests, totalTests, sumRuntime, sumMemory } =
+      this.calStats(results);
     const score = (problem.maxScore * passedTests) / totalTests;
 
     return {
@@ -453,7 +413,6 @@ export class SubmissionService {
       score: Math.round(score * 100) / 100, // Round to 2 decimal places
       runtime: sumRuntime,
       memory: sumMemory,
-      resultDescription: this.generateResult(firstNonAcceptedResult),
     };
   }
 
@@ -464,6 +423,7 @@ export class SubmissionService {
     let sumRuntime: number = 0;
     let sumMemory: number = 0;
     let firstNonAcceptedResult: TestResultDto | null = null;
+
     for (const result of results) {
       sumRuntime += Number(result.time) || 0;
       sumMemory += Number(result.memory) || 0;
@@ -477,13 +437,13 @@ export class SubmissionService {
         }
       }
     }
+
     return {
       overallStatus,
       passedTests,
       totalTests,
       sumRuntime,
       sumMemory,
-      firstNonAcceptedResult,
     };
   }
 
@@ -517,133 +477,4 @@ export class SubmissionService {
         return 'Unknown error occurred';
     }
   }
-  //
-  // private async findSubmissionWithPagination(
-  //   query: SubmissionsCursorQueryDto,
-  //   config: {
-  //     joins: string[];
-  //     filterFn: (qb: SelectQueryBuilder<Problem>) => void;
-  //   },
-  // ) {
-  //   const pagination = this.validateAndGetPagination(query);
-  //   const sortConfig = this.buildSortConfiguration(
-  //     query,
-  //     pagination.isBackward,
-  //   );
-  //
-  //   const ids = await this.findSubmissionIds(
-  //     query,
-  //     pagination.limit,
-  //     sortConfig,
-  //     config,
-  //   );
-  //
-  //   const items = await this.findProblemByIds(ids, sortConfig);
-  //   return this.buildPaginatedResult(
-  //     items,
-  //     pagination.limit,
-  //     pagination.isBackward,
-  //     query,
-  //   );
-  // }
-  //
-  // private validateAndGetPagination(query: PaginationCursorDto) {
-  //   const isBackward = !!query?.before && !query?.after;
-  //   const limit = isBackward ? query?.last : query?.first;
-  //
-  //   if (!limit || limit > this.MAX_PAGE_SIZE) {
-  //     throw new BadRequestException(
-  //       `Limit must be between 1 and ${this.MAX_PAGE_SIZE}`,
-  //     );
-  //   }
-  //
-  //   return { limit, isBackward };
-  // }
-  //
-  // private buildSortConfiguration(
-  //   query: SubmissionsCursorQueryDto,
-  //   isBackward: boolean,
-  // ) {
-  //   const sortBy = query?.sortBy;
-  //   const naturalOrder: 'ASC' | 'DESC' =
-  //     query.sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
-  //   const operator = this.determineCursorOperator(query, naturalOrder);
-  //
-  //   // Reverse sort order for backward pagination
-  //   const reversedOrder: 'ASC' | 'DESC' =
-  //     naturalOrder === 'ASC' ? 'DESC' : 'ASC';
-  //   const sortOrder: 'ASC' | 'DESC' = isBackward ? reversedOrder : naturalOrder;
-  //
-  //   return { sortBy, sortOrder, operator };
-  // }
-  //
-  // private determineCursorOperator(
-  //   query: PaginationCursorDto,
-  //   naturalOrder: 'ASC' | 'DESC',
-  // ): '>' | '<' {
-  //   if (query?.after) {
-  //     return naturalOrder === 'ASC' ? '>' : '<';
-  //   }
-  //
-  //   if (query?.before) {
-  //     return naturalOrder === 'ASC' ? '<' : '>';
-  //   }
-  //
-  //   return '>';
-  // }
-  //
-  // private async findSubmissionIds(
-  //   query: SubmissionsCursorQueryDto,
-  //   limit: number,
-  //   sortConfig: {
-  //     sortBy:  ;
-  //     sortOrder: 'ASC' | 'DESC';
-  //     operator: '<' | '>';
-  //   },
-  //   config: {
-  //     joins: string[];
-  //     filterFn: (qb: SelectQueryBuilder<Problem>) => void;
-  //   },
-  // ) {
-  //   const queryBuilder = this.buildBaseQuery(config.joins);
-  //
-  //   config.filterFn(queryBuilder);
-  //   this.applyMatchFilters(queryBuilder, query);
-  //
-  //   await this.applyCursorPagination(queryBuilder, query, sortConfig);
-  //
-  //   queryBuilder
-  //     .select('submission.id', 'id')
-  //     .addSelect(`submission.${sortConfig.sortBy}`, sortConfig.sortBy)
-  //     .distinct(true)
-  //     .limit(limit + 1);
-  //
-  //   const items = await queryBuilder.getRawMany<{
-  //     id: string;
-  //     [key: string]: any;
-  //   }>();
-  //   this.logger.debug(`Found submission IDs: ${JSON.stringify(items)}`);
-  //
-  //   return items.map((item) => item.id);
-  // }
-  //
-  // private buildBaseQuery(joins: string[]) {
-  //   const queryBuilder = this.dataSource.createQueryBuilder(
-  //     Submission,
-  //     'submission',
-  //   );
-  //
-  //   const joinMap: Record<string, string> = {
-  //     submissionProblem: 'submission.problem',
-  //     submissionContestParticipation: 'submission.user',
-  //   };
-  //
-  //   for (const join of joins) {
-  //     if (joinMap[join]) {
-  //       queryBuilder.leftJoin(joinMap[join], join);
-  //     }
-  //   }
-  //
-  //   return queryBuilder;
-  // }
 }

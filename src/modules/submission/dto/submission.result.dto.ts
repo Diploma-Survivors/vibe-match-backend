@@ -45,10 +45,4 @@ export class SubmissionResultDto {
     type: [TestResultDto],
   })
   results: TestResultDto[];
-
-  @ApiProperty({
-    description: 'Description for the submission result',
-    example: 'All test cases passed',
-  })
-  resultDescription: string;
 }

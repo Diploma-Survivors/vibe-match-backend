@@ -1,10 +1,15 @@
+// NestJS
 import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+
+// Third-party
 import { BackoffOptions, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { Repository } from 'typeorm';
+
+// Shared/Common
 import { REDIS } from '../../../shared/redis/redis.module';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Judge0Response } from '../../judge0/judge0.interface';

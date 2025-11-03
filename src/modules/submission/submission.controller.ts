@@ -1,3 +1,8 @@
+// Built-in
+import { finalize, interval, merge, Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+// NestJS
 import {
   Body,
   ClassSerializerInterceptor,
@@ -13,23 +18,30 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { finalize, interval, merge, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { ApiTags } from '@nestjs/swagger';
-import { SubmissionService } from './submission.service';
+import { Throttle } from '@nestjs/throttler';
+
+// Third-party
+import { memoryStorage } from 'multer';
+
+// Shared/Common
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { SkipTransformResponse } from 'src/common/decorators/skip-transform.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+
+// Relative imports
+import * as judge0Interface from '../judge0/judge0.interface';
+import { SubmissionConstants } from './constants/submission.constant';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { SubmissionEvent } from './enums/submission-event.enum';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { SubmissionConstants } from './constants/submission.constant';
-import * as judge0Interface from '../judge0/judge0.interface';
+import { SubmissionService } from './submission.service';
+
+// Type imports
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
-import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
-import { SubmissionEvent } from './enums/submission-event.enum';
-import { ConfigService } from '@nestjs/config';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -42,24 +54,26 @@ export class SubmissionController {
     private readonly configService: ConfigService,
   ) {}
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('run')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async run(
     @Body() dto: CreateSubmissionDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.submissionService.run(dto, file);
+    return this.submissionService.executeTestRun(dto, file);
   }
 
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('submit')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async submit(
+  async submitForGrading(
     @Body() dto: CreateSubmissionDto,
     @CurrentUser() user: JwtPayload,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.submissionService.submit(dto, user, file);
+    return this.submissionService.submitForGrading(dto, user, file);
   }
 
   @Put('judge0/callback/run')
