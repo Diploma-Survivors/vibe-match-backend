@@ -1,19 +1,34 @@
+// NestJS
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Language } from './entities/language.entity';
+
+// Third-party
 import { Repository } from 'typeorm';
+
+// Relative imports
+import { CACHE_TTL } from 'src/common/constants/cache.constants';
+import { Cacheable } from 'src/common/decorators/cacheable.decorator';
+import { Language } from './entities/language.entity';
 
 @Injectable()
 export class LanguageService {
   constructor(
     @InjectRepository(Language)
-    private languageRepository: Repository<Language>,
+    private readonly languageRepository: Repository<Language>,
   ) {}
 
+  @Cacheable({
+    key: 'languages:all',
+    ttl: CACHE_TTL.ONE_HOUR,
+  })
   async findAll(): Promise<Language[]> {
     return this.languageRepository.find();
   }
 
+  @Cacheable({
+    key: (id: number) => `language:${id}`,
+    ttl: CACHE_TTL.ONE_HOUR,
+  })
   async findOne(id: number): Promise<Language> {
     const language = await this.languageRepository.findOneBy({ id });
     if (!language) {
