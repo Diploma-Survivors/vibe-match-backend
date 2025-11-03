@@ -10,7 +10,7 @@ import {
 import { Problem } from './problem.entity';
 
 @Entity({ name: 'course_problems' })
-@Index(['courseId', 'problemId'], { unique: true })
+@Index('idx_course_problem_unique', ['courseId', 'problemId'], { unique: true })
 export class CourseProblem {
   @PrimaryGeneratedColumn('increment', { name: 'course_problem_id' })
   id: number;

@@ -1,4 +1,7 @@
+// NestJS
 import { ApiProperty } from '@nestjs/swagger';
+
+// Third-party
 import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
@@ -10,9 +13,14 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
+
+// Shared/Common
 import { PaginationCursorDto } from 'src/common/pagination/dtos/pagination-cursor.dto';
+
+// Relative imports
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
 import { ProblemType } from '../enums/problem-type.enum';
+import { ProblemVisibility } from '../enums/problem-visibility.enum';
 import { SortBy } from '../enums/sort-by.enum';
 
 class QueryProblemsFilterDto {
@@ -25,16 +33,6 @@ class QueryProblemsFilterDto {
   @IsOptional()
   @IsEnum(DifficultyLevel)
   difficulty?: DifficultyLevel;
-
-  @ApiProperty({
-    enum: ProblemType,
-    description: 'Filter problems by type',
-    example: ProblemType.CONTEST,
-    required: false,
-  })
-  @IsOptional()
-  @IsEnum(ProblemType)
-  type?: ProblemType;
 
   @ApiProperty({
     description: 'Filter problems by topic ID',
@@ -61,6 +59,11 @@ class QueryProblemsFilterDto {
   @IsInt({ each: true })
   @Expose({ name: 'tagIds' })
   tags?: number[];
+
+  courseId?: number;
+  authorId?: number;
+  type?: ProblemType;
+  visibility?: ProblemVisibility;
 }
 
 export class ProblemCursorFieldsDto {

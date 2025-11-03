@@ -1,5 +1,4 @@
-import { ContestProblem } from 'src/modules/contests/entities/contest-problem.entity';
-import { User } from 'src/modules/user/entities/user.entity';
+// Third-party
 import {
   Column,
   CreateDateColumn,
@@ -12,10 +11,14 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { DifficultyLevel } from '../enums/difficulty-level.enum';
-import { ProblemStatus } from '../enums/problem-status.enum';
-import { ProblemType } from '../enums/problem-type.enum';
+
+// Relative imports
+import { ContestProblem } from 'src/modules/contests/entities/contest-problem.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 import { SubmissionStrategyEnum } from '../../submission/enums/submission-strategy.enum';
+import { DifficultyLevel } from '../enums/difficulty-level.enum';
+import { ProblemType } from '../enums/problem-type.enum';
+import { ProblemVisibility } from '../enums/problem-visibility.enum';
 import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Testcase } from '../testcases/entities/testcase.entity';
 import { CourseProblem } from './course-problem.entity';
@@ -25,13 +28,12 @@ import { ProblemTopic } from './problem-topic.entity';
 @Entity({
   name: 'problems',
 })
-@Index('idx_problem_created_at', ['createdAt', 'id'])
-@Index('idx_problem_title', ['title', 'id'])
+@Index('idx_problem_created_at_id', ['createdAt', 'id'])
+@Index('idx_problem_title_id', ['title', 'id'])
 export class Problem {
   @PrimaryGeneratedColumn('increment', { name: 'problem_id' })
   id: number;
 
-  @Index({ unique: false, fulltext: true })
   @Column('varchar')
   title: string;
 
@@ -68,18 +70,18 @@ export class Problem {
   type: ProblemType;
 
   @Column('enum', {
-    name: 'status',
-    enum: ProblemStatus,
-    default: ProblemStatus.PRIVATE,
+    name: 'visibility',
+    default: ProblemVisibility.PUBLIC,
+    enum: ProblemVisibility,
   })
-  status: ProblemStatus;
+  visibility: ProblemVisibility;
 
   @OneToMany(() => CourseProblem, (courseProblem) => courseProblem.problem, {
     cascade: true,
   })
   courseProblems: CourseProblem[];
 
-  @Index({ unique: false })
+  @Index('idx_problem_author_id', { unique: false })
   @Column('int', { name: 'author_id' })
   authorId: number;
 
