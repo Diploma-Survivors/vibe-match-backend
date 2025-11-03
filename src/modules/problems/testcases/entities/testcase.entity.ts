@@ -1,3 +1,4 @@
+// Third-party
 import {
   Column,
   CreateDateColumn,
@@ -7,6 +8,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+
+// Relative imports
 import { Problem } from '../../entities/problem.entity';
 
 @Entity({ name: 'testcases' })
@@ -23,7 +26,7 @@ export class Testcase {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
   updatedAt: Date;
 
-  @Index({ unique: true })
+  @Index('idx_testcase_problem_id', { unique: true })
   @Column('int', { name: 'problem_id' })
   problemId: number;
 

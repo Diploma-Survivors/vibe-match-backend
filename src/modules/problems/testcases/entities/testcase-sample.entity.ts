@@ -1,3 +1,4 @@
+// Third-party
 import {
   Column,
   CreateDateColumn,
@@ -8,6 +9,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+
+// Relative imports
 import { Problem } from '../../entities/problem.entity';
 
 @Entity({ name: 'testcase_samples' })
@@ -15,7 +18,7 @@ export class TestcaseSample {
   @PrimaryGeneratedColumn('increment', { name: 'testcase_sample_id' })
   id: number;
 
-  @Index()
+  @Index('idx_testcase_sample_problem_id')
   @Column('int', { name: 'problem_id' })
   problemId: number;
 
