@@ -16,7 +16,6 @@ import { Problem } from './entities/problem.entity';
 import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsController } from './problems.controller';
 import { ProblemsService } from './problems.service';
-import { ProblemsRepository } from './repositories/problems.repository';
 import { ProblemFactory } from './services/problem-factory.service';
 import { ProblemStatisticsService } from './services/problem-statistics.service';
 import { ProblemValidationService } from './services/problem-validation.service';
@@ -30,7 +29,6 @@ import { TopicsModule } from './topics/topics.module';
   controllers: [ProblemsController],
   providers: [
     ProblemsService,
-    ProblemsRepository,
     ProblemStatisticsService,
     ProblemValidationService,
     ProblemFactory,
