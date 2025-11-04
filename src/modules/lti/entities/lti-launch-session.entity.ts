@@ -11,7 +11,6 @@ import { Contest } from '../../contests/entities/contest.entity';
 import { User } from '../../user/entities/user.entity';
 
 @Entity('lti_launch_sessions')
-@Index('idx_lti_session_user_problem', ['user', 'problem'])
 @Index('idx_lti_session_resource_link', ['resourceLinkId'])
 @Index('idx_lti_session_expires', ['expiresAt'])
 export class LtiLaunchSession {
