@@ -381,7 +381,7 @@ export class SubmissionService {
     );
 
     return {
-      stdout: stdout,
+      stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0StatusMap[judge0Response.status.id],
