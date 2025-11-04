@@ -8,6 +8,10 @@ import { BaseQueryFilter } from 'src/common/pagination/filters/base-query.filter
 import { FilterContext } from '../interfaces/filter-context.interface';
 
 export class VisibilityFilter extends BaseQueryFilter<FilterContext> {
+  constructor(private readonly alias: string) {
+    super();
+  }
+
   shouldApply(context?: FilterContext): boolean {
     return !!context?.visibility;
   }
@@ -17,7 +21,7 @@ export class VisibilityFilter extends BaseQueryFilter<FilterContext> {
     context?: FilterContext,
   ): void {
     const [condition, params] = [
-      `${context?.alias}.visibility = :visibility`,
+      `${this.alias}.visibility = :visibility`,
       {
         visibility: context?.visibility,
       },
