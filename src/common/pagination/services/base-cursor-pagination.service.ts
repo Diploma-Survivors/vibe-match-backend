@@ -69,27 +69,21 @@ export abstract class BaseCursorPaginationService<
   async findWithCursorPagination(
     query: TQuery,
   ): Promise<CursorPaginated<TEntity>> {
-    // Step 1: Validate pagination (shared logic)
     const { limit, isBackward } = this.validatePagination(query);
 
-    // Step 2: Build sort configuration (shared logic)
     const { sortBy, sortOrder, operator } = this.buildSortConfiguration(
       query,
       isBackward,
     );
 
-    // Step 3: Build base query (hook method - subclass implements)
     const queryBuilder = this.buildBaseQuery(query);
 
-    // Step 4: Apply filters (hook method - subclass implements)
     await this.applyFilters(queryBuilder, query);
 
-    // Step 5: Apply keyword filter if needed (shared logic with hook)
     if (query?.keyword) {
       this.applyKeywordFilter(queryBuilder, query.keyword);
     }
 
-    // Step 6: Apply cursor pagination (shared logic)
     await this.applyCursorPagination(
       queryBuilder,
       query,
@@ -99,10 +93,8 @@ export abstract class BaseCursorPaginationService<
       limit + 1,
     );
 
-    // Step 7: Select fields (hook method - subclass implements)
     await this.selectFields(queryBuilder, sortBy);
 
-    // Step 8: Build paginated result (shared logic with hook)
     return this.buildPaginatedResult(
       queryBuilder,
       query,
