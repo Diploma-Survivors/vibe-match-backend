@@ -31,7 +31,7 @@ export class TopicsService {
 
   @Cacheable({
     key: 'topics:all',
-    ttl: CACHE_TTL.ONE_HOUR,
+    ttl: CACHE_TTL.ONE_DAY,
   })
   async findAll() {
     return this.topicsRepository.find();
@@ -43,7 +43,7 @@ export class TopicsService {
 
   @Cacheable({
     key: (id: number) => `topic:${id}`,
-    ttl: CACHE_TTL.ONE_HOUR,
+    ttl: CACHE_TTL.ONE_DAY,
   })
   async findOne(id: number) {
     return this.topicsRepository.findOne({ where: { id } });

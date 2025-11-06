@@ -6,9 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
+import { Repository } from 'typeorm';
 import { JwtAuthService } from '../../modules/auth/jwt-auth.service';
 import { CourseService } from '../../modules/course/services/course.service';
 import { UserCourseService } from '../../modules/user-course/services/user-course.service';
@@ -27,22 +27,19 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { AssignmentContentType } from 'src/common/enums/assignment-content-type.enum';
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
-import { Contest } from '../contests/entities/contest.entity';
 import { ContestsService } from '../contests/contests.service';
+import { Contest } from '../contests/entities/contest.entity';
 import { Course } from '../course/entities/course.entity';
-import { Problem } from '../problems/entities/problem.entity';
-import { ProblemType } from '../problems/enums/problem-type.enum';
-import { ProblemsService } from '../problems/problems.service';
 import { User } from '../user/entities/user.entity';
 import { RoleEnum } from '../user/enums/role.enum';
 import { IdTokenPayloadDto } from './dto/id-token-payload.dto';
 import { LtiDeepLinkingRequestDto } from './dto/lti-deep-linking-request.dto';
 import { LtiDeepLinkingJwtPayloadDto } from './dto/lti-deep-linking-response.dto';
 import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
+import { LtiLaunchSession } from './entities/lti-launch-session.entity';
 import { ContentItemType } from './enums/content-item-type.enum';
 import { LtiMessageType } from './enums/lti-message-type.enum';
 import { KeysService } from './keys.service';
-import { LtiLaunchSession } from './entities/lti-launch-session.entity';
 
 const LTI_STATE_TTL_SECONDS = 300;
 const LTI_DEEP_LINKING_TIMEOUT_MS = 10 * 60 * 1000;
@@ -68,7 +65,6 @@ export class LtiService {
     private readonly courseService: CourseService,
     private readonly userCourseService: UserCourseService,
     private readonly keysService: KeysService,
-    private readonly problemsService: ProblemsService,
     private readonly contestService: ContestsService,
     @InjectRepository(LtiLaunchSession)
     private readonly ltiLaunchSessionRepository: Repository<LtiLaunchSession>,
@@ -188,17 +184,11 @@ export class LtiService {
       nonce,
     );
 
-    // Get content identifiers from custom claims (currently supporting problem or contest)
-    const problemId = Number.parseInt(
-      claims.customClaims?.['problemId'] as string,
-    );
     const contestId = Number.parseInt(
-      claims.customClaims?.['contestId'] as string,
+      claims?.customClaims?.['contestId'] as string,
     );
-    if (isNaN(problemId) && isNaN(contestId)) {
-      throw new BadRequestException(
-        'Missing required custom claim: problemId or contestId',
-      );
+    if (Number.isNaN(contestId)) {
+      throw new BadRequestException('Missing required custom claim: contestId');
     }
 
     // Update or create the user in the local database based on LTI claims
@@ -221,12 +211,11 @@ export class LtiService {
       );
     }
 
-    if (agsEndpoint && (problemId || contestId)) {
+    if (agsEndpoint && contestId) {
       ltiSession = await this.saveLtiLaunchSession({
         userId: user.id,
         ltiUserId: claims.sub,
-        problemId: problemId || null,
-        contestId: contestId || null,
+        contestId: contestId ?? null,
         resourceLinkId: claims.resourceLink.id,
         contextId: claims.context.id,
         agsLineitemUrl: agsEndpoint.lineitem,
@@ -242,15 +231,13 @@ export class LtiService {
     // Issue JWT tokens for the user
     const tokens = await this.issueTokens(user, claims, course, ltiSession?.id);
 
-    const contentType = problemId
-      ? AssignmentContentType.PROBLEM
-      : AssignmentContentType.CONTEST;
+    const contentType = AssignmentContentType.CONTEST;
 
     // Determine the appropriate redirect target based on user roles and content type
     const redirectTarget = this.getRedirectTargetForFrontend(
       user.roles,
       contentType,
-      problemId || contestId,
+      contestId,
     );
 
     return {
@@ -385,49 +372,26 @@ export class LtiService {
         ]
       : [];
 
-    const problemId = Number.parseInt(
-      ltiResourceLinkDto?.custom?.['problemId'] as string,
-    );
     const contestId = Number.parseInt(
       ltiResourceLinkDto?.custom?.['contestId'] as string,
     );
 
-    if (isNaN(problemId) && isNaN(contestId)) {
-      throw new BadRequestException(
-        'Missing required custom claim: problemId or contestId',
-      );
-    }
-    if (!isNaN(problemId) && !isNaN(contestId)) {
-      throw new BadRequestException(
-        'Redundant field of custom claims: provide either problemId or contestId, not both',
-      );
+    if (Number.isNaN(contestId)) {
+      throw new BadRequestException('Missing required custom claim: contestId');
     }
 
-    // Validate the selected content belongs to the current course
-    if (problemId) {
-      const problem = await this.problemsService.findById(problemId, {
+    const contest = await this.contestService.findOne(
+      { id: contestId },
+      {
         id: true,
-        type: true,
-      });
-      if (!problem || problem.type === ProblemType.CONTEST) {
-        throw new BadRequestException('Problem not found or invalid');
-      }
-
-      this.logger.debug(`Deep linking selected problem ID: ${problemId}`);
-    } else if (contestId) {
-      const contest = await this.contestService.findOne(
-        { id: contestId },
-        {
-          id: true,
-          courseId: true,
-        },
-      );
-      if (!contest || contest.courseId !== currentCourse) {
-        throw new BadRequestException('Contest not found');
-      }
-
-      this.logger.debug(`Deep linking selected contest ID: ${contestId}`);
+        courseId: true,
+      },
+    );
+    if (contest?.courseId !== currentCourse) {
+      throw new BadRequestException('Contest not found');
     }
+
+    this.logger.debug(`Deep linking selected contest ID: ${contestId}`);
 
     // Retrieve deep linking session data from Redis
     const keyRedis = this.getKeyRedisForDeepLinking(deviceId);
@@ -744,7 +708,6 @@ export class LtiService {
   private async saveLtiLaunchSession(params: {
     userId: number;
     ltiUserId: string;
-    problemId: number | null;
     contestId: number | null;
     resourceLinkId: string;
     contextId: string;
@@ -761,7 +724,6 @@ export class LtiService {
     const session = this.ltiLaunchSessionRepository.create({
       user: { id: params.userId } as User,
       ltiUserId: params.ltiUserId,
-      problem: params.problemId ? ({ id: params.problemId } as Problem) : null,
       contest: params.contestId ? ({ id: params.contestId } as Contest) : null,
       resourceLinkId: params.resourceLinkId,
       contextId: params.contextId,
