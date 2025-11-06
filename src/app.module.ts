@@ -7,6 +7,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Third-party
+import KeyvRedis from '@keyv/redis';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { addTransactionalDataSource } from 'typeorm-transactional';
 
@@ -68,9 +69,19 @@ import { RedisModule } from './shared/redis/redis.module';
       inject: [ConfigService],
     }),
     CacheModule.registerAsync({
-      useFactory: (configService: ConfigService) => ({
-        ...(configService.get('redis') as Record<string, unknown>),
-      }),
+      useFactory: (configService: ConfigService) => {
+        const username = configService.get<string>('redis.username');
+        const password = configService.get<string>('redis.password');
+        const host = configService.get<string>('redis.host');
+        const port = configService.get<number>('redis.port');
+        const db = configService.get<number>('redis.db');
+        const authPart = username && password ? `${username}:${password}@` : '';
+        const redisUrl = `redis://${authPart}${host}:${port}/${db}`;
+
+        return {
+          stores: [new KeyvRedis(redisUrl)],
+        };
+      },
       inject: [ConfigService],
       isGlobal: true,
     }),
