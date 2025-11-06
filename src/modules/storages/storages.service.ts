@@ -8,11 +8,13 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as readline from 'node:readline';
 import { FileUploadOptions } from './interfaces/file-update-options.interface';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
+import { Readable } from 'node:stream';
 
 @Injectable()
 export class StoragesService {
   private readonly client: S3Client;
+  private readonly useAWS: boolean;
 
   constructor(private readonly configService: ConfigService) {
     const accessKeyId = this.configService.get<string>('aws.s3.accessKeyId');
@@ -20,6 +22,7 @@ export class StoragesService {
       'aws.s3.secretAccessKey',
     );
     const region = this.configService.get<string>('aws.s3.region');
+    this.useAWS = this.configService.get<boolean>('useAWS')!;
 
     const clientConfig: S3ClientConfig = {
       region,
@@ -66,18 +69,33 @@ export class StoragesService {
     }
   }
 
-  async *streamLinesLocal(filePath: string): AsyncGenerator<string> {
-    const fileStream = fs.createReadStream(filePath, {
-      encoding: 'utf-8',
-    });
+  async readFile(bucketOrPath: string, key?: string): Promise<Buffer> {
+    if (this.useAWS) {
+      if (!key) throw new Error('Missing S3 key');
 
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
+      const command = new GetObjectCommand({ Bucket: bucketOrPath, Key: key });
+      const response = await this.client.send(command);
 
-    for await (const line of rl) {
-      yield line.trim();
+      const stream = response.Body as Readable;
+      const chunks: Uint8Array[] = [];
+
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
+      return Buffer.concat(chunks);
     }
+
+    return fs.readFile(bucketOrPath);
+  }
+
+  async readAuto(source: string): Promise<Buffer> {
+    if (this.useAWS) {
+      const url = new URL(source);
+      const bucket = url.hostname.split('.')[0];
+      const key = url.pathname.substring(1);
+      return this.readFile(bucket, key);
+    }
+    return this.readFile(source);
   }
 }

@@ -39,5 +39,13 @@ export const ApiPaginatedSubmissionsResponse = () => {
         ],
       },
     }),
+    ApiResponse({
+      status: HttpStatus.UNAUTHORIZED,
+      description: 'Unauthorized',
+    }),
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'You are not allowed to view this submission list.',
+    }),
   );
 };

@@ -14,8 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { Language } from '../language/entities/language.entity';
 import { User } from '../user/entities/user.entity';
 import { StoragesService } from '../storages/storages.service';
-import { Module, forwardRef } from '@nestjs/common';
-import { SubmissionQueue } from './enums/submission-event.enum';
+import { forwardRef, Module } from '@nestjs/common';
 import { Contest } from '../contests/entities/contest.entity';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { LtiModule } from '../lti/lti.module';
@@ -26,6 +25,9 @@ import { SingleSubmissionStrategy } from './strategies/single-submission.strateg
 import { BestScoreStrategy } from './strategies/best-score.strategy';
 import { LatestScoreStrategy } from './strategies/latest-score.strategy';
 import { AverageScoreStrategy } from './strategies/average-score.strategy';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
+import { SubmissionQueue } from './enums/submission-event.enum';
+import { TestcaseParserUtil } from './helpers/parse-test-file-util';
 
 @Module({
   imports: [
@@ -72,7 +74,9 @@ import { AverageScoreStrategy } from './strategies/average-score.strategy';
     CallbackProcessor,
     SubmissionService,
     SubmissionsSseService,
+    SubmissionCursorService,
     StoragesService,
+    TestcaseParserUtil,
     GradingStrategyService,
     GradingStrategyFactory,
     SingleSubmissionStrategy,

@@ -9,18 +9,18 @@ import {
 } from 'typeorm';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Language } from '../../language/entities/language.entity';
-import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
 import { ResultDescription } from '../dto/result-description.dto';
+import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 
 @Entity()
 @Index('idx_submission_user', ['user']) // search submissions by user
 @Index('idx_submission_contest_problem', ['contestParticipation', 'problem']) // search submisisons of 1 user in a contest participation by problem
 export class Submission {
-  @PrimaryGeneratedColumn('uuid', { name: 'submission_id' })
-  id: string;
+  @PrimaryGeneratedColumn('increment', { name: 'submission_id' })
+  id: number;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })

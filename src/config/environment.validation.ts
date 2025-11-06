@@ -67,4 +67,6 @@ export default Joi.object({
   JUDGE0_CALLBACK_URL: Joi.string().uri().required(),
   RAPIDAPI_KEY: Joi.string().required(),
   RAPIDAPI_HOST: Joi.string().required(),
+  JUDGE0_USE_CE: Joi.boolean().required(),
+  USE_AWS: Joi.boolean().required(),
 });

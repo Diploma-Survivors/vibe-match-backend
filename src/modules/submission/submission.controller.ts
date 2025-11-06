@@ -2,7 +2,10 @@ import {
   Body,
   ClassSerializerInterceptor,
   Controller,
+  Get,
   HttpCode,
+  HttpStatus,
+  Logger,
   MessageEvent,
   Param,
   Post,
@@ -17,7 +20,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { finalize, interval, merge, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags, getSchemaPath, } from '@nestjs/swagger';
+import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
+import { ApiPaginatedSubmissionsResponse } from './decorators/api-paginated-submissions.decorator';
 import { SubmissionService } from './submission.service';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
@@ -31,10 +36,15 @@ import { SkipTransformResponse } from '../../common/decorators/skip-transform.de
 import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
 
+import { SubmissionDetailDto } from './dto/detail-submission.dto';
+import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
+import { string } from 'joi';
+
 @ApiTags('submissions')
 @Controller('submissions')
 @UseInterceptors(ClassSerializerInterceptor)
 export class SubmissionController {
+  logger = new Logger(SubmissionController.name);
   constructor(
     private readonly submissionService: SubmissionService,
     private readonly submissionsSseService: SubmissionsSseService,
@@ -43,6 +53,17 @@ export class SubmissionController {
   ) {}
 
   @Post('run')
+  @ApiResponse({
+    type: () => string,
+    status: HttpStatus.OK,
+    description: 'Code has been submitted successfully.',
+  })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async run(
     @Body() dto: CreateSubmissionDto,
@@ -52,6 +73,16 @@ export class SubmissionController {
   }
 
   @Post('submit')
+  @ApiResponse({
+    type: () => string,
+    status: HttpStatus.OK,
+    description: 'Code has been submitted successfully.',
+  })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async submit(
@@ -60,6 +91,97 @@ export class SubmissionController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.submissionService.submit(dto, user, file);
+  }
+
+  @Post('/contest-participation/:contestId/submit')
+  @ApiResponse({
+    type: () => string,
+    status: HttpStatus.OK,
+    description: 'Code has been submitted successfully.',
+  })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You are not allowed to submit to this contest.',
+  })
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async submitToContest(
+    @Param('contestId') contestId: number,
+    @Body() dto: CreateSubmissionDto,
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.submissionService.submitToContest(contestId, dto, user, file);
+  }
+
+  @Get('/problem/:problemId')
+  @ApiBearerAuth()
+  @ApiPaginatedSubmissionsResponse()
+  @UseGuards(JwtAuthGuard)
+  @ApiQuery({
+    name: 'filters',
+    required: false,
+    style: 'deepObject',
+    explode: true,
+    schema: { $ref: getSchemaPath(QuerySubmissionsFilterDto) },
+  })
+  async getByProblem(
+    @Param('problemId') problemId: number,
+    @Query() query: SubmissionsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.submissionService.getListSubmissionOfUserInOneProblem(
+      problemId,
+      user,
+      query,
+    );
+  }
+
+  @Get('/contest-participation/:contestParticipationId/problem/:problemId')
+  @ApiBearerAuth()
+  @ApiPaginatedSubmissionsResponse()
+  @UseGuards(JwtAuthGuard)
+  async getByContestAndProblem(
+    @Param('contestParticipationId') contestParticipationId: number,
+    @Param('problemId') problemId: number,
+    @Query() query: SubmissionsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.submissionService.getByContestParticipationAndProblem(
+      contestParticipationId,
+      problemId,
+      query,
+      user,
+    );
+  }
+
+  @Get('/:id')
+  @ApiOperation({
+    summary: 'Get a submission by ID',
+    description: 'Retrieve a specific submission by its unique ID.',
+  })
+  @ApiResponse({
+    type: () => SubmissionDetailDto,
+    status: HttpStatus.OK,
+    description: 'Get a submission by ID successfully.',
+  })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You are not allowed to view this submission.',
+  })
+  @UseGuards(JwtAuthGuard)
+  async getById(@Param('id') id: number, @CurrentUser() user: JwtPayload) {
+    return this.submissionService.getDetailSubmissionById(id, user);
   }
 
   @Put('judge0/callback/run')
@@ -73,7 +195,9 @@ export class SubmissionController {
     this.submissionCallbackProcessor
       .handleCallback(submissionId, Number(tcid), result, false)
       .catch(() => {
-        /* processor logs errors */
+        this.logger.error(
+          'Failed to process run callback for submission ' + submissionId,
+        );
       });
   }
 
