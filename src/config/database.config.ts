@@ -10,7 +10,7 @@ export default registerAs('database', function () {
     database: process.env.DATABASE_NAME,
     synchronize: process.env.DATABASE_SYNC === 'true',
     autoLoadEntities: process.env.DATABASE_AUTOLOAD === 'true',
-    logging: process.env.NODE_ENV === 'development',
+    logging: false,
     entities: ['dist/**/*.entity{.ts,.js}'],
     migrations: ['dist/migrations/*{.ts,.js}'],
     migrationsRun: process.env.DATABASE_MIGRATIONS_RUN === 'true',

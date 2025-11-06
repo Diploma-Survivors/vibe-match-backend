@@ -1,6 +1,6 @@
 // NestJS
 import { BullModule } from '@nestjs/bullmq';
-import { Module, forwardRef } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -20,7 +20,9 @@ import { SubmissionQueue } from './enums/submission-event.enum';
 import { SubmissionFinalizeProcessor } from './events/submission-finalizer.processor';
 import { SubmissionsSseService } from './events/submission-sse.service';
 import { CallbackProcessor } from './helpers/callback.processor';
+import { TestcaseParserUtil } from './helpers/parse-test-file-util';
 import { RedisKeys } from './helpers/redis-keys.helper';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { AverageScoreStrategy } from './strategies/average-score.strategy';
 import { BestScoreStrategy } from './strategies/best-score.strategy';
 import { GradingStrategyFactory } from './strategies/grading-strategy.factory';
@@ -53,7 +55,7 @@ import { SubmissionService } from './submission.service';
 
         const port = Number.isInteger(portFromConfig)
           ? portFromConfig!
-          : parseInt(process.env.REDIS_PORT ?? '6379', 10);
+          : Number.parseInt(process.env.REDIS_PORT ?? '6379', 10);
         return {
           connection: {
             host,
@@ -75,7 +77,9 @@ import { SubmissionService } from './submission.service';
     CallbackProcessor,
     SubmissionService,
     SubmissionsSseService,
+    SubmissionCursorService,
     StoragesService,
+    TestcaseParserUtil,
     GradingStrategyService,
     GradingStrategyFactory,
     SingleSubmissionStrategy,

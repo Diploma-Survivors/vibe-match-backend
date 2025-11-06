@@ -37,6 +37,7 @@ export interface Judge0Response {
   message?: string;
   status: Judge0Status;
   expected_output?: string; // NOTE: This field is only returned in the GET request not in the callback
+  stdin?: string; // NOTE: This field is only returned in the GET request not in the callback
 }
 
 /**

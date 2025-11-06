@@ -111,6 +111,14 @@ export class CallbackProcessor implements OnModuleInit {
       payload,
     );
 
+    this.logger.log('Callback handled', {
+      submissionId,
+      index,
+      added,
+      received,
+      total,
+    });
+
     if (added && received >= total) {
       await this.tryLockAndScheduleFinalize(submissionId, isSubmit);
     }
@@ -120,30 +128,54 @@ export class CallbackProcessor implements OnModuleInit {
     submissionId: string,
     isSubmit: boolean,
   ): Promise<void> {
-    const metaKey = this.redisKeys.meta(submissionId);
-    const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
-    const seenKey = this.redisKeys.seen(submissionId);
+    try {
+      this.logger.log('Finalizer started', { submissionId, isSubmit });
 
-    const meta = await this.redis.hgetall(metaKey);
-    const results = await this.redis.hgetall(resultsIKey);
+      const metaKey = this.redisKeys.meta(submissionId);
+      const resultsIKey = this.redisKeys.resultsByIndex(submissionId);
+      const seenKey = this.redisKeys.seen(submissionId);
 
-    await this.cleanupRedisKeys(submissionId, [metaKey, resultsIKey, seenKey]);
+      const meta = await this.redis.hgetall(metaKey);
+      const results = await this.redis.hgetall(resultsIKey);
 
-    const testResults = this.aggregateTestResults(results);
-    const finalResult = await this.submissionService.buildSubmissionResult(
-      testResults,
-      +meta.problemId,
-    );
+      await this.cleanupRedisKeys(submissionId, [
+        metaKey,
+        resultsIKey,
+        seenKey,
+      ]);
 
-    if (isSubmit) {
-      await this.updateSubmissionEntity(submissionId, finalResult);
-    }
+      const testResults = this.aggregateTestResults(results);
+      let finalResult: SubmissionResultDto;
 
-    await this.publishFinalize(submissionId, finalResult);
+      if (isSubmit) {
+        finalResult =
+          await this.submissionService.buildSubmissionResultForSubmitMode(
+            testResults,
+            +meta.problemId,
+          );
+        await this.updateSubmissionEntity(
+          Number.parseInt(submissionId),
+          finalResult,
+        );
+      } else {
+        finalResult =
+          await this.submissionService.buildSubmissionResultForRunMode(
+            testResults,
+            +meta.problemId,
+          );
+      }
 
-    // Send grade to Moodle
-    if (isSubmit) {
-      await this.sendGradeToMoodleIfApplicable(submissionId);
+      await this.publishFinalize(submissionId, finalResult);
+
+      if (isSubmit) {
+        await this.sendGradeToMoodleIfApplicable(Number.parseInt(submissionId));
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(`Finalizer failed: ${error.message}`, error.stack);
+      } else {
+        this.logger.error('Finalizer failed with unknown error', error);
+      }
     }
   }
 
@@ -154,31 +186,48 @@ export class CallbackProcessor implements OnModuleInit {
     const lockKey = this.redisKeys.doneLock(submissionId);
     const lock = await this.redis.set(lockKey, '1', 'EX', 600, 'NX');
     if (lock === 'OK') {
+      this.logger.log(
+        `[${submissionId}] Lock acquired. Calling scheduleFinalizeJob.`,
+      );
       await this.scheduleFinalizeJob(submissionId, isSubmit);
+    } else {
+      this.logger.warn(
+        `[${submissionId}] Lock is already held, skipping finalize scheduling.`,
+      );
     }
   }
 
   private async scheduleFinalizeJob(submissionId: string, isSubmit: boolean) {
-    const jobName = isSubmit
-      ? SubmissionJob.FINALIZE_RUN
-      : SubmissionJob.FINALIZE_SUBMIT;
-    await this.finalizeQueue.add(
-      jobName,
-      { submissionId },
-      {
-        jobId: submissionId,
-        attempts: this.configService.get<number>('submission.job.attempts'),
-        backoff: this.configService.get<object>(
-          'submission.job.backoff',
-        ) as BackoffOptions,
-        removeOnComplete: this.configService.get<boolean>(
-          'submission.job.removeOnComplete',
-        ),
-        removeOnFail: this.configService.get<number>(
-          'submission.job.removeOnFail',
-        ),
-      },
+    this.logger.log(
+      `[${submissionId}] Inside scheduleFinalizeJob. Preparing to add to queue.`,
     );
+    const jobName = isSubmit
+      ? SubmissionJob.FINALIZE_SUBMIT
+      : SubmissionJob.FINALIZE_RUN;
+    try {
+      await this.finalizeQueue.add(
+        jobName,
+        { submissionId },
+        {
+          jobId: `finalize-${submissionId}`, // Add a string prefix
+          attempts: this.configService.get<number>('submission.job.attempts'),
+          backoff: this.configService.get<object>(
+            'submission.job.backoff',
+          ) as BackoffOptions,
+          removeOnComplete: this.configService.get<boolean>(
+            'submission.job.removeOnComplete',
+          ),
+          removeOnFail: this.configService.get<number>(
+            'submission.job.removeOnFail',
+          ),
+        },
+      );
+    } catch (error) {
+      this.logger.error(
+        `[${submissionId}] FAILED to add job to finalizeQueue`,
+        error,
+      );
+    }
   }
 
   private aggregateTestResults(
@@ -191,7 +240,7 @@ export class CallbackProcessor implements OnModuleInit {
   }
 
   private async updateSubmissionEntity(
-    submissionId: string,
+    submissionId: number,
     finalResult: SubmissionResultDto,
   ) {
     const savedSubmission = await this.submissionRepository.findOne({
@@ -205,6 +254,7 @@ export class CallbackProcessor implements OnModuleInit {
     savedSubmission.passedTests = finalResult.passedTests;
     savedSubmission.runtime = finalResult.runtime;
     savedSubmission.memory = finalResult.memory;
+    savedSubmission.resultDescription = finalResult.resultDescription!;
 
     await this.submissionRepository.save(savedSubmission);
   }
@@ -306,7 +356,7 @@ export class CallbackProcessor implements OnModuleInit {
   }
 
   private async sendGradeToMoodleIfApplicable(
-    submissionId: string,
+    submissionId: number,
   ): Promise<void> {
     try {
       const submission = await this.submissionRepository.findOne({
