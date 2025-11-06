@@ -262,25 +262,17 @@ export class SubmissionService {
   ) {
     if (!query) return;
     if (query.status) {
-      if (
-        query.status == SubmissionStatus.RUNTIME_ERROR ||
-        query.status == SubmissionStatus.TIME_LIMIT_EXCEEDED ||
-        query.status == SubmissionStatus.SIGABRT ||
-        query.status == SubmissionStatus.SIGFPE ||
-        query.status == SubmissionStatus.SIGSEGV ||
-        query.status == SubmissionStatus.SIGXFSZ ||
-        query.status == SubmissionStatus.NZEC
-      ) {
+      const RUNTIME_ERROR_STATUSES: Array<SubmissionStatus> = [
+        SubmissionStatus.SIGABRT,
+        SubmissionStatus.SIGFPE,
+        SubmissionStatus.SIGSEGV,
+        SubmissionStatus.SIGXFSZ,
+        SubmissionStatus.NZEC,
+        SubmissionStatus.RUNTIME_ERROR,
+      ];
+      if (RUNTIME_ERROR_STATUSES.includes(query.status)) {
         qb.andWhere('submission.status IN (:...statuses)', {
-          statuses: [
-            SubmissionStatus.RUNTIME_ERROR,
-            SubmissionStatus.TIME_LIMIT_EXCEEDED,
-            SubmissionStatus.SIGABRT,
-            SubmissionStatus.SIGFPE,
-            SubmissionStatus.SIGSEGV,
-            SubmissionStatus.SIGXFSZ,
-            SubmissionStatus.NZEC,
-          ],
+          statuses: RUNTIME_ERROR_STATUSES,
         });
         return;
       }
@@ -306,7 +298,10 @@ export class SubmissionService {
       .innerJoinAndSelect('submission.user', 'user')
       .innerJoinAndSelect('submission.language', 'language')
       .where('problem.id = :problemId', { problemId })
-      .andWhere('contest.id = :contestId', { contestParticipationId })
+      .andWhere(
+        'submission.contest_participation_id = :contestParticipationId',
+        { contestParticipationId },
+      )
       .andWhere('user.id = :userId', { userId: user.userId });
 
     this.applyFilter(queryBuilder, query.filters);
