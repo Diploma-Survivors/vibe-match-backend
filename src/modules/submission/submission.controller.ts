@@ -20,14 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { finalize, interval, merge, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-  getSchemaPath,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags, getSchemaPath, } from '@nestjs/swagger';
 import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
 import { ApiPaginatedSubmissionsResponse } from './decorators/api-paginated-submissions.decorator';
 import { SubmissionService } from './submission.service';
@@ -42,9 +35,10 @@ import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
 import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
-import { string } from 'joi';
+
 import { SubmissionDetailDto } from './dto/detail-submission.dto';
 import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
+import { string } from 'joi';
 
 @ApiTags('submissions')
 @Controller('submissions')
