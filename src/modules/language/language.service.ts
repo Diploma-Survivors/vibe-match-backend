@@ -21,7 +21,7 @@ export class LanguageService {
 
   @Cacheable({
     key: 'languages:all',
-    ttl: CACHE_TTL.ONE_HOUR,
+    ttl: CACHE_TTL.ONE_DAY,
   })
   async findAll(): Promise<Language[]> {
     return this.languageRepository.find();
@@ -29,7 +29,7 @@ export class LanguageService {
 
   @Cacheable({
     key: (id: number) => `language:${id}`,
-    ttl: CACHE_TTL.ONE_HOUR,
+    ttl: CACHE_TTL.ONE_DAY,
   })
   async findOne(id: number): Promise<Language> {
     const language = await this.languageRepository.findOneBy({ id });

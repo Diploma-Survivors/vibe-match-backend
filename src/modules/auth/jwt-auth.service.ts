@@ -1,7 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { JwtConfig } from '../../config/auth.config';
 import { JwtPayload } from './interfaces/jwt.interface';
@@ -29,11 +29,24 @@ export class JwtAuthService {
     const secret = jwtConfig.secret;
     const audience = jwtConfig.tokenAudience;
 
-    return await this.jwtService.signAsync(payload, {
-      secret: secret,
-      expiresIn: accessTokenTtl,
-      audience: audience,
-    });
+    return await this.jwtService.signAsync(
+      {
+        userId: payload.userId,
+        courseId: payload?.courseId,
+        email: payload?.email,
+        firstName: payload?.firstName,
+        lastName: payload?.lastName,
+        roles: payload.roles,
+        sub: payload?.sub,
+        iss: payload?.iss,
+        ltiSessionId: payload?.ltiSessionId,
+      },
+      {
+        secret: secret,
+        expiresIn: accessTokenTtl,
+        audience: audience,
+      },
+    );
   }
 
   public async generateRefreshToken(
@@ -52,11 +65,24 @@ export class JwtAuthService {
     const refreshTokenSecret = jwtConfig.refreshTokenSecret;
     const audience = jwtConfig.tokenAudience;
 
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: refreshTokenSecret,
-      expiresIn: refreshTokenTtl,
-      audience: audience,
-    });
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        userId: payload.userId,
+        courseId: payload?.courseId,
+        email: payload?.email,
+        firstName: payload?.firstName,
+        lastName: payload?.lastName,
+        roles: payload.roles,
+        sub: payload?.sub,
+        iss: payload?.iss,
+        ltiSessionId: payload?.ltiSessionId,
+      },
+      {
+        secret: refreshTokenSecret,
+        expiresIn: refreshTokenTtl,
+        audience: audience,
+      },
+    );
 
     const refreshTokenHashed = this.hashRefreshToken(refreshToken);
     const redisKey = this.getRefreshTokenKey(payload.userId, deviceId);

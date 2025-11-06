@@ -30,7 +30,6 @@ import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestsService } from '../contests/contests.service';
 import { Contest } from '../contests/entities/contest.entity';
 import { Course } from '../course/entities/course.entity';
-import { ProblemsService } from '../problems/problems.service';
 import { User } from '../user/entities/user.entity';
 import { RoleEnum } from '../user/enums/role.enum';
 import { IdTokenPayloadDto } from './dto/id-token-payload.dto';
@@ -66,7 +65,6 @@ export class LtiService {
     private readonly courseService: CourseService,
     private readonly userCourseService: UserCourseService,
     private readonly keysService: KeysService,
-    private readonly problemsService: ProblemsService,
     private readonly contestService: ContestsService,
     @InjectRepository(LtiLaunchSession)
     private readonly ltiLaunchSessionRepository: Repository<LtiLaunchSession>,

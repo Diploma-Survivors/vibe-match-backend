@@ -37,7 +37,7 @@ export class TagsService {
 
   @Cacheable({
     key: 'tags:all',
-    ttl: CACHE_TTL.ONE_HOUR,
+    ttl: CACHE_TTL.ONE_DAY,
   })
   async findAll() {
     return await this.tagsRepository.find();
@@ -45,7 +45,7 @@ export class TagsService {
 
   @Cacheable({
     key: (id: number) => `tag:${id}`,
-    ttl: CACHE_TTL.ONE_HOUR,
+    ttl: CACHE_TTL.ONE_DAY,
   })
   async findOne(id: number) {
     return await this.tagsRepository.findOne({ where: { id } });

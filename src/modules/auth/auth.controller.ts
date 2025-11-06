@@ -69,7 +69,7 @@ export class AuthController {
   ) {
     try {
       const newAccessToken =
-        this.jwtAuthService.generateAccessToken(jwtPayload);
+        await this.jwtAuthService.generateAccessToken(jwtPayload);
       const newRefreshToken = await this.jwtAuthService.generateRefreshToken(
         jwtPayload,
         refreshTokenDto.deviceId,
