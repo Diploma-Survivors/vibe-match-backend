@@ -1,3 +1,4 @@
+import { LtiLaunchSession } from 'src/modules/lti/entities/lti-launch-session.entity';
 import {
   Column,
   CreateDateColumn,
