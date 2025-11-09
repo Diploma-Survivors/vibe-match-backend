@@ -1,5 +1,5 @@
+// NestJS
 import {
-  BadRequestException,
   Body,
   ClassSerializerInterceptor,
   Controller,
@@ -14,7 +14,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -25,6 +24,8 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+
+// Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -32,21 +33,21 @@ import {
   CursorEdgeDto,
   PaginationCursorResponseDto,
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
+
+// Relative imports
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
+import { GetProblemForInstructorResponseDto } from './dto/get-problem-for-instructor-response.dto';
 import { GetDetailProblemResponseDto } from './dto/get-problem-response.dto';
 import { GetProblemsResponseDto } from './dto/get-problems-response.dto';
 import { ProblemsCursorQueryDto } from './dto/problems-cursor-query.dto';
+import { UpdateProblemResponseDto } from './dto/update-problem-response.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
+import { FileInterceptor } from './interceptors/file.interceptor';
 import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsService } from './problems.service';
-import {
-  TESTCASE_FILE_FIELD_NAME,
-  TESTCASE_FILE_MIME_TYPE,
-  TESTCASE_MAX_FILE_SIZE,
-} from './testcases/constants/testcases.constant';
 
 // Helper function to generate paginated response schema
 const getPaginatedProblemsSchema = () => ({
@@ -128,24 +129,7 @@ export class ProblemsController {
   })
   @ApiConsumes('multipart/form-data')
   @ApiInstructorAuth()
-  @UseInterceptors(
-    FileInterceptor(TESTCASE_FILE_FIELD_NAME, {
-      limits: { fileSize: TESTCASE_MAX_FILE_SIZE },
-      fileFilter: (_req, file, cb) => {
-        if (file.mimetype !== TESTCASE_FILE_MIME_TYPE) {
-          return cb(
-            new BadRequestException(
-              'Invalid file type. File must be a text/plain file.',
-            ),
-            false,
-          );
-        }
-
-        return cb(null, true);
-      },
-    }),
-    ClassSerializerInterceptor,
-  )
+  @UseInterceptors(FileInterceptor(), ClassSerializerInterceptor)
   async createProblem(
     @Body() createProblemDto: CreateProblemDto,
     @CurrentUser() user: JwtPayload,
@@ -193,16 +177,30 @@ export class ProblemsController {
     );
   }
 
-  @Get('selectable-for-assignment')
-  @ApiOperation({
-    summary: 'Get list problems for assignment creation',
-    description:
-      'Get list problems that instructors can select to add to an assignment',
+  @Get(':id/detail')
+  @ApiOperation({ summary: 'Get detailed problem by ID (Instructor only)' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Problem ID' })
+  @ApiResponse({
+    type: () => GetProblemForInstructorResponseDto,
+    status: HttpStatus.OK,
+    description: 'The problem has been found.',
   })
-  @ApiPaginatedProblemsResponse()
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Problem not found.',
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiInstructorAuth()
-  async findSelectableForAssignment(@Query() query: ProblemsCursorQueryDto) {
-    return await this.problemsService.findProblemsForAssignmentCreation(query);
+  @UseInterceptors(ClassSerializerInterceptor)
+  async findDetailedProblemById(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const problem = await this.problemsService.getDetailProblemForInstructor(
+      +id,
+      currentUser,
+    );
+    return new GetProblemForInstructorResponseDto(problem);
   }
 
   @Get(':id')
@@ -236,8 +234,9 @@ export class ProblemsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a problem (Instructor only)' })
   @ApiParam({ name: 'id', type: 'string', description: 'Problem ID' })
+  @ApiConsumes('multipart/form-data')
   @ApiResponse({
-    type: () => CreateProblemResponseDto,
+    type: () => UpdateProblemResponseDto,
     status: HttpStatus.OK,
     description: 'The problem has been updated.',
   })
@@ -246,12 +245,24 @@ export class ProblemsController {
     description: 'Problem not found.',
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @UseInterceptors(FileInterceptor())
   @ApiInstructorAuth()
   async update(
     @Param('id') id: string,
     @Body() updateProblemDto: UpdateProblemDto,
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() testcaseFile?: Express.Multer.File,
   ) {
-    return await this.problemsService.updateById(+id, updateProblemDto);
+    await this.problemsService.updateById(
+      +id,
+      updateProblemDto,
+      user,
+      testcaseFile,
+    );
+
+    return {
+      message: 'Problem updated successfully',
+    };
   }
 
   @Delete(':id')

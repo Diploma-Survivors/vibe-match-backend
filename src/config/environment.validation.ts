@@ -48,9 +48,7 @@ export default Joi.object({
   AWS_S3_REGION: Joi.string().required(),
   AWS_S3_BUCKET_NAME: Joi.string().required(),
   // LTI Frontend Callback URLS
-  LTI_FRONTEND_STUDENT_PROBLEM_URL: Joi.string().required(),
   LTI_FRONTEND_STUDENT_CONTEST_URL: Joi.string().required(),
-  LTI_FRONTEND_INSTRUCTOR_PROBLEM_URL: Joi.string().required(),
   LTI_FRONTEND_INSTRUCTOR_CONTEST_URL: Joi.string().required(),
   LTI_FRONTEND_SELECT_CONTENT_URL: Joi.string().uri().required(),
   LTI_FRONTEND_STUDENT_SET_COOKIES_URL: Joi.string().uri().required(),

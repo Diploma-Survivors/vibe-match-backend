@@ -1,13 +1,16 @@
+// NestJS
 import { Injectable } from '@nestjs/common';
+
+// Third-party
 import {
   ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-export const AFTER_TIME_VALIDATOR = 'AFTER_TIME_VALIDATOR';
+export const LESS_THAN_VALIDATOR = 'LESS_THAN_VALIDATOR';
 
-@ValidatorConstraint({ name: AFTER_TIME_VALIDATOR, async: false })
+@ValidatorConstraint({ name: LESS_THAN_VALIDATOR, async: false })
 @Injectable()
 export class IsLessThanValidator<T> implements ValidatorConstraintInterface {
   validate(value: T, args: ValidationArguments): Promise<boolean> | boolean {
@@ -18,7 +21,7 @@ export class IsLessThanValidator<T> implements ValidatorConstraintInterface {
     const [relatedPropertyName] = args.constraints as string[];
     const relatedValue = args?.object?.[relatedPropertyName] as T;
     if (!relatedValue) {
-      return false;
+      return true;
     }
 
     return value < relatedValue;

@@ -9,11 +9,11 @@ import {
 } from 'typeorm';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Language } from '../../language/entities/language.entity';
+import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 import { SubmissionStatus } from '../enums/submission-status.enum';
 import { ResultDescription } from '../dto/result-description.dto';
-import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 
 @Entity()
 @Index('idx_submission_user', ['user']) // search submissions by user
@@ -22,9 +22,15 @@ export class Submission {
   @PrimaryGeneratedColumn('increment', { name: 'submission_id' })
   id: number;
 
+  @Column({ name: 'user_id' })
+  userId: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @Column({ name: 'problem_id' })
+  problemId: number;
 
   @ManyToOne(() => Problem)
   @JoinColumn({ name: 'problem_id' })

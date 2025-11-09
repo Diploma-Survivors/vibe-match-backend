@@ -1,19 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { SortOrder } from '../../../common/pagination/enums/sort-order.enum';
 import { CursorPaginated } from '../../../common/pagination/interfaces/cursor-paginated.interface';
 import {
   decodeCursor,
   encodeCursor,
 } from '../../../common/utils/cursor-query.util';
-import { Submission } from '../entities/submission.entity';
-import { SubmissionsCursorQueryDto } from '../dto/submission-cursor-query.dto';
 import { SubmissionInListDto } from '../dto/get-submissions-response.dto';
-import { CountSubmissionField } from '../interfaces/count-submission-field';
 import { SubmissionCursorFieldsDto } from '../dto/submission-cursor-fields.dto';
+import { SubmissionsCursorQueryDto } from '../dto/submission-cursor-query.dto';
+import { Submission } from '../entities/submission.entity';
+import { CountSubmissionField } from '../interfaces/count-submission-field';
 
 @Injectable()
 export class SubmissionCursorService {
@@ -102,7 +102,7 @@ export class SubmissionCursorService {
   private async getAndValidateCursorPayload(
     payload: string,
   ): Promise<SubmissionCursorFieldsDto> {
-    const cursorRaw = decodeCursor(payload) as Record<string, any>;
+    const cursorRaw = decodeCursor<SubmissionCursorFieldsDto>(payload);
     const cursor = plainToInstance(SubmissionCursorFieldsDto, cursorRaw);
     const errors = await validate(cursor);
     if (errors.length > 0) {
@@ -138,8 +138,8 @@ export class SubmissionCursorService {
       }),
     }));
 
-    const startCursor = edges.length > 0 ? edges[0].cursor : null;
-    const endCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+    const startCursor = edges?.[0]?.cursor ?? null;
+    const endCursor = edges?.at(-1)?.cursor ?? null;
 
     const hasNextPage = isBackward ? !!query.before : hasMore;
     const hasPreviousPage = isBackward ? hasMore : !!query.after;

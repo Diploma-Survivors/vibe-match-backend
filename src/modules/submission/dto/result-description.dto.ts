@@ -15,6 +15,7 @@ export class ResultDescription {
   })
   @Expose()
   input?: string;
+
   @ApiProperty({
     description: 'The expected output for the given input.',
     example: '15',

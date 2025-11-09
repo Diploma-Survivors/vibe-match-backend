@@ -3,6 +3,10 @@ import { Transform } from 'class-transformer';
 
 export function JsonArrayTransform(fieldName: string): PropertyDecorator {
   return Transform(({ value }) => {
+    if (!value) {
+      return;
+    }
+
     if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value) as unknown;

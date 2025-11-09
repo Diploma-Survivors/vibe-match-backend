@@ -53,7 +53,7 @@ export class UserController {
     description: 'User not found',
   })
   findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
+    return this.userService.findOne({ where: { id: +id } });
   }
 
   @Patch(':id')

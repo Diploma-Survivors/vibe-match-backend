@@ -1,3 +1,4 @@
+// NestJS
 import {
   BadRequestException,
   HttpException,
@@ -7,15 +8,23 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { SubmissionCursorService } from './helpers/submission-cursor.service';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+
+// Third-party
+import { plainToInstance } from 'class-transformer';
 import Redis from 'ioredis';
 import { Repository } from 'typeorm';
+import { SelectQueryBuilder } from 'typeorm/browser';
 import { v4 as uuidv4 } from 'uuid';
+
+// Shared/Common
+import { CACHE_TTL } from 'src/common/constants/cache.constants';
 import { REDIS } from '../../shared/redis/redis.module';
 import { Base64Util } from '../../shared/util/base64.util';
 import { TimeUtil } from '../../shared/util/time.util';
+
+// Relative imports
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { Contest } from '../contests/entities/contest.entity';
@@ -25,36 +34,37 @@ import {
   Judge0SubmissionPayload,
 } from '../judge0/judge0.interface';
 import { Judge0Service } from '../judge0/judge0.service';
+import { isMultiFileProgram } from '../language/constants/language.constants';
 import { Language } from '../language/entities/language.entity';
+import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
 import { Problem } from '../problems/entities/problem.entity';
 import { TestResultDto } from '../problems/testcases/dto/run-testcase-result.response.dto';
 import { StoragesService } from '../storages/storages.service';
 import { User } from '../user/entities/user.entity';
+import { RoleEnum } from '../user/enums/role.enum';
 import { SubmissionConstants } from './constants/submission.constant';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { SubmissionDetailDto } from './dto/detail-submission.dto';
+import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
+import { ResultDescription } from './dto/result-description.dto';
+import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
 import { SubmissionResultDto } from './dto/submission.result.dto';
 import { Submission } from './entities/submission.entity';
 import {
   judge0StatusMap,
   SubmissionStatus,
 } from './enums/submission-status.enum';
-import { RedisKeys } from './helpers/redis-keys.helper';
-import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
-import { SubmissionDetailDto } from './dto/detail-submission.dto';
-import { plainToInstance } from 'class-transformer';
-import { CountSubmissionField } from './interfaces/count-submission-field';
-import { RoleEnum } from '../user/enums/role.enum';
-import { ResultDescription } from './dto/result-description.dto';
 import { TestcaseParserUtil } from './helpers/parse-test-file-util';
-import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
-import { SelectQueryBuilder } from 'typeorm/browser';
-import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
+import { RedisKeys } from './helpers/redis-keys.helper';
+import { SubmissionCursorService } from './helpers/submission-cursor.service';
+import { CountSubmissionField } from './interfaces/count-submission-field';
 import { GradingStrategyService } from './strategies/grading-strategy.service';
 
 @Injectable()
 export class SubmissionService {
-  private static readonly REDIS_TTL_SECONDS = 3600; // 1 hour
+  private static readonly REDIS_TTL_SECONDS = CACHE_TTL.ONE_HOUR;
   private readonly logger = new Logger(SubmissionService.name);
+  private readonly MAX_PAGE_SIZE = 100;
 
   constructor(
     @InjectRepository(Submission)
@@ -80,7 +90,7 @@ export class SubmissionService {
     private readonly parser: TestcaseParserUtil,
   ) {}
 
-  async run(
+  async executeTestRun(
     dto: CreateSubmissionDto,
     file?: Express.Multer.File,
   ): Promise<{ submissionId: string }> {
@@ -89,7 +99,7 @@ export class SubmissionService {
     return this.submitBatch(submissionId, dto, problem, false, file);
   }
 
-  async submit(
+  async submitForGrading(
     dto: CreateSubmissionDto,
     user: JwtPayload,
     file?: Express.Multer.File,
@@ -106,7 +116,7 @@ export class SubmissionService {
     );
 
     let fileUrl: string | null = null;
-    const isMultiFile = dto.languageId === 89;
+    const isMultiFile = isMultiFileProgram(dto.languageId);
     if (isMultiFile) {
       fileUrl = await this.saveSubmitFile(user.userId, problem.id, file);
     }
@@ -325,7 +335,7 @@ export class SubmissionService {
     }
 
     // Prepare common encodings (source/additional files) and constants
-    const isMultiFile = dto.languageId === 89;
+    const isMultiFile = isMultiFileProgram(dto.languageId);
     const sourceBase64 =
       !isMultiFile && dto.sourceCode
         ? Base64Util.encodeBase64(dto.sourceCode)
@@ -532,7 +542,7 @@ export class SubmissionService {
     const stdout = Base64Util.decodeBase64(judge0Response.stdout);
 
     return {
-      stdout: stdout,
+      stdout,
       time: judge0Response.time,
       memory: judge0Response.memory,
       status: judge0StatusMap[judge0Response.status.id],

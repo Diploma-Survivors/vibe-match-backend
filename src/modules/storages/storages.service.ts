@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -6,10 +7,10 @@ import {
 } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'node:fs/promises';
 import * as readline from 'node:readline';
-import { FileUploadOptions } from './interfaces/file-update-options.interface';
-import * as fs from 'fs/promises';
 import { Readable } from 'node:stream';
+import { FileUploadOptions } from './interfaces/file-update-options.interface';
 
 @Injectable()
 export class StoragesService {
@@ -46,6 +47,20 @@ export class StoragesService {
         Body: file,
       }),
     );
+  }
+
+  async delete(bucket: string, key: string) {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      }),
+    );
+  }
+
+  getKeyFromUrl(url: string): string {
+    const urlObj = new URL(url);
+    return urlObj.pathname.slice(1);
   }
 
   getObjectUrl(bucket: string, key: string) {

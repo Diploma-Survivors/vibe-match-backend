@@ -1,13 +1,19 @@
+// NestJS
 import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+
+// Third-party
 import { BackoffOptions, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { Repository } from 'typeorm';
+
+// Shared/Common
 import { REDIS } from '../../../shared/redis/redis.module';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 import { Judge0Response } from '../../judge0/judge0.interface';
+import { AgsService } from '../../lti/ags/ags.service';
 import { TestResultDto } from '../../problems/testcases/dto/run-testcase-result.response.dto';
 import { SubmissionConstants } from '../constants/submission.constant';
 import { SubmissionResultDto } from '../dto/submission.result.dto';
@@ -15,8 +21,22 @@ import { Submission } from '../entities/submission.entity';
 import { SubmissionJob, SubmissionQueue } from '../enums/submission-event.enum';
 import { SubmissionService } from '../submission.service';
 import { RedisKeys } from './redis-keys.helper';
-import { AgsService } from '../../lti/ags/ags.service';
 
+/**
+ * @description Lua script to add a result by index with deduplication and first-writer-wins logic.
+ * @param KEYS
+ *   - KEYS[1]=resultsI (hash index->json)  stores results by their index
+ *   - KEYS[2]=meta     (hash)              stores metadata like "received" count and "total" count
+ *   - KEYS[3]=seen     (set)               stores tokens of already seen results for deduplication
+ * @param ARGV
+ *   - ARGV[1]=token    unique token of the result
+ *   - ARGV[2]=index    index of the result
+ *   - ARGV[3]=json     JSON stringified result data
+ * @returns An array containing:
+ *   - added (0|1): Whether a new result was added (1) or it was a duplicate (0).
+ *   - received: The total number of unique results received so far.
+ *   - total: The total number of expected results.
+ */
 const LUA_ADD_RESULT_BY_INDEX = `
 -- KEYS[1]=resultsI (hash index->json)
 -- KEYS[2]=meta     (hash)
@@ -50,6 +70,7 @@ local received = redis.call('HINCRBY', meta, 'received', 1)
 local total    = redis.call('HGET', meta, 'total') or '0'
 return {1, tostring(received), total}
 `;
+
 @Injectable()
 export class CallbackProcessor implements OnModuleInit {
   private readonly logger = new Logger(CallbackProcessor.name);
@@ -147,7 +168,7 @@ export class CallbackProcessor implements OnModuleInit {
       await this.publishFinalize(submissionId, finalResult);
 
       if (isSubmit) {
-        await this.sendGradeToMoodleIfApplicable(parseInt(submissionId));
+        await this.sendGradeToMoodleIfApplicable(Number.parseInt(submissionId));
       }
     } catch (error) {
       if (error instanceof Error) {

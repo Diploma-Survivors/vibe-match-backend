@@ -1,14 +1,22 @@
+// NestJS
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
+// Third-party
+import KeyvRedis from '@keyv/redis';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { addTransactionalDataSource } from 'typeorm-transactional';
+
+// Relative imports
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { DataResponseInterceptor } from './common/interceptors/data-response.interceptor';
+import { PaginationModule } from './common/pagination/pagination.module';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
 import { awsConfig } from './config/aws.config';
@@ -61,12 +69,29 @@ import { RedisModule } from './shared/redis/redis.module';
       inject: [ConfigService],
     }),
     CacheModule.registerAsync({
-      useFactory: (configService: ConfigService) => ({
-        ...(configService.get('redis') as Record<string, unknown>),
-      }),
+      useFactory: (configService: ConfigService) => {
+        const username = configService.get<string>('redis.username');
+        const password = configService.get<string>('redis.password');
+        const host = configService.get<string>('redis.host');
+        const port = configService.get<number>('redis.port');
+        const db = configService.get<number>('redis.db');
+        const authPart = username && password ? `${username}:${password}@` : '';
+        const redisUrl = `redis://${authPart}${host}:${port}/${db}`;
+
+        return {
+          stores: [new KeyvRedis(redisUrl)],
+        };
+      },
       inject: [ConfigService],
       isGlobal: true,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds
+        limit: 100, // 100 requests per minute (global default)
+      },
+    ]),
+    PaginationModule,
     AuthModule,
     UserModule,
     LtiModule,
@@ -83,6 +108,7 @@ import { RedisModule } from './shared/redis/redis.module';
     AppService,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: DataResponseInterceptor },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

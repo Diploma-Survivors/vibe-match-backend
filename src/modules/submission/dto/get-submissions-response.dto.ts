@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SubmissionStatus } from '../enums/submission-status.enum';
-import { UserInformationDto } from '../../user/dto/user-information.dto';
 import { Expose, Type } from 'class-transformer';
 import { LanguageDto } from '../../language/dto/language.dto';
+import { UserInformationDto } from '../../user/dto/user-information.dto';
+import { SubmissionStatus } from '../enums/submission-status.enum';
 
 export class SubmissionInListDto {
   @ApiProperty({

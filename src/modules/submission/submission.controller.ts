@@ -1,3 +1,8 @@
+// Built-in
+import { finalize, interval, merge, Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+// NestJS
 import {
   Body,
   ClassSerializerInterceptor,
@@ -16,29 +21,41 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { finalize, interval, merge, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags, getSchemaPath, } from '@nestjs/swagger';
-import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
-import { ApiPaginatedSubmissionsResponse } from './decorators/api-paginated-submissions.decorator';
-import { SubmissionService } from './submission.service';
-import { SubmissionsSseService } from './events/submission-sse.service';
-import { CallbackProcessor } from './helpers/callback.processor';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { SubmissionConstants } from './constants/submission.constant';
-import * as judge0Interface from '../judge0/judge0.interface';
-import type { JwtPayload } from '../auth/interfaces/jwt.interface';
-import { SkipTransformResponse } from '../../common/decorators/skip-transform.decorator';
-import { SubmissionEvent } from './enums/submission-event.enum';
 import { ConfigService } from '@nestjs/config';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
+// Third-party
+import { memoryStorage } from 'multer';
+
+// Shared/Common
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { SkipTransformResponse } from 'src/common/decorators/skip-transform.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+
+// Relative imports
+import * as judge0Interface from '../judge0/judge0.interface';
+import { SubmissionConstants } from './constants/submission.constant';
+import { ApiPaginatedSubmissionsResponse } from './decorators/api-paginated-submissions.decorator';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { SubmissionDetailDto } from './dto/detail-submission.dto';
 import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
-import { string } from 'joi';
+import { SubmissionsCursorQueryDto } from './dto/submission-cursor-query.dto';
+import { SubmissionEvent } from './enums/submission-event.enum';
+import { SubmissionsSseService } from './events/submission-sse.service';
+import { CallbackProcessor } from './helpers/callback.processor';
+import { SubmissionService } from './submission.service';
+
+// Type imports
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @ApiTags('submissions')
 @Controller('submissions')
@@ -52,9 +69,10 @@ export class SubmissionController {
     private readonly configService: ConfigService,
   ) {}
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('run')
   @ApiResponse({
-    type: () => string,
+    type: () => String,
     status: HttpStatus.OK,
     description: 'Code has been submitted successfully.',
   })
@@ -69,12 +87,13 @@ export class SubmissionController {
     @Body() dto: CreateSubmissionDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.submissionService.run(dto, file);
+    return this.submissionService.executeTestRun(dto, file);
   }
 
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('submit')
   @ApiResponse({
-    type: () => string,
+    type: () => String,
     status: HttpStatus.OK,
     description: 'Code has been submitted successfully.',
   })
@@ -85,17 +104,17 @@ export class SubmissionController {
   })
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async submit(
+  async submitForGrading(
     @Body() dto: CreateSubmissionDto,
     @CurrentUser() user: JwtPayload,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.submissionService.submit(dto, user, file);
+    return this.submissionService.submitForGrading(dto, user, file);
   }
 
   @Post('/contest-participation/:contestId/submit')
   @ApiResponse({
-    type: () => string,
+    type: () => String,
     status: HttpStatus.OK,
     description: 'Code has been submitted successfully.',
   })

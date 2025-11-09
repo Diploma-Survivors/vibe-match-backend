@@ -1,15 +1,22 @@
+// Built-in
+import { Response } from 'express';
+
+// NestJS
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+// Third-party
 import cookieParser from 'cookie-parser';
-import { Response } from 'express';
-import qs from 'qs';
+import qs, { ParsedQs } from 'qs';
 import {
   initializeTransactionalContext,
   StorageDriver,
 } from 'typeorm-transactional';
+
+// Relative imports
 import { AppModule } from './app.module';
 import { Environment } from './common/enums/environment.enum';
 import { ExpressSetting } from './common/enums/express-setting.enum';
@@ -21,9 +28,10 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Parse query params with qs library to support nested objects
-  app.set(ExpressSetting.QUERY_PARSER, (str: string) =>
-    qs.parse(str, { allowPrototypes: false, allowDots: true }),
+  app.set(
+    ExpressSetting.QUERY_PARSER,
+    (str: string): ParsedQs =>
+      qs.parse(str, { allowPrototypes: false, allowDots: true }),
   );
 
   // Global prefix

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOneOptions, Repository } from 'typeorm';
 import {
   LTI_ROLES,
   LTI_ROLES_ARRAY,
@@ -30,8 +30,8 @@ export class UserService {
     return this.userRepository.find();
   }
 
-  findOne(id: number) {
-    return this.userRepository.findOne({ where: { id } });
+  findOne(options: FindOneOptions<User>) {
+    return this.userRepository.findOne(options);
   }
 
   update(id: number, updateUserDto: UpdateUserDto) {

@@ -8,11 +8,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Contest } from '../../contests/entities/contest.entity';
-import { Problem } from '../../problems/entities/problem.entity';
 import { User } from '../../user/entities/user.entity';
 
 @Entity('lti_launch_sessions')
-@Index('idx_lti_session_user_problem', ['user', 'problem'])
 @Index('idx_lti_session_resource_link', ['resourceLinkId'])
 @Index('idx_lti_session_expires', ['expiresAt'])
 export class LtiLaunchSession {
@@ -25,10 +23,6 @@ export class LtiLaunchSession {
 
   @Column({ name: 'lti_user_id', type: 'varchar' })
   ltiUserId: string;
-
-  @ManyToOne(() => Problem, { nullable: true })
-  @JoinColumn({ name: 'problem_id' })
-  problem: Problem | null;
 
   @ManyToOne(() => Contest, { nullable: true })
   @JoinColumn({ name: 'contest_id' })

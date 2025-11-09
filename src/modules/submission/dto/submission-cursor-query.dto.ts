@@ -3,8 +3,8 @@ import { Type } from 'class-transformer';
 import { IsEnum, IsOptional, ValidateNested } from 'class-validator';
 import { PaginationCursorDto } from '../../../common/pagination/dtos/pagination-cursor.dto';
 import { SortOrder } from '../../../common/pagination/enums/sort-order.enum';
-import { QuerySubmissionsFilterDto } from './query-submission-filter.dto';
 import { SortBy } from '../enums/submission-search.enum';
+import { QuerySubmissionsFilterDto } from './query-submission-filter.dto';
 
 export class SubmissionsCursorQueryDto extends PaginationCursorDto {
   @ApiProperty({
@@ -26,7 +26,7 @@ export class SubmissionsCursorQueryDto extends PaginationCursorDto {
   })
   @IsOptional()
   @IsEnum(SortBy)
-  sortBy: SortBy = SortBy.CREATED_AT;
+  readonly sortBy: SortBy = SortBy.CREATED_AT;
 
   @ApiProperty({
     type: () => QuerySubmissionsFilterDto,
