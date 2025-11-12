@@ -29,7 +29,11 @@ export class ContestParticipation {
   @CreateDateColumn({ name: 'start_time' })
   startTime: Date;
 
-  @Column({ type: 'time', name: 'end_time', nullable: true })
+  @Column({
+    type: 'timestamp with time zone',
+    name: 'end_time',
+    nullable: true,
+  })
   endTime: Date | null;
 
   @Column({ name: 'final_score', type: 'float', nullable: true })

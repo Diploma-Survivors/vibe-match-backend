@@ -57,7 +57,7 @@ import { SubmissionService } from './submission.service';
 // Type imports
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 
-@ApiTags('submissions')
+@ApiTags('Submissions')
 @Controller('submissions')
 @UseInterceptors(ClassSerializerInterceptor)
 export class SubmissionController {

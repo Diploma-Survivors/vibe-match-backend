@@ -9,6 +9,7 @@ import { Course } from 'src/modules/course/entities/course.entity';
 import { DifficultyLevel } from 'src/modules/problems/enums/difficulty-level.enum';
 import { User } from 'src/modules/user/entities/user.entity';
 import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
+import { ParticipationStatusDto } from './participation-status.dto';
 
 export class ContestProblemDetail {
   @ApiProperty({
@@ -122,6 +123,12 @@ export class GetDetailContestResponseDto {
   })
   @Expose({ name: 'problems' })
   contestProblems: ContestProblemDetail[];
+
+  @ApiProperty({
+    description: 'User participation status in this contest',
+    type: () => ParticipationStatusDto,
+  })
+  participation: ParticipationStatusDto;
 
   @Exclude()
   createdAt: Date;

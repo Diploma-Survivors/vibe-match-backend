@@ -27,6 +27,7 @@ import { Contest } from './entities/contest.entity';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
+import { ContestParticipationService } from './services/contest-participation.service';
 
 @Injectable()
 export class ContestsService {
@@ -35,6 +36,7 @@ export class ContestsService {
     private readonly contestsRepository: Repository<Contest>,
     private readonly problemsService: ProblemsService,
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
+    private readonly contestParticipationService: ContestParticipationService,
   ) {}
 
   @Transactional()
@@ -108,10 +110,18 @@ export class ContestsService {
       throw new BadRequestException('Contest not found');
     }
 
-    const isAccessible = contest.courseId === currentUser.courseId;
-
-    if (!isAccessible) {
+    if (contest.courseId !== currentUser.courseId) {
       throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    const participation = await this.contestParticipationService.findOne(
+      id,
+      currentUser.userId,
+    );
+    if (!participation) {
+      throw new ForbiddenException(
+        'You must start participating in the contest first',
+      );
     }
 
     const problems = contest.contestProblems.map((cp) => ({
@@ -130,9 +140,16 @@ export class ContestsService {
       return a.score - b.score;
     });
 
+    const participationStatus =
+      this.contestParticipationService.getParticipationStatus(
+        participation,
+        contest,
+      );
+
     return {
       ...contest,
       contestProblems: sortedProblems,
+      participation: participationStatus,
     };
   }
 }
