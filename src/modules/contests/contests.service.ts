@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -21,7 +22,12 @@ import { ProblemVisibility } from '../problems/enums/problem-visibility.enum';
 import { ProblemsService } from '../problems/problems.service';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
+import { UpdateContestDto } from './dto/update-contest.dto';
+import { AddProblemToContestDto } from './dto/add-problem-to-contest.dto';
+import { UpdateContestProblemDto } from './dto/update-contest-problem.dto';
 import { Contest } from './entities/contest.entity';
+import { ContestProblem } from './entities/contest-problem.entity';
+import { ContestParticipation } from './entities/contest-participations.entity';
 
 // Import types
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
@@ -34,6 +40,10 @@ export class ContestsService {
   constructor(
     @InjectRepository(Contest)
     private readonly contestsRepository: Repository<Contest>,
+    @InjectRepository(ContestProblem)
+    private readonly contestProblemRepository: Repository<ContestProblem>,
+    @InjectRepository(ContestParticipation)
+    private readonly contestParticipationRepository: Repository<ContestParticipation>,
     private readonly problemsService: ProblemsService,
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
     private readonly contestParticipationService: ContestParticipationService,
@@ -150,6 +160,222 @@ export class ContestsService {
       ...contest,
       contestProblems: sortedProblems,
       participation: participationStatus,
+    };
+  }
+
+  @Transactional()
+  async updateContest(
+    id: number,
+    updateContestDto: UpdateContestDto,
+    currentUser: JwtPayload,
+  ) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id },
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    if (contest.authorId !== currentUser.userId) {
+      throw new ForbiddenException('Only the contest author can update it');
+    }
+
+    Object.assign(contest, updateContestDto);
+
+    return this.contestsRepository.save(contest);
+  }
+
+  @Transactional()
+  async deleteContest(id: number, currentUser: JwtPayload) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id },
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    if (contest.authorId !== currentUser.userId) {
+      throw new ForbiddenException('Only the contest author can delete it');
+    }
+
+    await this.contestsRepository.remove(contest);
+  }
+
+  @Transactional()
+  async addProblemToContest(
+    contestId: number,
+    addProblemDto: AddProblemToContestDto,
+    currentUser: JwtPayload,
+  ) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id: contestId },
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    if (contest.authorId !== currentUser.userId) {
+      throw new ForbiddenException('Only the contest author can add problems');
+    }
+
+    const problem = await this.problemsService
+      .getQueryBuilder()
+      .leftJoin('problem.courseProblems', 'courseProblem')
+      .where('problem.id = :problemId', { problemId: addProblemDto.problemId })
+      .andWhere(
+        '(problem.visibility = :visibility OR courseProblem.courseId = :courseId)',
+        {
+          visibility: ProblemVisibility.PUBLIC,
+          courseId: currentUser.courseId,
+        },
+      )
+      .select('problem.id', 'id')
+      .getRawOne<Problem>();
+
+    if (!problem) {
+      throw new BadRequestException(
+        'Problem not found or not accessible in this course',
+      );
+    }
+
+    const existingContestProblem = await this.contestProblemRepository.findOne({
+      where: {
+        contestId,
+        problemId: addProblemDto.problemId,
+      },
+    });
+
+    if (existingContestProblem) {
+      throw new BadRequestException('Problem already exists in this contest');
+    }
+
+    const contestProblem = this.contestProblemRepository.create({
+      contestId,
+      problemId: addProblemDto.problemId,
+      score: addProblemDto.score,
+    });
+
+    return this.contestProblemRepository.save(contestProblem);
+  }
+
+  @Transactional()
+  async updateContestProblem(
+    contestId: number,
+    problemId: number,
+    updateDto: UpdateContestProblemDto,
+    currentUser: JwtPayload,
+  ) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id: contestId },
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    if (contest.authorId !== currentUser.userId) {
+      throw new ForbiddenException(
+        'Only the contest author can update problems',
+      );
+    }
+
+    const contestProblem = await this.contestProblemRepository.findOne({
+      where: { contestId, problemId },
+    });
+
+    if (!contestProblem) {
+      throw new NotFoundException('Problem not found in this contest');
+    }
+
+    contestProblem.score = updateDto.score;
+
+    return this.contestProblemRepository.save(contestProblem);
+  }
+
+  @Transactional()
+  async removeProblemFromContest(
+    contestId: number,
+    problemId: number,
+    currentUser: JwtPayload,
+  ) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id: contestId },
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    if (contest.authorId !== currentUser.userId) {
+      throw new ForbiddenException(
+        'Only the contest author can remove problems',
+      );
+    }
+
+    const contestProblem = await this.contestProblemRepository.findOne({
+      where: { contestId, problemId },
+    });
+
+    if (!contestProblem) {
+      throw new NotFoundException('Problem not found in this contest');
+    }
+
+    await this.contestProblemRepository.remove(contestProblem);
+  }
+
+  async getContestParticipants(contestId: number, currentUser: JwtPayload) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id: contestId },
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    if (contest.authorId !== currentUser.userId) {
+      throw new ForbiddenException(
+        'Only the contest author can view participants',
+      );
+    }
+
+    const participants = await this.contestParticipationRepository.find({
+      where: { contest: { id: contestId } },
+      relations: ['user'],
+      order: { startTime: 'ASC' },
+    });
+
+    return {
+      participants: participants.map((p) => ({
+        userId: p.user.id,
+        firstName: p.user.firstName,
+        lastName: p.user.lastName,
+        email: p.user.email,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        finalScore: p.finalScore,
+      })),
+      totalParticipants: participants.length,
     };
   }
 }

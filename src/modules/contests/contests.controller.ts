@@ -4,10 +4,13 @@ import {
   Body,
   ClassSerializerInterceptor,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
+  HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -41,9 +44,13 @@ import { CreateContestResponseDto } from './dto/create-contest-response.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
 import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
+import { UpdateContestDto } from './dto/update-contest.dto';
+import { AddProblemToContestDto } from './dto/add-problem-to-contest.dto';
+import { UpdateContestProblemDto } from './dto/update-contest-problem.dto';
 import { StartParticipationResponseDto } from './dto/start-participation-response.dto';
 import { GetContestProblemsResponseDto } from './dto/get-contest-problems-response.dto';
 import { GetContestProblemDetailResponseDto } from './dto/get-contest-problem-detail-response.dto';
+import { GetParticipantsResponseDto } from './dto/get-participants-response.dto';
 import { ContestParticipationService } from './services/contest-participation.service';
 import { ContestProblemsService } from './services/contest-problems.service';
 
@@ -329,5 +336,248 @@ export class ContestsController {
       +contestId,
       +problemId,
     );
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Update a contest',
+    description:
+      'Partially update contest details such as name, description, start/end time. Only the contest author can update it.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Contest updated successfully',
+    type: () => CreateContestResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the contest author can update it',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async updateContest(
+    @Param('id') id: string,
+    @Body() updateContestDto: UpdateContestDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const contest = await this.contestsService.updateContest(
+      +id,
+      updateContestDto,
+      currentUser,
+    );
+    return new CreateContestResponseDto(contest);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Delete a contest',
+    description: 'Delete a contest. Only the contest author can delete it.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'Contest deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the contest author can delete it',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async deleteContest(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    await this.contestsService.deleteContest(+id, currentUser);
+  }
+
+  @Post(':id/problems')
+  @ApiOperation({
+    summary: 'Add a problem to a contest',
+    description:
+      'Link an existing problem to a contest with a specific score. Only the contest author can add problems.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Problem added to contest successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Problem already exists in contest or problem not accessible',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the contest author can add problems',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async addProblemToContest(
+    @Param('id') id: string,
+    @Body() addProblemDto: AddProblemToContestDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.contestsService.addProblemToContest(
+      +id,
+      addProblemDto,
+      currentUser,
+    );
+  }
+
+  @Patch(':id/problems/:problemId')
+  @ApiOperation({
+    summary: 'Update a problem in a contest',
+    description:
+      'Update the score of a problem in a contest. Only the contest author can update problems.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiParam({
+    name: 'problemId',
+    description: 'The unique identifier of the problem',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Problem updated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest or problem not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the contest author can update problems',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async updateContestProblem(
+    @Param('id') id: string,
+    @Param('problemId') problemId: string,
+    @Body() updateDto: UpdateContestProblemDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.contestsService.updateContestProblem(
+      +id,
+      +problemId,
+      updateDto,
+      currentUser,
+    );
+  }
+
+  @Delete(':id/problems/:problemId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Remove a problem from a contest',
+    description:
+      'Remove a problem from a contest. Only the contest author can remove problems.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiParam({
+    name: 'problemId',
+    description: 'The unique identifier of the problem',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'Problem removed from contest successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest or problem not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the contest author can remove problems',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async removeProblemFromContest(
+    @Param('id') id: string,
+    @Param('problemId') problemId: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    await this.contestsService.removeProblemFromContest(
+      +id,
+      +problemId,
+      currentUser,
+    );
+  }
+
+  @Get(':id/participants')
+  @ApiOperation({
+    summary: 'Get list of participants in a contest',
+    description:
+      'Retrieve all users who have started participating in the contest. Only the contest author can view participants.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Participants list retrieved successfully',
+    type: () => GetParticipantsResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the contest author can view participants',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async getContestParticipants(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.contestsService.getContestParticipants(+id, currentUser);
   }
 }
