@@ -9,7 +9,7 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../../common/utils/cursor-query.util';
-import { SubmissionInListDto } from '../dto/get-submissions-response.dto';
+import { SubmissionInListDto, ContestSubmissionDto } from '../dto/get-submissions-response.dto';
 import { SubmissionCursorFieldsDto } from '../dto/submission-cursor-fields.dto';
 import { SubmissionsCursorQueryDto } from '../dto/submission-cursor-query.dto';
 import { Submission } from '../entities/submission.entity';
@@ -37,6 +37,27 @@ export class SubmissionCursorService {
 
     const items = await queryBuilder.getMany();
     return this.buildPaginatedResult(
+      items,
+      limit,
+      isBackward,
+      query,
+      countSubmissionsField,
+    );
+  }
+
+  async paginateContestSubmissions(
+    queryBuilder: SelectQueryBuilder<Submission>,
+    query: SubmissionsCursorQueryDto,
+    countSubmissionsField: CountSubmissionField,
+  ): Promise<CursorPaginated<ContestSubmissionDto>> {
+    const { limit, isBackward } = this.validateAndGetPagination(query);
+
+    await this.applyCursorPagination(queryBuilder, query, isBackward);
+
+    queryBuilder.take(limit + 1);
+
+    const items = await queryBuilder.getMany();
+    return this.buildContestPaginatedResult(
       items,
       limit,
       isBackward,
@@ -189,5 +210,49 @@ export class SubmissionCursorService {
     }
 
     return qb.getCount();
+  }
+
+  async buildContestPaginatedResult(
+    items: Submission[],
+    limit: number,
+    isBackward: boolean,
+    query: SubmissionsCursorQueryDto,
+    countSubmissionsField: CountSubmissionField,
+  ): Promise<CursorPaginated<ContestSubmissionDto>> {
+    const hasMore = items.length > limit;
+    if (hasMore) {
+      items.pop();
+    }
+
+    if (isBackward) {
+      items.reverse();
+    }
+
+    const edges = items.map((item) => ({
+      node: plainToInstance(ContestSubmissionDto, item, {
+        excludeExtraneousValues: true,
+      }),
+      cursor: encodeCursor({
+        id: item.id,
+        [query.sortBy || 'createdAt']: item[query.sortBy || 'createdAt'],
+      }),
+    }));
+
+    const startCursor = edges?.[0]?.cursor ?? null;
+    const endCursor = edges?.at(-1)?.cursor ?? null;
+
+    const hasNextPage = isBackward ? !!query.before : hasMore;
+    const hasPreviousPage = isBackward ? hasMore : !!query.after;
+
+    return {
+      edges,
+      pageInfos: {
+        hasNextPage,
+        hasPreviousPage,
+        startCursor,
+        endCursor,
+      },
+      totalCount: await this.getSubmissionCount(countSubmissionsField),
+    };
   }
 }

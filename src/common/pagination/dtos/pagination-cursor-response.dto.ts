@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CursorEdgeDto<T> {
+  @ApiProperty({
+    description: 'The data node',
+  })
   node: T;
 
   @ApiProperty({

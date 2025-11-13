@@ -25,4 +25,30 @@ export class QuerySubmissionsFilterDto {
   )
   @IsInt()
   languageId?: number;
+
+  @ApiProperty({
+    description: 'Filter submissions by contest participation ID',
+    required: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value !== undefined && value !== null && value !== ''
+      ? Number(value)
+      : undefined,
+  )
+  @IsInt()
+  participationId?: number;
+
+  @ApiProperty({
+    description: 'Filter submissions by problem ID',
+    required: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value !== undefined && value !== null && value !== ''
+      ? Number(value)
+      : undefined,
+  )
+  @IsInt()
+  problemId?: number;
 }
