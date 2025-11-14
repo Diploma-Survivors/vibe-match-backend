@@ -13,8 +13,7 @@ import { ContestsService } from './contests.service';
 import { Contest } from './entities/contest.entity';
 import { ContestParticipation } from './entities/contest-participations.entity';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
-import { LeaderboardCursorService } from './services/leaderboard-cursor.service';
-import { SubmissionsOverviewCursorService } from './services/submissions-overview-cursor.service';
+import { ContestsPaginationService } from './services/contests-pagination.service';
 import { StudentContestListStrategy } from './strategies/student-contest-list.strategy';
 import { TeacherContestListStrategy } from './strategies/teacher-contest-list.strategy';
 
@@ -25,8 +24,7 @@ import { TeacherContestListStrategy } from './strategies/teacher-contest-list.st
     TeacherContestListStrategy,
     StudentContestListStrategy,
     ContestFilterStrategyFactory,
-    LeaderboardCursorService,
-    SubmissionsOverviewCursorService,
+    ContestsPaginationService,
   ],
   imports: [
     TypeOrmModule.forFeature([Contest, ContestParticipation, Submission]),

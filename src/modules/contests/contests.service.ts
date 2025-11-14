@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 // Shared/Common
 import { Cacheable } from 'src/common/decorators/cacheable.decorator';
 import { CACHE_TTL } from 'src/common/constants/cache.constants';
+import { CursorPaginated } from 'src/common/pagination/interfaces/cursor-paginated.interface';
 
 // Third-party
 import {
@@ -25,26 +26,20 @@ import { ContestParticipation } from './entities/contest-participations.entity';
 import { Problem } from '../problems/entities/problem.entity';
 import { ProblemVisibility } from '../problems/enums/problem-visibility.enum';
 import { ProblemsService } from '../problems/problems.service';
+import { BaseProblemResponseDto } from '../problems/dto/base-problem-response.dto';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { LeaderboardCursorQueryDto } from './dto/leaderboard-cursor-query.dto';
-import {
-  LeaderboardProblemDto,
-  LeaderboardProblemResultDto,
-  LeaderboardRankingDto,
-  LeaderboardResponseDto,
-} from './dto/leaderboard-response.dto';
+import { LeaderboardResponseDto } from './dto/leaderboard-response.dto';
+import { ContestParticipationDto } from './dto/contest-participation.dto';
 import { SubmissionsOverviewCursorQueryDto } from './dto/submissions-overview-cursor-query.dto';
-import { SubmissionsOverviewResponseDto } from './dto/submissions-overview-response.dto';
 import { Contest } from './entities/contest.entity';
 
 // Import types
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
-import { LeaderboardCursorService } from './services/leaderboard-cursor.service';
-import { SubmissionsOverviewCursorService } from './services/submissions-overview-cursor.service';
-import { SubmissionStatus } from '../submission/enums/submission-status.enum';
+import { ContestsPaginationService } from './services/contests-pagination.service';
 
 @Injectable()
 export class ContestsService {
@@ -57,8 +52,7 @@ export class ContestsService {
     private readonly submissionRepository: Repository<Submission>,
     private readonly problemsService: ProblemsService,
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
-    private readonly leaderboardCursorService: LeaderboardCursorService,
-    private readonly submissionsOverviewCursorService: SubmissionsOverviewCursorService,
+    private readonly contestsPaginationService: ContestsPaginationService,
   ) {}
 
   @Transactional()
@@ -163,12 +157,11 @@ export class ContestsService {
   @Cacheable({
     key: (contestId: number, query: LeaderboardCursorQueryDto) =>
       `leaderboard:${contestId}:${JSON.stringify(query)}`,
-    ttl: CACHE_TTL.FIVE_MINUTES, // 5 minutes cache for live contests
+    ttl: CACHE_TTL.ONE_MINUTE,
   })
   async getLeaderboard(
     contestId: number,
     query: LeaderboardCursorQueryDto,
-    currentUser: JwtPayload,
   ): Promise<LeaderboardResponseDto> {
     // Check contest access
     const contest = await this.contestsRepository.findOne({
@@ -180,13 +173,8 @@ export class ContestsService {
       throw new BadRequestException('Contest not found');
     }
 
-    const isAccessible = contest.courseId === currentUser.courseId;
-    if (!isAccessible) {
-      throw new ForbiddenException('You do not have access to this contest');
-    }
-
     // Get contest problems for header
-    const problems: LeaderboardProblemDto[] = contest.contestProblems
+    const problems: BaseProblemResponseDto[] = contest.contestProblems
       .sort((a, b) => {
         if (a.score === b.score) {
           return a.problem.title.localeCompare(b.problem.title);
@@ -194,124 +182,41 @@ export class ContestsService {
         return a.score - b.score;
       })
       .map((cp, index) => ({
-        problemId: cp.problemId,
-        alias: String.fromCharCode(65 + index), // A, B, C, etc.
+        id: cp.problem.id,
+        title: `${String.fromCharCode(65 + index)}. ${cp.problem.title}`,
+        description: cp.problem.description,
+        inputDescription: cp.problem.inputDescription,
+        outputDescription: cp.problem.outputDescription,
         maxScore: cp.score,
+        timeLimitMs: cp.problem.timeLimitMs,
+        memoryLimitKb: cp.problem.memoryLimitKb,
+        difficulty: cp.problem.difficulty,
+        type: cp.problem.type,
+        visibility: cp.problem.visibility,
+        createdAt: cp.problem.createdAt,
+        updatedAt: cp.problem.updatedAt,
       }));
 
-    // Get all participations for this contest
-    const participations = await this.contestParticipationRepository.find({
-      where: { contest: { id: contestId } },
-      relations: ['user', 'submissions', 'submissions.problem'],
-    });
+    // Get all participations for this contest with submissions
+    // Note: Ranking calculation requires all participants' data for accurate relative rankings
+    // Cursor pagination is applied after ranking calculation for correctness
 
-    // Calculate rankings
-    const rankings: LeaderboardRankingDto[] = [];
-
-    for (const participation of participations) {
-      const userSubmissions = participation.submissions || [];
-      const problemResults: LeaderboardProblemResultDto[] = [];
-      let totalScore = 0;
-      let totalPenaltyTime = 0; // in seconds
-
-      // Group submissions by problem and find best submission for each
-      const submissionsByProblem = new Map<number, Submission[]>();
-      userSubmissions.forEach((submission) => {
-        if (!submissionsByProblem.has(submission.problemId)) {
-          submissionsByProblem.set(submission.problemId, []);
-        }
-        submissionsByProblem.get(submission.problemId)!.push(submission);
-      });
-
-      // Process each problem
-      for (const [problemId, submissions] of submissionsByProblem) {
-        // Sort submissions by creation time
-        submissions.sort(
-          (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-        );
-
-        // Find first accepted submission
-        const acceptedSubmission = submissions.find(
-          (s) => s.status === SubmissionStatus.ACCEPTED,
-        );
-        if (acceptedSubmission) {
-          const contestProblem = contest.contestProblems.find(
-            (cp) => cp.problemId === problemId,
-          );
-          if (contestProblem) {
-            const attempts =
-              submissions.findIndex((s) => s.id === acceptedSubmission.id) + 1;
-            const timeToFirstAC = Math.floor(
-              (acceptedSubmission.createdAt.getTime() -
-                participation.startTime.getTime()) /
-                1000,
-            );
-            const penaltyTime = (attempts - 1) * 20 * 60; // 20 minutes penalty per wrong attempt
-            const totalTimeForProblem = timeToFirstAC + penaltyTime;
-
-            problemResults.push({
-              problemId,
-              score: contestProblem.score,
-              time: this.formatTime(totalTimeForProblem),
-              isAccepted: true,
-              attempts,
-            });
-
-            totalScore += contestProblem.score;
-            totalPenaltyTime += totalTimeForProblem;
-          }
-        }
-      }
-
-      if (problemResults.length > 0) {
-        rankings.push({
-          rank: 0, // Will be set after sorting
-          user: {
-            userId: participation.user.id,
-            username:
-              participation.user.email || `user_${participation.user.id}`,
-            displayName:
-              participation.user.firstName && participation.user.lastName
-                ? `${participation.user.firstName} ${participation.user.lastName}`
-                : participation.user.email || `User ${participation.user.id}`,
-          },
-          totalScore,
-          totalTime: this.formatTime(totalPenaltyTime),
-          problemResults,
-        });
-      }
-    }
-
-    // Sort rankings: highest score first, then lowest penalty time
-    rankings.sort((a, b) => {
-      if (a.totalScore !== b.totalScore) {
-        return b.totalScore - a.totalScore;
-      }
-      return this.parseTime(a.totalTime) - this.parseTime(b.totalTime);
-    });
-
-    // Assign ranks
-    rankings.forEach((ranking, index) => {
-      ranking.rank = index + 1;
-    });
-
-    // Apply cursor pagination
-    const paginatedRankings = await this.leaderboardCursorService.paginateLeaderboard(
-      rankings,
+    // Use the contests pagination service
+    const rankings = await this.contestsPaginationService.calculateRankings(
+      contestId,
       query,
     );
 
     return {
       problems,
-      rankings: paginatedRankings,
+      rankings,
     };
   }
 
   async getSubmissionsOverview(
     contestId: number,
     query: SubmissionsOverviewCursorQueryDto,
-    currentUser: JwtPayload,
-  ): Promise<SubmissionsOverviewResponseDto> {
+  ): Promise<CursorPaginated<ContestParticipationDto>> {
     // Check contest access and instructor/admin role
     const contest = await this.contestsRepository.findOne({
       where: { id: contestId },
@@ -322,135 +227,14 @@ export class ContestsService {
       throw new BadRequestException('Contest not found');
     }
 
-    const isAccessible = contest.courseId === currentUser.courseId;
-    if (!isAccessible) {
-      throw new ForbiddenException('You do not have access to this contest');
-    }
-
-    // Check if user is instructor or admin
-    const isInstructorOrAdmin =
-      currentUser.roles?.includes(RoleEnum.INSTRUCTOR) ||
-      currentUser.roles?.includes(RoleEnum.ADMIN);
-    if (!isInstructorOrAdmin) {
-      throw new ForbiddenException(
-        'Only instructors and admins can view submissions overview',
+    // Use the pagination service
+    const paginatedResult =
+      await this.contestsPaginationService.paginateContestants(
+        contestId,
+        query,
       );
-    }
 
-    // Get contest problems
-    const problems = contest.contestProblems
-      .sort((a, b) => {
-        if (a.score === b.score) {
-          return a.problem.title.localeCompare(b.problem.title);
-        }
-        return a.score - b.score;
-      })
-      .map((cp, index) => ({
-        problemId: cp.problemId,
-        title: `${String.fromCharCode(65 + index)}. ${cp.problem.title}`,
-      }));
-
-    // Get all participations with their best submissions
-    const participations = await this.contestParticipationRepository.find({
-      where: { contest: { id: contestId } },
-      relations: ['user', 'submissions', 'submissions.problem'],
-    });
-
-    const participantResults: Array<{
-      participationId: number;
-      user: { userId: number; displayName: string };
-      totalScore: number;
-      problemSubmissions: Array<{
-        problemId: number;
-        bestSubmissionId: number;
-        score: number;
-        status: string;
-      }>;
-    }> = [];
-
-    for (const participation of participations) {
-      const userSubmissions = participation.submissions || [];
-      let totalScore = 0;
-      const problemSubmissions: Array<{
-        problemId: number;
-        bestSubmissionId: number;
-        score: number;
-        status: string;
-      }> = [];
-
-      // Group submissions by problem and find best submission for each
-      const bestSubmissionsByProblem = new Map<number, Submission>();
-
-      userSubmissions.forEach((submission) => {
-        const existing = bestSubmissionsByProblem.get(submission.problemId);
-        if (!existing || (submission.score || 0) > (existing.score || 0)) {
-          bestSubmissionsByProblem.set(submission.problemId, submission);
-        }
-      });
-
-      // Process each problem's best submission
-      for (const [problemId, bestSubmission] of bestSubmissionsByProblem) {
-        const contestProblem = contest.contestProblems.find(
-          (cp) => cp.problemId === problemId,
-        );
-        if (contestProblem) {
-          problemSubmissions.push({
-            problemId,
-            bestSubmissionId: bestSubmission.id,
-            score: bestSubmission.score || 0,
-            status: bestSubmission.status,
-          });
-          totalScore += bestSubmission.score || 0;
-        }
-      }
-
-      if (problemSubmissions.length > 0) {
-        participantResults.push({
-          participationId: participation.id,
-          user: {
-            userId: participation.user.id,
-            displayName:
-              participation.user.firstName && participation.user.lastName
-                ? `${participation.user.firstName} ${participation.user.lastName}`
-                : participation.user.email || `User ${participation.user.id}`,
-          },
-          totalScore,
-          problemSubmissions,
-        });
-      }
-    }
-
-    // Sort by total score descending
-    participantResults.sort((a, b) => b.totalScore - a.totalScore);
-
-    // Apply cursor pagination
-    const paginatedResults = await this.submissionsOverviewCursorService.paginateSubmissionsOverview(
-      participantResults,
-      query,
-    );
-
-    return {
-      problems,
-      participantResults: paginatedResults,
-    };
-  }
-
-  private formatTime(seconds: number): string {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  private parseTime(timeStr: string): number {
-    const parts = timeStr.split(':').map(Number);
-    if (parts.length === 3) {
-      return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    }
-    return parts[0] * 60 + parts[1];
+    // The pagination service already returns the correct DTO format
+    return paginatedResult;
   }
 }

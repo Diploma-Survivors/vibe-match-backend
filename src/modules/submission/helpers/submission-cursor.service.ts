@@ -9,7 +9,10 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../../common/utils/cursor-query.util';
-import { SubmissionInListDto, ContestSubmissionDto } from '../dto/get-submissions-response.dto';
+import {
+  SubmissionInListDto,
+  ContestSubmissionDto,
+} from '../dto/get-submissions-response.dto';
 import { SubmissionCursorFieldsDto } from '../dto/submission-cursor-fields.dto';
 import { SubmissionsCursorQueryDto } from '../dto/submission-cursor-query.dto';
 import { Submission } from '../entities/submission.entity';

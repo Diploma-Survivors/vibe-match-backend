@@ -1,5 +1,4 @@
 // NestJS
-import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 // Third-party
@@ -14,6 +13,8 @@ import { CursorPaginationService } from 'src/common/pagination/services/cursor-p
 // Relative imports
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
 import { Contest } from '../entities/contest.entity';
+import { ContestParticipation } from '../entities/contest-participations.entity';
+import { Submission } from '../../submission/entities/submission.entity';
 import { AuthorFilter } from '../filters/author.filter';
 import { CompositeFilter } from '../filters/composite.filter';
 import { CourseFilter } from '../filters/course.filter';
@@ -25,12 +26,16 @@ import { ContestsPaginationService } from '../services/contests-pagination.servi
 export class TeacherContestListStrategy extends ContestsPaginationService {
   constructor(
     @InjectRepository(Contest) contestsRepository: Repository<Contest>,
+    @InjectRepository(ContestParticipation)
+    contestParticipationRepository: Repository<ContestParticipation>,
+    @InjectRepository(Submission) submissionRepository: Repository<Submission>,
     cursorPagination: CursorPaginationService,
   ) {
     super(
       contestsRepository,
+      contestParticipationRepository,
+      submissionRepository,
       cursorPagination,
-      new Logger(TeacherContestListStrategy.name),
     );
   }
 

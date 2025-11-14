@@ -1,60 +1,10 @@
 // NestJS
 import { ApiProperty } from '@nestjs/swagger';
+import { ProblemResultDto } from './problem-result.dto';
+import { UserInformationDto } from '../../user/dto/user-information.dto';
+import { BaseProblemResponseDto } from '../../problems/dto/base-problem-response.dto';
 
 // Relative imports
-
-export class LeaderboardProblemDto {
-  @ApiProperty({
-    description: 'The unique identifier of the problem',
-    example: 101,
-  })
-  problemId: number;
-
-  @ApiProperty({
-    description: 'The alias/title of the problem in the contest',
-    example: 'A',
-  })
-  alias: string;
-
-  @ApiProperty({
-    description: 'The maximum score for this problem in the contest',
-    example: 100,
-  })
-  maxScore: number;
-}
-
-export class LeaderboardProblemResultDto {
-  @ApiProperty({
-    description: 'The unique identifier of the problem',
-    example: 101,
-  })
-  problemId: number;
-
-  @ApiProperty({
-    description: 'The score achieved for this problem',
-    example: 100,
-  })
-  score: number;
-
-  @ApiProperty({
-    description:
-      'The time taken to first accepted submission (formatted as MM:SS)',
-    example: '15:23',
-  })
-  time: string;
-
-  @ApiProperty({
-    description: 'Whether the submission was accepted',
-    example: true,
-  })
-  isAccepted: boolean;
-
-  @ApiProperty({
-    description: 'Number of attempts before acceptance',
-    example: 2,
-  })
-  attempts: number;
-}
 
 export class LeaderboardRankingDto {
   @ApiProperty({
@@ -65,18 +15,15 @@ export class LeaderboardRankingDto {
 
   @ApiProperty({
     description: 'Information about the user',
-    type: 'object',
-    properties: {
-      userId: { type: 'number', example: 15 },
-      username: { type: 'string', example: 'tran_nhat_long' },
-      displayName: { type: 'string', example: 'Trần Nhật Long' },
-    },
+    type: () => UserInformationDto,
+    example: () => ({
+      id: 1,
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john_doe@gmail.com',
+    }),
   })
-  user: {
-    userId: number;
-    username: string;
-    displayName: string;
-  };
+  user: UserInformationDto;
 
   @ApiProperty({
     description: 'Total score achieved in the contest',
@@ -92,18 +39,18 @@ export class LeaderboardRankingDto {
 
   @ApiProperty({
     description: 'Results for each problem the user attempted',
-    type: () => [LeaderboardProblemResultDto],
+    type: () => [ProblemResultDto],
   })
-  problemResults: LeaderboardProblemResultDto[];
+  problemResults: ProblemResultDto[];
 }
 
 export class LeaderboardResponseDto {
   @ApiProperty({
     description:
       'List of problems in the contest for building the table header',
-    type: () => [LeaderboardProblemDto],
+    type: () => [BaseProblemResponseDto],
   })
-  problems: LeaderboardProblemDto[];
+  problems: BaseProblemResponseDto[];
 
   @ApiProperty({
     description: 'Leaderboard rankings with cursor pagination',

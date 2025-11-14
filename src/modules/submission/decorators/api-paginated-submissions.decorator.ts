@@ -4,7 +4,10 @@ import {
   CursorEdgeDto,
   PaginationCursorResponseDto,
 } from '../../../common/pagination/dtos/pagination-cursor-response.dto';
-import { SubmissionInListDto, ContestSubmissionDto } from '../dto/get-submissions-response.dto';
+import {
+  SubmissionInListDto,
+  ContestSubmissionDto,
+} from '../dto/get-submissions-response.dto';
 
 export const ApiPaginatedSubmissionsResponse = () => {
   return applyDecorators(

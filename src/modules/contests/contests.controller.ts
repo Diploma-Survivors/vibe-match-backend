@@ -40,86 +40,11 @@ import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
 import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
 import { LeaderboardCursorQueryDto } from './dto/leaderboard-cursor-query.dto';
-import { LeaderboardRankingDto, LeaderboardResponseDto, LeaderboardProblemDto } from './dto/leaderboard-response.dto';
 import { SubmissionsOverviewCursorQueryDto } from './dto/submissions-overview-cursor-query.dto';
-import { ParticipantResultDto, SubmissionsOverviewResponseDto } from './dto/submissions-overview-response.dto';
-
-// Helper functions to generate paginated response schemas
-const getPaginatedLeaderboardSchema = () => ({
-  type: 'object',
-  properties: {
-    problems: {
-      type: 'array',
-      items: { $ref: getSchemaPath(LeaderboardProblemDto) },
-    },
-    rankings: {
-      type: 'object',
-      properties: {
-        edges: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              node: { $ref: getSchemaPath(LeaderboardRankingDto) },
-              cursor: { type: 'string' },
-            },
-          },
-        },
-        pageInfos: {
-          type: 'object',
-          properties: {
-            hasNextPage: { type: 'boolean' },
-            hasPreviousPage: { type: 'boolean' },
-            startCursor: { type: 'string', nullable: true },
-            endCursor: { type: 'string', nullable: true },
-          },
-        },
-        totalCount: { type: 'number' },
-      },
-    },
-  },
-});
-
-const getPaginatedSubmissionsOverviewSchema = () => ({
-  type: 'object',
-  properties: {
-    problems: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          problemId: { type: 'number' },
-          title: { type: 'string' },
-        },
-      },
-    },
-    participantResults: {
-      type: 'object',
-      properties: {
-        edges: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              node: { $ref: getSchemaPath(ParticipantResultDto) },
-              cursor: { type: 'string' },
-            },
-          },
-        },
-        pageInfos: {
-          type: 'object',
-          properties: {
-            hasNextPage: { type: 'boolean' },
-            hasPreviousPage: { type: 'boolean' },
-            startCursor: { type: 'string', nullable: true },
-            endCursor: { type: 'string', nullable: true },
-          },
-        },
-        totalCount: { type: 'number' },
-      },
-    },
-  },
-});
+import {
+  ApiContestLeadingDecorator,
+  ApiPaginatedContestantDecorator,
+} from './decorators/api-contest-leading.decorator';
 
 @Controller('contests')
 @ApiTags('Contests')
@@ -248,28 +173,14 @@ export class ContestsController {
     description: 'The unique identifier of the contest',
     example: 1,
   })
-  @ApiExtraModels(
-    PaginationCursorResponseDto,
-    CursorEdgeDto,
-    LeaderboardProblemDto,
-    LeaderboardRankingDto,
-  )
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Leaderboard retrieved successfully',
-    schema: getPaginatedLeaderboardSchema(),
-  })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request.' })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
+  @ApiContestLeadingDecorator()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Roles(RoleEnum.STUDENT, RoleEnum.INSTRUCTOR, RoleEnum.ADMIN)
   async getLeaderboard(
-    @Param('id') id: string,
+    @Param('id') id: number,
     @Query() query: LeaderboardCursorQueryDto,
-    @CurrentUser() user: JwtPayload,
   ) {
-    return this.contestsService.getLeaderboard(+id, query, user);
+    return this.contestsService.getLeaderboard(id, query);
   }
 
   @Get(':id/submissions/overview')
@@ -283,26 +194,14 @@ export class ContestsController {
     description: 'The unique identifier of the contest',
     example: 1,
   })
-  @ApiExtraModels(
-    PaginationCursorResponseDto,
-    CursorEdgeDto,
-    ParticipantResultDto,
-  )
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Submissions overview retrieved successfully',
-    schema: getPaginatedSubmissionsOverviewSchema(),
-  })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request.' })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @ApiPaginatedContestantDecorator()
   @Roles(RoleEnum.INSTRUCTOR, RoleEnum.ADMIN)
   async getSubmissionsOverview(
     @Param('id') id: string,
     @Query() query: SubmissionsOverviewCursorQueryDto,
-    @CurrentUser() user: JwtPayload,
   ) {
-    return this.contestsService.getSubmissionsOverview(+id, query, user);
+    return this.contestsService.getSubmissionsOverview(+id, query);
   }
 }
