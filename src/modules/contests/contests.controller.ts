@@ -632,7 +632,7 @@ export class ContestsController {
   @ApiOperation({
     summary: 'Submit a solution to a problem within a contest',
     description:
-      'Submit code for grading to a specific problem in a contest. The contest participation is automatically determined from the authenticated user and contest ID - do NOT send contestParticipationId in the request body. Automatically calculates aggregated contest score and syncs with Moodle via LTI.',
+      "Submit code for grading to a specific problem in a contest. The contest participation is automatically determined from the authenticated user and contest ID - do NOT send contestParticipationId in the request body. Automatically calculates aggregated contest score and syncs with Moodle via LTI. Deadline enforcement follows the contest's deadlineEnforcement strategy: STRICT (hard deadline at contest.endTime) or FLEXIBLE (allows late submissions until lateDeadline for untimed contests, or participation.startTime + durationMinutes for timed contests).",
   })
   @ApiParam({
     name: 'id',
@@ -653,7 +653,7 @@ export class ContestsController {
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'Contest not started yet, already ended, or problem not in contest',
+      'Contest not started yet, deadline has passed (based on enforcement strategy), participation time ended, late deadline passed, or problem not in contest. Deadline enforcement: STRICT (always contest.endTime or participation.endTime) or FLEXIBLE (participation.startTime + durationMinutes for timed contests, or lateDeadline for untimed contests)',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,

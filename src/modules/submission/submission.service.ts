@@ -28,6 +28,7 @@ import { TimeUtil } from '../../shared/util/time.util';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { Contest } from '../contests/entities/contest.entity';
+import { DeadlineEnforcement } from '../contests/enums/deadline-enforcement.enum';
 import {
   Judge0BatchResponse,
   Judge0Response,
@@ -152,20 +153,27 @@ export class SubmissionService {
     if (!contest) throw new NotFoundException('Contest not found');
 
     const now = new Date();
-    if (now < contest.startTime)
+
+    // Check contest has started
+    if (now < contest.startTime) {
       throw new BadRequestException('Contest not started yet');
-    if (now > contest.endTime)
-      throw new BadRequestException('Contest already ended');
+    }
 
     // Validate participation
     const contestParticipation = await this.contestParticipationRepo.findOne({
-      where: { id: createSubmissionDto.contestParticipationId },
+      where: {
+        contest: { id: contestId },
+        user: { id: user.userId },
+      },
     });
     if (!contestParticipation) {
-      throw new BadRequestException(
+      throw new NotFoundException(
         'You have not started participation in this contest. Please join the contest first.',
       );
     }
+
+    // Validate deadline based on enforcement strategy
+    this.validateContestDeadline(contest, contestParticipation, now);
 
     // Validate problem in contest
     const problem = await this.findProblemOrFail(createSubmissionDto.problemId);
@@ -207,6 +215,72 @@ export class SubmissionService {
       true,
       file,
     );
+  }
+
+  /**
+   * Validates contest submission deadline based on enforcement strategy.
+   *
+   * Rules:
+   * - With durationMinutes:
+   *   - STRICT: deadline = contest.endTime
+   *   - FLEXIBLE: deadline = participation.startTime + durationMinutes
+   * - Without durationMinutes:
+   *   - STRICT: deadline = contest.endTime
+   *   - FLEXIBLE: deadline = contest.lateDeadline (late if after contest.endTime)
+   */
+  private validateContestDeadline(
+    contest: Contest,
+    participation: ContestParticipation,
+    now: Date,
+  ): void {
+    const { deadlineEnforcement, durationMinutes, endTime, lateDeadline } =
+      contest;
+
+    if (deadlineEnforcement === DeadlineEnforcement.STRICT) {
+      // STRICT mode: Always enforce contest.endTime
+      if (now > endTime) {
+        throw new BadRequestException('Contest deadline has passed');
+      }
+
+      // Also check participation.endTime if set (for timed contests)
+      if (participation.endTime && now > participation.endTime) {
+        throw new BadRequestException(
+          'Your participation time has ended for this contest',
+        );
+      }
+    } else {
+      // FLEXIBLE mode
+      if (durationMinutes) {
+        // Timed contest: deadline = participation.startTime + durationMinutes
+        const participationDeadline = new Date(participation.startTime);
+        participationDeadline.setMinutes(
+          participationDeadline.getMinutes() + durationMinutes,
+        );
+
+        if (now > participationDeadline) {
+          throw new BadRequestException(
+            'Your participation time has ended for this contest',
+          );
+        }
+      } else {
+        // Untimed contest with late deadline
+        if (!lateDeadline) {
+          // No late deadline set, fall back to contest.endTime
+          if (now > endTime) {
+            throw new BadRequestException('Contest deadline has passed');
+          }
+        } else {
+          // Late deadline is set
+          if (now > lateDeadline) {
+            throw new BadRequestException(
+              'Contest late deadline has passed. Submissions are no longer accepted',
+            );
+          }
+          // Note: Submission is allowed but may be marked as late if after endTime
+          // This is handled in the response/grading logic, not here
+        }
+      }
+    }
   }
 
   async getDetailSubmissionById(
