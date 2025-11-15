@@ -378,4 +378,53 @@ export class ContestsService {
       totalParticipants: participants.length,
     };
   }
+
+  async getContestOverview(id: number, currentUser: JwtPayload) {
+    const contest = await this.contestsRepository.findOne({
+      where: { id },
+      relations: ['author', 'contestProblems'],
+    });
+    if (!contest) {
+      throw new NotFoundException('Contest not found');
+    }
+
+    if (contest.courseId !== currentUser.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    const participantCount = await this.contestParticipationRepository.count({
+      where: { contest: { id } },
+    });
+
+    const userParticipation = await this.contestParticipationRepository.findOne(
+      {
+        where: {
+          contest: { id },
+          user: { id: currentUser.userId },
+        },
+      },
+    );
+
+    return {
+      id: contest.id,
+      name: contest.name,
+      description: contest.description,
+      startTime: contest.startTime,
+      endTime: contest.endTime,
+      lateDeadline: contest.lateDeadline,
+      durationMinutes: contest.durationMinutes,
+      deadlineEnforcement: contest.deadlineEnforcement,
+      submissionStrategy: contest.submissionStrategy,
+      author: {
+        userId: contest.author.id,
+        firstName: contest.author.firstName,
+        lastName: contest.author.lastName,
+        email: contest.author.email,
+      },
+      totalProblems: contest.contestProblems.length,
+      participantCount,
+      hasParticipated: !!userParticipation,
+      createdAt: contest.createdAt,
+    };
+  }
 }

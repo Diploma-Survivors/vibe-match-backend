@@ -1,6 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
+import { ContestProblem } from '../../contests/entities/contest-problem.entity';
 import { LtiLaunchSession } from '../../lti/entities/lti-launch-session.entity';
 import { Problem } from '../../problems/entities/problem.entity';
 import { Submission } from '../entities/submission.entity';
@@ -23,6 +25,10 @@ export class GradingStrategyService {
     private readonly problemRepository: Repository<Problem>,
     @InjectRepository(LtiLaunchSession)
     private readonly ltiSessionRepository: Repository<LtiLaunchSession>,
+    @InjectRepository(ContestParticipation)
+    private readonly contestParticipationRepository: Repository<ContestParticipation>,
+    @InjectRepository(ContestProblem)
+    private readonly contestProblemRepository: Repository<ContestProblem>,
   ) {}
 
   async validateSubmission(
@@ -81,7 +87,13 @@ export class GradingStrategyService {
   async executeStrategy(submissionId: number): Promise<StrategyResult | null> {
     const submission = await this.submissionRepository.findOne({
       where: { id: submissionId },
-      relations: ['user', 'problem', 'ltiLaunchSession'],
+      relations: [
+        'user',
+        'problem',
+        'ltiLaunchSession',
+        'contestParticipation',
+        'contestParticipation.contest',
+      ],
     });
 
     if (!submission) {
@@ -89,9 +101,18 @@ export class GradingStrategyService {
       return null;
     }
 
-    const strategyType =
-      submission.problem.submissionStrategy ||
-      SubmissionStrategyEnum.BEST_SCORE;
+    // Priority: Contest strategy > Problem strategy > Default
+    let strategyType = SubmissionStrategyEnum.BEST_SCORE;
+    let strategySource = 'default';
+
+    if (submission.contestParticipation?.contest?.submissionStrategy) {
+      strategyType = submission.contestParticipation.contest.submissionStrategy;
+      strategySource = `Contest ${submission.contestParticipation.contest.id}`;
+    } else if (submission.problem.submissionStrategy) {
+      strategyType = submission.problem.submissionStrategy;
+      strategySource = `Problem ${submission.problem.id}`;
+    }
+
     const strategy = this.strategyFactory.create(strategyType);
 
     const previousSubmissions = await this.findPreviousSubmissions(
@@ -109,10 +130,115 @@ export class GradingStrategyService {
     };
 
     this.logger.log(
-      `Executing ${strategyType} strategy (from Problem ${submission.problem.id}) for submission ${submissionId}`,
+      `Executing ${strategyType} strategy (from ${strategySource}) for submission ${submissionId}`,
     );
 
     return strategy.execute(context);
+  }
+
+  async executeContestStrategy(contestParticipationId: number): Promise<{
+    userScore: number;
+    maxScore: number;
+    problemBreakdown: Array<{
+      problemId: number;
+      score: number;
+      maxScore: number;
+    }>;
+  }> {
+    // Get contest participation with full relations
+    const participation = await this.contestParticipationRepository.findOne({
+      where: { id: contestParticipationId },
+      relations: ['contest', 'user', 'submissions', 'submissions.problem'],
+    });
+
+    if (!participation) {
+      throw new NotFoundException(
+        `Contest participation ${contestParticipationId} not found`,
+      );
+    }
+
+    // Get all contest problems
+    const contestProblems = await this.contestProblemRepository.find({
+      where: { contestId: participation.contest.id },
+      relations: ['problem'],
+    });
+
+    const contestStrategy =
+      participation.contest.submissionStrategy ||
+      SubmissionStrategyEnum.BEST_SCORE;
+
+    this.logger.log(
+      `Calculating contest score for participation ${contestParticipationId} using ${contestStrategy} strategy`,
+    );
+
+    let totalScore = 0;
+    let totalMaxScore = 0;
+    const problemBreakdown: Array<{
+      problemId: number;
+      score: number;
+      maxScore: number;
+    }> = [];
+
+    // For each problem in the contest, calculate the user's score using the strategy
+    for (const contestProblem of contestProblems) {
+      const problemId = contestProblem.problemId;
+      const problemMaxScore = contestProblem.score; // Use contest_problems.score, not problem.maxScore
+
+      // Get all submissions for this problem within this contest participation
+      const problemSubmissions = participation.submissions.filter(
+        (s) => s.problem.id === problemId,
+      );
+
+      let problemScore = 0;
+
+      if (problemSubmissions.length > 0) {
+        // Apply contest strategy using the factory pattern
+        const strategy = this.strategyFactory.create(contestStrategy);
+
+        // Create context for strategy execution
+        // Note: We use the most recent submission as the "current" submission
+        const latestSubmission = problemSubmissions.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0];
+
+        const previousSubmissions = problemSubmissions.filter(
+          (s) => s.id !== latestSubmission.id,
+        );
+
+        const context: StrategyContext = {
+          submission: latestSubmission,
+          previousSubmissions,
+          problem: contestProblem.problem,
+          ltiSession: null,
+        };
+
+        // Calculate score using the strategy
+        problemScore = await strategy.calculateScore(context);
+
+        // Cap the score at the contest's max score for this problem
+        problemScore = Math.min(problemScore, problemMaxScore);
+      }
+
+      totalScore += problemScore;
+      totalMaxScore += problemMaxScore;
+
+      problemBreakdown.push({
+        problemId,
+        score: problemScore,
+        maxScore: problemMaxScore,
+      });
+    }
+
+    this.logger.log(
+      `Contest score calculated for participation ${contestParticipationId}: ${totalScore}/${totalMaxScore}`,
+    );
+
+    return {
+      userScore: totalScore,
+      maxScore: totalMaxScore,
+      problemBreakdown,
+    };
   }
 
   private async findPreviousSubmissions(

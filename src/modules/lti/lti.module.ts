@@ -4,6 +4,7 @@ import { AuthModule } from '../../modules/auth/auth.module';
 import { RefreshTokenModule } from '../../modules/auth/refresh-token.module';
 import { UserModule } from '../../modules/user/user.module';
 import { RedisModule } from '../../shared/redis/redis.module';
+import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { ContestsModule } from '../contests/contests.module';
 import { CourseModule } from '../course/course.module';
 import { ProblemsModule } from '../problems/problems.module';
@@ -18,7 +19,11 @@ import { LtiService } from './lti.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([LtiLaunchSession, Submission]),
+    TypeOrmModule.forFeature([
+      LtiLaunchSession,
+      Submission,
+      ContestParticipation,
+    ]),
     UserModule,
     AuthModule,
     RedisModule,
@@ -26,7 +31,7 @@ import { LtiService } from './lti.service';
     UserCourseModule,
     RefreshTokenModule,
     ProblemsModule,
-    ContestsModule,
+    forwardRef(() => ContestsModule),
     forwardRef(() => SubmissionModule),
   ],
   controllers: [LtiController],

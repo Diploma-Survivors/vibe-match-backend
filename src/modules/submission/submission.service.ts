@@ -162,7 +162,9 @@ export class SubmissionService {
       where: { id: createSubmissionDto.contestParticipationId },
     });
     if (!contestParticipation) {
-      throw new NotFoundException('User is not registered in the contest');
+      throw new BadRequestException(
+        'You have not started participation in this contest. Please join the contest first.',
+      );
     }
 
     // Validate problem in contest
@@ -192,6 +194,9 @@ export class SubmissionService {
         contestParticipation,
         language,
         fileUrl,
+        ltiLaunchSession: user.ltiSessionId
+          ? ({ id: user.ltiSessionId } as LtiLaunchSession)
+          : null,
       }),
     );
 
@@ -311,6 +316,56 @@ export class SubmissionService {
       userId: user.userId,
       problemId: Number(problemId),
       contestParticipationId: Number(contestParticipationId),
+    };
+
+    return this.submissionCursorService.paginateSubmissions(
+      queryBuilder,
+      query,
+      countSubmissionsField,
+    );
+  }
+
+  async getByContest(
+    contestId: number,
+    query: SubmissionsCursorQueryDto,
+    user: JwtPayload,
+    problemId?: number,
+  ) {
+    // Find contest participation for this user
+    const contestParticipation = await this.contestParticipationRepo.findOne({
+      where: {
+        contest: { id: contestId },
+        user: { id: user.userId },
+      },
+    });
+
+    if (!contestParticipation) {
+      throw new NotFoundException(
+        'You have not started participation in this contest',
+      );
+    }
+
+    const queryBuilder = this.submissionRepository
+      .createQueryBuilder('submission')
+      .innerJoinAndSelect('submission.problem', 'problem')
+      .innerJoinAndSelect('submission.user', 'user')
+      .innerJoinAndSelect('submission.language', 'language')
+      .where('submission.contest_participation_id = :contestParticipationId', {
+        contestParticipationId: contestParticipation.id,
+      })
+      .andWhere('user.id = :userId', { userId: user.userId });
+
+    // Optional filter by specific problem
+    if (problemId) {
+      queryBuilder.andWhere('problem.id = :problemId', { problemId });
+    }
+
+    this.applyFilter(queryBuilder, query.filters);
+
+    const countSubmissionsField: CountSubmissionField = {
+      userId: user.userId,
+      contestParticipationId: contestParticipation.id,
+      ...(problemId && { problemId }),
     };
 
     return this.submissionCursorService.paginateSubmissions(

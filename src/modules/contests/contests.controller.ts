@@ -13,18 +13,25 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiExtraModels,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+
+// Third-party
+import { memoryStorage } from 'multer';
 
 // Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -37,6 +44,9 @@ import {
 
 // Relative imports
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
+import { CreateSubmissionDto } from '../submission/dto/create-submission.dto';
+import { SubmissionsCursorQueryDto } from '../submission/dto/submission-cursor-query.dto';
+import { SubmissionService } from '../submission/submission.service';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestsService } from './contests.service';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
@@ -51,6 +61,7 @@ import { StartParticipationResponseDto } from './dto/start-participation-respons
 import { GetContestProblemsResponseDto } from './dto/get-contest-problems-response.dto';
 import { GetContestProblemDetailResponseDto } from './dto/get-contest-problem-detail-response.dto';
 import { GetParticipantsResponseDto } from './dto/get-participants-response.dto';
+import { GetContestOverviewResponseDto } from './dto/get-contest-overview-response.dto';
 import { ContestParticipationService } from './services/contest-participation.service';
 import { ContestProblemsService } from './services/contest-problems.service';
 
@@ -61,6 +72,7 @@ export class ContestsController {
     private readonly contestsService: ContestsService,
     private readonly contestParticipationService: ContestParticipationService,
     private readonly contestProblemsService: ContestProblemsService,
+    private readonly submissionService: SubmissionService,
   ) {}
 
   @Post()
@@ -145,11 +157,45 @@ export class ContestsController {
     );
   }
 
+  @Get(':id/overview')
+  @ApiOperation({
+    summary: 'Get contest overview information',
+    description:
+      'Retrieve basic contest information without problem list. Accessible to all users in the course without requiring participation.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Contest overview retrieved successfully',
+    type: () => GetContestOverviewResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Contest not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'User does not have access to this contest',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.STUDENT, RoleEnum.INSTRUCTOR)
+  async getContestOverview(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.contestsService.getContestOverview(+id, user);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get detailed information about a specific contest',
     description:
-      'Retrieve detailed information about a specific contest by ID. User must have started participation to access.',
+      'Retrieve detailed information about a specific contest by ID including problem list. User must have started participation to access.',
   })
   @ApiParam({
     name: 'id',
@@ -579,5 +625,111 @@ export class ContestsController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     return this.contestsService.getContestParticipants(+id, currentUser);
+  }
+
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Post(':id/submit')
+  @ApiOperation({
+    summary: 'Submit a solution to a problem within a contest',
+    description:
+      'Submit code for grading to a specific problem in a contest. The contest participation is automatically determined from the authenticated user and contest ID - do NOT send contestParticipationId in the request body. Automatically calculates aggregated contest score and syncs with Moodle via LTI.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    type: () => String,
+    status: HttpStatus.OK,
+    description:
+      'Code has been submitted successfully. Returns a submission ID for tracking via SSE.',
+    schema: {
+      example: {
+        submissionId: '550e8400-e29b-41d4-a716-446655440000',
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Contest not started yet, already ended, or problem not in contest',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description:
+      'You have not started participation in this contest. Please join the contest first.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You are not allowed to submit to this contest.',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async submitToContest(
+    @Param('id') contestId: string,
+    @Body() dto: CreateSubmissionDto,
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.submissionService.submitToContest(+contestId, dto, user, file);
+  }
+
+  @Get(':id/submissions')
+  @ApiOperation({
+    summary: 'Get all submissions for a contest',
+    description:
+      'Retrieve all submissions made by the authenticated user in this contest. Supports pagination and optional filtering by problem.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'problemId',
+    description: 'Optional: Filter submissions by specific problem ID',
+    required: false,
+    type: Number,
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Submissions retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'You have not started participation in this contest',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You do not have access to this contest',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.STUDENT, RoleEnum.INSTRUCTOR)
+  async getContestSubmissions(
+    @Param('id') contestId: string,
+    @Query() query: SubmissionsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const problemId = (query as any).problemId
+      ? +(query as any).problemId
+      : undefined;
+    return this.submissionService.getByContest(
+      +contestId,
+      query,
+      user,
+      problemId,
+    );
   }
 }

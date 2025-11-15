@@ -112,32 +112,6 @@ export class SubmissionController {
     return this.submissionService.submitForGrading(dto, user, file);
   }
 
-  @Post('/contest-participation/:contestId/submit')
-  @ApiResponse({
-    type: () => String,
-    status: HttpStatus.OK,
-    description: 'Code has been submitted successfully.',
-  })
-  @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Unauthorized',
-  })
-  @ApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'You are not allowed to submit to this contest.',
-  })
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async submitToContest(
-    @Param('contestId') contestId: number,
-    @Body() dto: CreateSubmissionDto,
-    @CurrentUser() user: JwtPayload,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
-    return this.submissionService.submitToContest(contestId, dto, user, file);
-  }
-
   @Get('/problem/:problemId')
   @ApiBearerAuth()
   @ApiPaginatedSubmissionsResponse()

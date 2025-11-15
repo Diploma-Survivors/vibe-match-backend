@@ -1,5 +1,5 @@
 // NestJS
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Shared/Common
@@ -7,6 +7,7 @@ import { PaginationModule } from 'src/common/pagination/pagination.module';
 
 // Relative imports
 import { ProblemsModule } from '../problems/problems.module';
+import { SubmissionModule } from '../submission/submission.module';
 import { ContestsController } from './contests.controller';
 import { ContestsService } from './contests.service';
 import { Contest } from './entities/contest.entity';
@@ -32,6 +33,7 @@ import { TeacherContestListStrategy } from './strategies/teacher-contest-list.st
     TypeOrmModule.forFeature([Contest, ContestParticipation, ContestProblem]),
     ProblemsModule,
     PaginationModule,
+    forwardRef(() => SubmissionModule),
   ],
   exports: [ContestsService, ContestParticipationService],
 })

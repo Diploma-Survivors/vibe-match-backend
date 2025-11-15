@@ -7,6 +7,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
+import { SubmissionStrategyEnum } from 'src/modules/submission/enums/submission-strategy.enum';
 import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
 
 export class UpdateContestDto {
@@ -69,4 +70,14 @@ export class UpdateContestDto {
   @IsOptional()
   @IsEnum(DeadlineEnforcement)
   deadlineEnforcement?: DeadlineEnforcement;
+
+  @ApiPropertyOptional({
+    description:
+      'Submission strategy for all problems in this contest (overrides individual problem strategies)',
+    enum: SubmissionStrategyEnum,
+    example: SubmissionStrategyEnum.BEST_SCORE,
+  })
+  @IsOptional()
+  @IsEnum(SubmissionStrategyEnum)
+  submissionStrategy?: SubmissionStrategyEnum;
 }

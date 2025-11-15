@@ -16,6 +16,7 @@ import {
   AgsAccessTokenResponse,
   AgsTokenCache,
 } from './interfaces/ags-token.interface';
+import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
 
 @Injectable()
 export class AgsService {
@@ -28,6 +29,8 @@ export class AgsService {
     private readonly gradingStrategyService: GradingStrategyService,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
+    @InjectRepository(ContestParticipation)
+    private readonly contestParticipationRepository: Repository<ContestParticipation>,
   ) {}
 
   async generateClientAssertionJwt(): Promise<string> {
@@ -196,7 +199,14 @@ export class AgsService {
     try {
       const submission = await this.submissionRepository.findOne({
         where: { id: submissionId },
-        relations: ['ltiLaunchSession', 'problem', 'user'],
+        relations: [
+          'ltiLaunchSession',
+          'ltiLaunchSession.contest',
+          'problem',
+          'user',
+          'contestParticipation',
+          'contestParticipation.contest',
+        ],
       });
 
       if (!submission) {
@@ -225,21 +235,67 @@ export class AgsService {
         return false;
       }
 
-      const strategyResult =
-        await this.gradingStrategyService.executeStrategy(submissionId);
+      let scoreToSend: number;
+      let maxScore: number;
+      let comment: string;
 
-      if (!strategyResult?.shouldSendGrade) {
-        this.logger.debug(
-          `Strategy determined not to send grade for submission ${submissionId}`,
+      // Check if this is a contest submission
+      if (submission.contestParticipation) {
+        this.logger.log(
+          `Submission ${submissionId} is part of contest ${submission.contestParticipation.contest.id}`,
         );
-        return false;
+
+        // Calculate aggregated contest score using the strategy service
+        const contestScore =
+          await this.gradingStrategyService.executeContestStrategy(
+            submission.contestParticipation.id,
+          );
+
+        scoreToSend = contestScore.userScore;
+        maxScore = contestScore.maxScore;
+
+        // Update contest_participation.finalScore
+        await this.contestParticipationRepository.update(
+          submission.contestParticipation.id,
+          { finalScore: scoreToSend },
+        );
+
+        // Build detailed comment
+        const breakdown = contestScore.problemBreakdown
+          .map(
+            (p) => `  Problem ${p.problemId}: ${p.score}/${p.maxScore} points`,
+          )
+          .join('\n');
+
+        comment = [
+          `Contest: ${submission.contestParticipation.contest.name}`,
+          `Total Score: ${scoreToSend}/${maxScore}`,
+          '',
+          'Breakdown:',
+          breakdown,
+        ].join('\n');
+      } else {
+        // Standalone problem submission - use existing strategy logic
+        const strategyResult =
+          await this.gradingStrategyService.executeStrategy(submissionId);
+
+        if (!strategyResult?.shouldSendGrade) {
+          this.logger.debug(
+            `Strategy determined not to send grade for submission ${submissionId}`,
+          );
+          return false;
+        }
+
+        scoreToSend = strategyResult.scoreToSend;
+        maxScore = submission.problem.maxScore;
+        comment = strategyResult.comment;
       }
 
       const scoreDto: SendScoreDto = {
         userId: session.ltiUserId,
-        scoreGiven: strategyResult.scoreToSend,
-        scoreMaximum: submission.problem.maxScore,
-        comment: strategyResult.comment,
+        scoreGiven: scoreToSend,
+        scoreMaximum: maxScore,
+        comment,
         timestamp: new Date().toISOString(),
         activityProgress: AgsActivityProgress.COMPLETED,
         gradingProgress: AgsGradingProgress.FULLY_GRADED,
@@ -249,7 +305,7 @@ export class AgsService {
       await this.sendScore(session.agsLineitemUrl, scoreDto);
 
       this.logger.log(
-        `Grade passback successful for submission ${submissionId} (score: ${strategyResult.scoreToSend})`,
+        `Grade passback successful for submission ${submissionId} (score: ${scoreToSend}/${maxScore})`,
       );
       return true;
     } catch (error) {

@@ -7,6 +7,7 @@ import { Exclude, Expose } from 'class-transformer';
 // Relative imports
 import { Course } from 'src/modules/course/entities/course.entity';
 import { DifficultyLevel } from 'src/modules/problems/enums/difficulty-level.enum';
+import { SubmissionStrategyEnum } from 'src/modules/submission/enums/submission-strategy.enum';
 import { User } from 'src/modules/user/entities/user.entity';
 import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
 import { ParticipationStatusDto } from './participation-status.dto';
@@ -103,6 +104,14 @@ export class GetDetailContestResponseDto {
     enum: DeadlineEnforcement,
   })
   deadlineEnforcement: DeadlineEnforcement;
+
+  @ApiProperty({
+    description:
+      'Submission strategy for all problems in this contest (overrides individual problem strategies)',
+    enum: SubmissionStrategyEnum,
+    example: SubmissionStrategyEnum.BEST_SCORE,
+  })
+  submissionStrategy: SubmissionStrategyEnum;
 
   @Exclude()
   courseId: number;

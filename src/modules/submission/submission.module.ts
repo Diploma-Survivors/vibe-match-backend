@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 // Relative imports
 import { RedisModule } from '../../shared/redis/redis.module';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
+import { ContestProblem } from '../contests/entities/contest-problem.entity';
 import { Contest } from '../contests/entities/contest.entity';
 import { Judge0Module } from '../judge0/judge0.module';
 import { Language } from '../language/entities/language.entity';
@@ -41,6 +42,7 @@ import { SubmissionService } from './submission.service';
       User,
       Contest,
       ContestParticipation,
+      ContestProblem,
       LtiLaunchSession,
     ]),
     Judge0Module,
