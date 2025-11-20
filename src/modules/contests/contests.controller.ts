@@ -62,6 +62,7 @@ import { GetContestProblemsResponseDto } from './dto/get-contest-problems-respon
 import { GetContestProblemDetailResponseDto } from './dto/get-contest-problem-detail-response.dto';
 import { GetParticipantsResponseDto } from './dto/get-participants-response.dto';
 import { GetContestOverviewResponseDto } from './dto/get-contest-overview-response.dto';
+import { FinishParticipationResponseDto } from './dto/finish-participation-response.dto';
 import { ContestParticipationService } from './services/contest-participation.service';
 import { ContestProblemsService } from './services/contest-problems.service';
 
@@ -274,6 +275,64 @@ export class ContestsController {
       contest,
       user.userId,
     );
+  }
+
+  @Post(':id/finish')
+  @ApiOperation({
+    summary: 'Finish participation in a contest',
+    description:
+      'Allows a student to manually finish their contest participation before their allocated time expires. Once finished, no further submissions are allowed. Cannot be undone.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Participation finished successfully',
+    type: () => FinishParticipationResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Contest not found, participation not started, already finished, or participation time already expired',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'User does not have access to this contest',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(RoleEnum.STUDENT, RoleEnum.INSTRUCTOR)
+  async finishParticipation(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const contest = await this.contestsService.findOne({ id: +id });
+    if (!contest) {
+      throw new BadRequestException('Contest not found');
+    }
+
+    if (contest.courseId !== user.courseId) {
+      throw new ForbiddenException('You do not have access to this contest');
+    }
+
+    const participation =
+      await this.contestParticipationService.finishParticipation(
+        +id,
+        user.userId,
+      );
+
+    return {
+      participationId: participation.id,
+      contestId: participation.contest.id,
+      startTime: participation.startTime,
+      finishedAt: participation.finishedAt,
+      endTime: participation.endTime,
+      finalScore: participation.finalScore,
+      message: 'Contest participation finished successfully',
+    };
   }
 
   @Get(':id/problems')

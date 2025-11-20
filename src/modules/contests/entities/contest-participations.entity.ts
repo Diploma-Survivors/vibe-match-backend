@@ -36,6 +36,13 @@ export class ContestParticipation {
   })
   endTime: Date | null;
 
+  @Column({
+    type: 'timestamp with time zone',
+    name: 'finished_at',
+    nullable: true,
+  })
+  finishedAt: Date | null;
+
   @Column({ name: 'final_score', type: 'float', nullable: true })
   finalScore: number;
 

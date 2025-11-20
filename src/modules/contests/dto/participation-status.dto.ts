@@ -48,6 +48,14 @@ export class ParticipationStatusDto {
   isActive: boolean;
 
   @ApiProperty({
+    description:
+      'When the user finished participating (manually or automatically when time expired)',
+    example: '2024-01-15T11:30:00Z',
+    nullable: true,
+  })
+  finishedAt: Date | null;
+
+  @ApiProperty({
     description: 'Final score of the participation',
     example: 85.5,
     nullable: true,

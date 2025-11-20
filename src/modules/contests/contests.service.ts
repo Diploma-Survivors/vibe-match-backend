@@ -124,6 +124,12 @@ export class ContestsService {
       throw new ForbiddenException('You do not have access to this contest');
     }
 
+    // Lazy update expired participation before fetching
+    await this.contestParticipationService.lazyUpdateExpiredParticipation(
+      id,
+      currentUser.userId,
+    );
+
     const participation = await this.contestParticipationService.findOne(
       id,
       currentUser.userId,

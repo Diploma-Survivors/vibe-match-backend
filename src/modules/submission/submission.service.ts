@@ -172,6 +172,13 @@ export class SubmissionService {
       );
     }
 
+    // Check if participation has been finished
+    if (contestParticipation.finishedAt) {
+      throw new BadRequestException(
+        'You have already finished this contest participation. No further submissions are allowed.',
+      );
+    }
+
     // Validate deadline based on enforcement strategy
     this.validateContestDeadline(contest, contestParticipation, now);
 

@@ -30,7 +30,10 @@ export class ContestParticipationService {
     const now = new Date();
     let isActive = false;
 
-    if (contest.durationMinutes && participation.endTime) {
+    // Cannot be active if already finished
+    if (participation.finishedAt) {
+      isActive = false;
+    } else if (contest.durationMinutes && participation.endTime) {
       const endTime = new Date(participation.endTime);
       isActive = now < endTime && now < contest.endTime;
     } else {
@@ -45,6 +48,7 @@ export class ContestParticipationService {
       endTime: participation.endTime,
       durationMinutes: contest.durationMinutes,
       isActive,
+      finishedAt: participation.finishedAt,
       finalScore: participation.finalScore,
     };
   }
@@ -133,5 +137,76 @@ export class ContestParticipationService {
         user: { id: userId },
       },
     });
+  }
+
+  @Transactional()
+  async finishParticipation(
+    contestId: number,
+    userId: number,
+  ): Promise<ContestParticipation> {
+    const participation = await this.participationRepository.findOne({
+      where: {
+        contest: { id: contestId },
+        user: { id: userId },
+      },
+      relations: ['contest'],
+    });
+
+    if (!participation) {
+      throw new BadRequestException(
+        'You have not started participating in this contest',
+      );
+    }
+
+    if (participation.finishedAt) {
+      throw new BadRequestException(
+        'You have already finished this contest participation',
+      );
+    }
+
+    const now = new Date();
+
+    // Check if participation has already expired
+    if (participation.endTime && now > participation.endTime) {
+      throw new BadRequestException(
+        'Your participation time has already expired',
+      );
+    }
+
+    // Mark as finished
+    participation.finishedAt = now;
+
+    return this.participationRepository.save(participation);
+  }
+
+  /**
+   * Lazily updates expired participations that haven't been marked as finished.
+   * This is called when retrieving contest details to ensure finishedAt is set
+   * for participations that have passed their endTime.
+   */
+  @Transactional()
+  async lazyUpdateExpiredParticipation(
+    contestId: number,
+    userId: number,
+  ): Promise<void> {
+    const participation = await this.participationRepository.findOne({
+      where: {
+        contest: { id: contestId },
+        user: { id: userId },
+      },
+    });
+
+    if (!participation || participation.finishedAt) {
+      // Already finished or doesn't exist
+      return;
+    }
+
+    const now = new Date();
+
+    // Check if participation has expired (endTime passed)
+    if (participation.endTime && now > participation.endTime) {
+      participation.finishedAt = participation.endTime;
+      await this.participationRepository.save(participation);
+    }
   }
 }
