@@ -64,7 +64,9 @@ export class ContestParticipationService {
       throw new BadRequestException('Contest has not started yet');
     }
 
-    if (now > contest.endTime) {
+    const deadline = contest.lateDeadline || contest.endTime;
+
+    if (now > deadline) {
       throw new BadRequestException('Contest has already ended');
     }
 
