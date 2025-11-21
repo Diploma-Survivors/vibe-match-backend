@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 // Shared/Common
 import { Cacheable } from 'src/common/decorators/cacheable.decorator';
 import { CACHE_TTL } from 'src/common/constants/cache.constants';
-import { CursorPaginated } from 'src/common/pagination/interfaces/cursor-paginated.interface';
+import { PaginationCursorResponseDto } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
 
 // Third-party
 import {
@@ -39,7 +39,8 @@ import { Contest } from './entities/contest.entity';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
-import { ContestsPaginationService } from './services/contests-pagination.service';
+import { LeaderboardPaginationService } from './services/leaderboard-pagination.service';
+import { SubmissionsOverviewPaginationService } from './services/submissions-overview-pagination.service';
 
 @Injectable()
 export class ContestsService {
@@ -52,7 +53,8 @@ export class ContestsService {
     private readonly submissionRepository: Repository<Submission>,
     private readonly problemsService: ProblemsService,
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
-    private readonly contestsPaginationService: ContestsPaginationService,
+    private readonly leaderboardPaginationService: LeaderboardPaginationService,
+    private readonly submissionsOverviewPaginationService: SubmissionsOverviewPaginationService,
   ) {}
 
   @Transactional()
@@ -201,8 +203,8 @@ export class ContestsService {
     // Note: Ranking calculation requires all participants' data for accurate relative rankings
     // Cursor pagination is applied after ranking calculation for correctness
 
-    // Use the contests pagination service
-    const rankings = await this.contestsPaginationService.calculateRankings(
+    // Use the leaderboard pagination service
+    const rankings = await this.leaderboardPaginationService.calculateRankings(
       contestId,
       query,
     );
@@ -216,7 +218,7 @@ export class ContestsService {
   async getSubmissionsOverview(
     contestId: number,
     query: SubmissionsOverviewCursorQueryDto,
-  ): Promise<CursorPaginated<ContestParticipationDto>> {
+  ): Promise<PaginationCursorResponseDto<ContestParticipationDto>> {
     // Check contest access and instructor/admin role
     const contest = await this.contestsRepository.findOne({
       where: { id: contestId },
@@ -227,14 +229,33 @@ export class ContestsService {
       throw new BadRequestException('Contest not found');
     }
 
-    // Use the pagination service
+    // Use the pagination service - pagination is applied at database level
     const paginatedResult =
-      await this.contestsPaginationService.paginateContestants(
+      await this.submissionsOverviewPaginationService.getContestants(
         contestId,
         query,
       );
 
-    // The pagination service already returns the correct DTO format
-    return paginatedResult;
+    // Transform entities to DTOs
+    const transformedEdges = paginatedResult.edges.map((edge) => ({
+      ...edge,
+      node: {
+        id: edge.node.id,
+        user: {
+          id: edge.node.user.id,
+          firstName: edge.node.user.firstName || '',
+          lastName: edge.node.user.lastName || '',
+          email: edge.node.user.email,
+        },
+        startTime: edge.node.startTime,
+        endTime: edge.node.endTime,
+        finalScore: edge.node.finalScore,
+      } as ContestParticipationDto,
+    }));
+
+    return {
+      ...paginatedResult,
+      edges: transformedEdges,
+    };
   }
 }

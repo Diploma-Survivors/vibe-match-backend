@@ -13,9 +13,11 @@ import { ContestsService } from './contests.service';
 import { Contest } from './entities/contest.entity';
 import { ContestParticipation } from './entities/contest-participations.entity';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
-import { ContestsPaginationService } from './services/contests-pagination.service';
+import { LeaderboardPaginationService } from './services/leaderboard-pagination.service';
+import { SubmissionsOverviewPaginationService } from './services/submissions-overview-pagination.service';
 import { StudentContestListStrategy } from './strategies/student-contest-list.strategy';
 import { TeacherContestListStrategy } from './strategies/teacher-contest-list.strategy';
+import { ContestProblem } from './entities/contest-problem.entity';
 
 @Module({
   controllers: [ContestsController],
@@ -24,10 +26,16 @@ import { TeacherContestListStrategy } from './strategies/teacher-contest-list.st
     TeacherContestListStrategy,
     StudentContestListStrategy,
     ContestFilterStrategyFactory,
-    ContestsPaginationService,
+    LeaderboardPaginationService,
+    SubmissionsOverviewPaginationService,
   ],
   imports: [
-    TypeOrmModule.forFeature([Contest, ContestParticipation, Submission]),
+    TypeOrmModule.forFeature([
+      Contest,
+      ContestParticipation,
+      Submission,
+      ContestProblem,
+    ]),
     ProblemsModule,
     PaginationModule,
   ],

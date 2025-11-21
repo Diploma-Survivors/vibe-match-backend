@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ProblemResultDto } from './problem-result.dto';
 import { UserInformationDto } from '../../user/dto/user-information.dto';
 import { BaseProblemResponseDto } from '../../problems/dto/base-problem-response.dto';
+import { PaginationCursorResponseDto } from '../../../common/pagination/dtos/pagination-cursor-response.dto';
 
 // Relative imports
 
@@ -54,6 +55,7 @@ export class LeaderboardResponseDto {
 
   @ApiProperty({
     description: 'Leaderboard rankings with cursor pagination',
+    type: () => PaginationCursorResponseDto,
   })
-  rankings: any; // Will be defined by the custom schema
+  rankings: PaginationCursorResponseDto<LeaderboardRankingDto>;
 }

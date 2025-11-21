@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ProblemLeadingStatus } from '../enums/problem-leading-status.enum';
 
 export class ProblemResultDto {
   @ApiProperty({
@@ -21,14 +22,9 @@ export class ProblemResultDto {
   time: string;
 
   @ApiProperty({
-    description: 'Whether the problem was solved (accepted)',
-    example: true,
+    description: 'Status of the problem solution',
+    example: ProblemLeadingStatus.ACCEPTED,
+    enum: ProblemLeadingStatus,
   })
-  isAccepted: boolean;
-
-  @ApiProperty({
-    description: 'Number of attempts made for this problem',
-    example: 3,
-  })
-  attempts: number;
+  status: ProblemLeadingStatus;
 }

@@ -1,0 +1,6 @@
+export enum ProblemLeadingStatus {
+  ACCEPTED = 'ACCEPTED',
+  NOT_ACCEPTED = 'NOT_ACCEPTED',
+  PENDING = 'PENDING',
+  NOT_ATTEMPTED = 'NOT_ATTEMPTED',
+}

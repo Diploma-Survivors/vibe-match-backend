@@ -40,6 +40,7 @@ import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
 import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
 import { LeaderboardCursorQueryDto } from './dto/leaderboard-cursor-query.dto';
+import { LeaderboardResponseDto } from './dto/leaderboard-response.dto';
 import { SubmissionsOverviewCursorQueryDto } from './dto/submissions-overview-cursor-query.dto';
 import {
   ApiContestLeadingDecorator,
@@ -179,7 +180,7 @@ export class ContestsController {
   async getLeaderboard(
     @Param('id') id: number,
     @Query() query: LeaderboardCursorQueryDto,
-  ) {
+  ): Promise<LeaderboardResponseDto> {
     return this.contestsService.getLeaderboard(id, query);
   }
 
