@@ -18,6 +18,9 @@ export class ContestParticipation {
   @PrimaryGeneratedColumn('increment', { name: 'contest_participation_id' })
   id: number;
 
+  @Column({ name: 'contest_id' })
+  contestId: number;
+
   @ManyToOne(() => Contest, (contest) => contest.contestParticipation)
   @JoinColumn({ name: 'contest_id' })
   contest: Contest;
