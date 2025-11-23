@@ -12,6 +12,12 @@ export class LanguageController {
   @ApiResponse({
     status: 200,
     description: 'List of all programming languages',
+    example: [
+      {
+        id: 1,
+        name: 'Python',
+      },
+    ],
     type: [LanguageDto],
   })
   findAll() {

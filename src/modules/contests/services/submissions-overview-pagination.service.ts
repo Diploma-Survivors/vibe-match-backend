@@ -15,7 +15,7 @@ import { SubmissionsOverviewCursorQueryDto } from '../dto/submissions-overview-c
 
 /**
  * Service for submissions overview pagination
- * Extends base cursor pagination for ContestParticipation entities
+ * Returns entities with joined user data for transformation
  */
 @Injectable()
 export class SubmissionsOverviewPaginationService extends BaseCursorPaginationService<
@@ -23,9 +23,6 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
   SubmissionsOverviewCursorQueryDto
 > {
   private contestId: number;
-  protected readonly logger = new Logger(
-    SubmissionsOverviewPaginationService.name,
-  );
 
   constructor(
     @InjectRepository(ContestParticipation)
@@ -53,7 +50,9 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
     return this.contestParticipationRepository
       .createQueryBuilder('cp')
       .leftJoinAndSelect('cp.user', 'u')
-      .where('cp.contestId = :contestId', { contestId: this.contestId });
+      .where('cp.contest.id = :contestId', {
+        contestId: this.contestId,
+      });
   }
 
   protected async applyFilters(
@@ -67,24 +66,29 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
 
   protected selectFields(
     queryBuilder: SelectQueryBuilder<ContestParticipation>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     sortBy: string,
-  ): Promise<void> {
+  ): Promise<void> | void {
+    const alias = this.getEntityAlias();
+    const defaultSortField = this.getDefaultSortField();
+
+    // Use raw selection with aliases to ensure proper field mapping
     queryBuilder
       .select([
-        'cp.id',
-        'cp.startTime',
-        'cp.endTime',
-        'cp.finalScore',
-        'u.id',
-        'u.firstName',
-        'u.lastName',
-        'u.email',
+        `${alias}.${defaultSortField} AS "${defaultSortField}"`,
+        `${alias}.${sortBy} AS "${sortBy}"`,
+        `${alias}.startTime AS "startTime"`,
+        `${alias}.endTime AS "endTime"`,
+        `${alias}.finalScore AS "finalScore"`,
+        `json_build_object(
+          'id', u.id,
+          'firstName', COALESCE(u.firstName, ''),
+          'lastName', COALESCE(u.lastName, ''),
+          'email', COALESCE(u.email, '')
+        ) AS "user"`,
       ])
       .orderBy('u.lastName', 'ASC')
-      .addOrderBy('u.firstName', 'ASC');
-
-    return Promise.resolve();
+      .addOrderBy('u.firstName', 'ASC')
+      .addOrderBy(`${alias}.${defaultSortField}`, 'ASC');
   }
 
   /**
@@ -97,7 +101,7 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
     type CountRaw = { count: string };
     const result = await this.contestParticipationRepository
       .createQueryBuilder('cp')
-      .where('cp.contestId = :contestId', { contestId: this.contestId })
+      .where('cp.contest.id = :contestId', { contestId: this.contestId })
       .select('COUNT(*)', 'count')
       .getRawOne<CountRaw | undefined>();
 
@@ -106,6 +110,7 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
 
   /**
    * Get paginated contestants for a specific contest
+   * Returns entities with joined user data
    */
   async getContestants(
     contestId: number,

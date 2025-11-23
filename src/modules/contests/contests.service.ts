@@ -236,22 +236,30 @@ export class ContestsService {
         query,
       );
 
-    // Transform entities to DTOs
-    const transformedEdges = paginatedResult.edges.map((edge) => ({
-      ...edge,
-      node: {
-        id: edge.node.id,
-        user: {
-          id: edge.node.user.id,
-          firstName: edge.node.user.firstName || '',
-          lastName: edge.node.user.lastName || '',
-          email: edge.node.user.email,
-        },
-        startTime: edge.node.startTime,
-        endTime: edge.node.endTime,
-        finalScore: edge.node.finalScore,
-      } as ContestParticipationDto,
-    }));
+    // Transform entities to DTOs - ensure user is not null
+    const transformedEdges = paginatedResult.edges.map((edge) => {
+      if (!edge.node.user) {
+        throw new BadRequestException(
+          `User data not found for participation ${edge.node.id}`,
+        );
+      }
+
+      return {
+        ...edge,
+        node: {
+          id: edge.node.id,
+          user: {
+            id: edge.node.user.id,
+            firstName: edge.node.user.firstName ?? '',
+            lastName: edge.node.user.lastName ?? '',
+            email: edge.node.user.email ?? '',
+          },
+          startTime: edge.node.startTime,
+          endTime: edge.node.endTime,
+          finalScore: edge.node.finalScore,
+        } as ContestParticipationDto,
+      };
+    });
 
     return {
       ...paginatedResult,

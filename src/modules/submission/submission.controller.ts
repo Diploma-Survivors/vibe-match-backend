@@ -45,8 +45,8 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import * as judge0Interface from '../judge0/judge0.interface';
 import { SubmissionConstants } from './constants/submission.constant';
 import {
-  ApiPaginatedSubmissionsResponse,
   ApiPaginatedContestSubmissionsResponse,
+  ApiPaginatedSubmissionsResponse,
 } from './decorators/api-paginated-submissions.decorator';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { SubmissionDetailDto } from './dto/detail-submission.dto';

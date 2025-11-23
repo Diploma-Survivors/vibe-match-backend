@@ -21,7 +21,10 @@ export class SubmissionInListDto {
 
   @ApiProperty({
     description: 'Language used for the submission',
-    example: 'JavaScript',
+    example: {
+      id: 1,
+      name: 'JavaScript',
+    },
     type: LanguageDto,
   })
   @Expose()
