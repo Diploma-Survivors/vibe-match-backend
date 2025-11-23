@@ -22,6 +22,9 @@ import { ProblemVisibility } from '../problems/enums/problem-visibility.enum';
 import { ProblemsService } from '../problems/problems.service';
 import { Submission } from '../submission/entities/submission.entity';
 import { SubmissionStatus } from '../submission/enums/submission-status.enum';
+import { SubmissionStrategyEnum } from '../submission/enums/submission-strategy.enum';
+import { GradingStrategyFactory } from '../submission/strategies/grading-strategy.factory';
+import { StrategyContext } from '../submission/strategies/interfaces/grading-strategy.interface';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { UpdateContestDto } from './dto/update-contest.dto';
@@ -52,6 +55,7 @@ export class ContestsService {
     private readonly problemsService: ProblemsService,
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
     private readonly contestParticipationService: ContestParticipationService,
+    private readonly gradingStrategyFactory: GradingStrategyFactory,
   ) {}
 
   @Transactional()
@@ -151,45 +155,77 @@ export class ContestsService {
         contestParticipation: { id: participation.id },
         userId: currentUser.userId,
       },
-      select: ['problemId', 'status'],
+      relations: ['problem'],
+      order: { createdAt: 'ASC' },
     });
 
     // Create a map of problem submissions
-    const problemSubmissionsMap = new Map<number, SubmissionStatus[]>();
+    const problemSubmissionsMap = new Map<number, Submission[]>();
     for (const submission of submissions) {
       if (!problemSubmissionsMap.has(submission.problemId)) {
         problemSubmissionsMap.set(submission.problemId, []);
       }
-      problemSubmissionsMap.get(submission.problemId)!.push(submission.status);
+      problemSubmissionsMap.get(submission.problemId)!.push(submission);
     }
 
     // Check if contest has ended
     const now = new Date();
     const contestEnded = now > contest.endTime;
 
-    const problems = contest.contestProblems.map((cp) => {
-      const submissionStatuses = problemSubmissionsMap.get(cp.problem.id) || [];
-      const status = this.calculateProblemStatus(
-        submissionStatuses,
-        contestEnded,
-      );
+    // Get contest strategy
+    const contestStrategy =
+      contest.submissionStrategy || SubmissionStrategyEnum.BEST_SCORE;
+    const strategy = this.gradingStrategyFactory.create(contestStrategy);
 
-      return {
-        id: cp.problem.id,
-        title: cp.problem.title,
-        score: cp.score,
-        difficulty: cp.problem.difficulty,
-        memoryLimitKb: cp.problem.memoryLimitKb,
-        timeLimitMs: cp.problem.timeLimitMs,
-        status,
-      };
-    });
+    const problems = await Promise.all(
+      contest.contestProblems.map(async (cp) => {
+        const problemSubmissions =
+          problemSubmissionsMap.get(cp.problem.id) || [];
+        const submissionStatuses = problemSubmissions.map((s) => s.status);
+        const status = this.calculateProblemStatus(
+          submissionStatuses,
+          contestEnded,
+        );
+
+        // Calculate user's score for this problem using the contest strategy
+        let userScore = 0;
+        if (problemSubmissions.length > 0) {
+          const latestSubmission =
+            problemSubmissions[problemSubmissions.length - 1];
+          const previousSubmissions = problemSubmissions.slice(0, -1);
+
+          const context: StrategyContext = {
+            submission: latestSubmission,
+            previousSubmissions,
+            problem: cp.problem,
+            ltiSession: null,
+          };
+
+          // Use the strategy's calculateScore method
+          userScore = await strategy.calculateScore(context);
+
+          // Cap the score at the contest's max score for this problem
+          userScore = Math.min(userScore, cp.score);
+        }
+
+        return {
+          id: cp.problem.id,
+          title: cp.problem.title,
+          difficulty: cp.problem.difficulty,
+          memoryLimitKb: cp.problem.memoryLimitKb,
+          timeLimitMs: cp.problem.timeLimitMs,
+          maxScore: cp.score,
+          userScore,
+          status,
+        };
+      }),
+    );
 
     const sortedProblems = problems.toSorted((a, b) => {
-      if (a.score === b.score) {
+      if (a.maxScore === b.maxScore) {
         return a.title.localeCompare(b.title);
       }
-      return a.score - b.score;
+      return a.maxScore - b.maxScore;
     });
 
     const participationStatus =

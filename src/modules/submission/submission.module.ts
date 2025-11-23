@@ -89,6 +89,6 @@ import { SubmissionService } from './submission.service';
     LatestScoreStrategy,
     AverageScoreStrategy,
   ],
-  exports: [SubmissionService, GradingStrategyService],
+  exports: [SubmissionService, GradingStrategyService, GradingStrategyFactory],
 })
 export class SubmissionModule {}

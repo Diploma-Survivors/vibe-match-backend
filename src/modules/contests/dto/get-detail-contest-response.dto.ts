@@ -27,12 +27,6 @@ export class ContestProblemDetail {
   title: string;
 
   @ApiProperty({
-    description: 'The score assigned to the problem in the contest',
-    example: 100,
-  })
-  score: number;
-
-  @ApiProperty({
     description: 'The difficulty level of the problem',
     example: DifficultyLevel.EASY,
     enum: DifficultyLevel,
@@ -50,6 +44,19 @@ export class ContestProblemDetail {
     example: 2000,
   })
   timeLimitMs: number;
+
+  @ApiProperty({
+    description: 'The maximum score for this problem in the contest',
+    example: 100,
+  })
+  maxScore: number;
+
+  @ApiProperty({
+    description:
+      "The user's score for this problem based on the contest's submission strategy",
+    example: 85,
+  })
+  userScore: number;
 
   @ApiProperty({
     description: 'The status of the problem for the user',
