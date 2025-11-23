@@ -7,6 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
+// Shared/Common
+import { Cacheable } from 'src/common/decorators/cacheable.decorator';
+import { CACHE_TTL } from 'src/common/constants/cache.constants';
+import { PaginationCursorResponseDto } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
+
 // Third-party
 import {
   FindOptionsRelations,
@@ -17,22 +22,27 @@ import {
 import { Transactional } from 'typeorm-transactional';
 
 // Relative imports
+import { Submission } from '../submission/entities/submission.entity';
+import { ContestParticipation } from './entities/contest-participations.entity';
 import { Problem } from '../problems/entities/problem.entity';
 import { ProblemVisibility } from '../problems/enums/problem-visibility.enum';
 import { ProblemsService } from '../problems/problems.service';
-import { Submission } from '../submission/entities/submission.entity';
 import { SubmissionStatus } from '../submission/enums/submission-status.enum';
 import { SubmissionStrategyEnum } from '../submission/enums/submission-strategy.enum';
 import { GradingStrategyFactory } from '../submission/strategies/grading-strategy.factory';
 import { StrategyContext } from '../submission/strategies/interfaces/grading-strategy.interface';
+import { BaseProblemResponseDto } from '../problems/dto/base-problem-response.dto';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
+import { LeaderboardCursorQueryDto } from './dto/leaderboard-cursor-query.dto';
+import { LeaderboardResponseDto } from './dto/leaderboard-response.dto';
+import { ContestParticipationDto } from './dto/contest-participation.dto';
+import { SubmissionsOverviewCursorQueryDto } from './dto/submissions-overview-cursor-query.dto';
 import { UpdateContestDto } from './dto/update-contest.dto';
 import { AddProblemToContestDto } from './dto/add-problem-to-contest.dto';
 import { UpdateContestProblemDto } from './dto/update-contest-problem.dto';
 import { Contest } from './entities/contest.entity';
 import { ContestProblem } from './entities/contest-problem.entity';
-import { ContestParticipation } from './entities/contest-participations.entity';
 import { ContestProblemResult } from './entities/contest-problem-result.entity';
 import { ProblemStatus } from './enums/problem-status.enum';
 
@@ -40,6 +50,8 @@ import { ProblemStatus } from './enums/problem-status.enum';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
+import { LeaderboardPaginationService } from './services/leaderboard-pagination.service';
+import { SubmissionsOverviewPaginationService } from './services/submissions-overview-pagination.service';
 import { ContestParticipationService } from './services/contest-participation.service';
 
 @Injectable()
@@ -59,6 +71,8 @@ export class ContestsService {
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
     private readonly contestParticipationService: ContestParticipationService,
     private readonly gradingStrategyFactory: GradingStrategyFactory,
+    private readonly leaderboardPaginationService: LeaderboardPaginationService,
+    private readonly submissionsOverviewPaginationService: SubmissionsOverviewPaginationService,
   ) {}
 
   @Transactional()
@@ -563,6 +577,117 @@ export class ContestsService {
       participantCount,
       hasParticipated: !!userParticipation,
       createdAt: contest.createdAt,
+    };
+  }
+
+  @Cacheable({
+    key: (contestId: number, query: LeaderboardCursorQueryDto) =>
+      `leaderboard:${contestId}:${JSON.stringify(query)}`,
+    ttl: CACHE_TTL.ONE_MINUTE,
+  })
+  async getLeaderboard(
+    contestId: number,
+    query: LeaderboardCursorQueryDto,
+  ): Promise<LeaderboardResponseDto> {
+    // Check contest access
+    const contest = await this.contestsRepository.findOne({
+      where: { id: contestId },
+      relations: ['contestProblems', 'contestProblems.problem'],
+    });
+
+    if (!contest) {
+      throw new BadRequestException('Contest not found');
+    }
+
+    // Get contest problems for header
+    const problems: BaseProblemResponseDto[] = contest.contestProblems
+      .sort((a, b) => {
+        if (a.score === b.score) {
+          return a.problem.title.localeCompare(b.problem.title);
+        }
+        return a.score - b.score;
+      })
+      .map((cp, index) => ({
+        id: cp.problem.id,
+        title: `${String.fromCharCode(65 + index)}. ${cp.problem.title}`,
+        description: cp.problem.description,
+        inputDescription: cp.problem.inputDescription,
+        outputDescription: cp.problem.outputDescription,
+        maxScore: cp.score,
+        timeLimitMs: cp.problem.timeLimitMs,
+        memoryLimitKb: cp.problem.memoryLimitKb,
+        difficulty: cp.problem.difficulty,
+        type: cp.problem.type,
+        visibility: cp.problem.visibility,
+        createdAt: cp.problem.createdAt,
+        updatedAt: cp.problem.updatedAt,
+      }));
+
+    // Get all participations for this contest with submissions
+    // Note: Ranking calculation requires all participants' data for accurate relative rankings
+    // Cursor pagination is applied after ranking calculation for correctness
+
+    // Use the leaderboard pagination service
+    const rankings = await this.leaderboardPaginationService.calculateRankings(
+      contestId,
+      query,
+    );
+
+    return {
+      problems,
+      rankings,
+    };
+  }
+
+  async getSubmissionsOverview(
+    contestId: number,
+    query: SubmissionsOverviewCursorQueryDto,
+  ): Promise<PaginationCursorResponseDto<ContestParticipationDto>> {
+    // Check contest access and instructor/admin role
+    const contest = await this.contestsRepository.findOne({
+      where: { id: contestId },
+      relations: ['contestProblems', 'contestProblems.problem'],
+    });
+
+    if (!contest) {
+      throw new BadRequestException('Contest not found');
+    }
+
+    // Use the pagination service - pagination is applied at database level
+    const paginatedResult =
+      await this.submissionsOverviewPaginationService.getContestants(
+        contestId,
+        query,
+      );
+
+    // Transform entities to DTOs - ensure user is not null
+    const transformedEdges = paginatedResult.edges.map((edge) => {
+      if (!edge.node.user) {
+        throw new BadRequestException(
+          'Unable to retrieve participant information',
+        );
+      }
+
+      return {
+        ...edge,
+        node: {
+          id: edge.node.id,
+          user: {
+            id: edge.node.user.id,
+            firstName: edge.node.user.firstName ?? '',
+            lastName: edge.node.user.lastName ?? '',
+            email: edge.node.user.email ?? '',
+          },
+          startTime: edge.node.startTime,
+          endTime: edge.node.endTime,
+          finalScore: edge.node.finalScore,
+        } as ContestParticipationDto,
+      };
+    });
+
+    return {
+      ...paginatedResult,
+      edges: transformedEdges,
     };
   }
 }

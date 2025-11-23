@@ -1,5 +1,5 @@
 // NestJS
-import { Module, forwardRef } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Shared/Common
@@ -18,6 +18,8 @@ import { ContestProblem } from './entities/contest-problem.entity';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
 import { ContestParticipationService } from './services/contest-participation.service';
 import { ContestProblemsService } from './services/contest-problems.service';
+import { LeaderboardPaginationService } from './services/leaderboard-pagination.service';
+import { SubmissionsOverviewPaginationService } from './services/submissions-overview-pagination.service';
 import { StudentContestListStrategy } from './strategies/student-contest-list.strategy';
 import { TeacherContestListStrategy } from './strategies/teacher-contest-list.strategy';
 
@@ -30,6 +32,8 @@ import { TeacherContestListStrategy } from './strategies/teacher-contest-list.st
     TeacherContestListStrategy,
     StudentContestListStrategy,
     ContestFilterStrategyFactory,
+    LeaderboardPaginationService,
+    SubmissionsOverviewPaginationService,
   ],
   imports: [
     TypeOrmModule.forFeature([

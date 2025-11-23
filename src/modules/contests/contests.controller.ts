@@ -17,7 +17,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiExtraModels,
@@ -28,10 +27,6 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-
-// Third-party
-import { memoryStorage } from 'multer';
 
 // Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -44,9 +39,6 @@ import {
 
 // Relative imports
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
-import { CreateSubmissionDto } from '../submission/dto/create-submission.dto';
-import { SubmissionsCursorQueryDto } from '../submission/dto/submission-cursor-query.dto';
-import { SubmissionService } from '../submission/submission.service';
 import { RoleEnum } from '../user/enums/role.enum';
 import { ContestsService } from './contests.service';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
@@ -54,6 +46,21 @@ import { CreateContestResponseDto } from './dto/create-contest-response.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
 import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
+
+// Third-party
+import { memoryStorage } from 'multer';
+import { CreateSubmissionDto } from '../submission/dto/create-submission.dto';
+import { SubmissionsCursorQueryDto } from '../submission/dto/submission-cursor-query.dto';
+import { SubmissionService } from '../submission/submission.service';
+import { LeaderboardCursorQueryDto } from './dto/leaderboard-cursor-query.dto';
+import { LeaderboardResponseDto } from './dto/leaderboard-response.dto';
+import { SubmissionsOverviewCursorQueryDto } from './dto/submissions-overview-cursor-query.dto';
+import {
+  ApiContestLeadingDecorator,
+  ApiPaginatedContestantDecorator,
+} from './decorators/api-contest-leading.decorator';
 import { UpdateContestDto } from './dto/update-contest.dto';
 import { AddProblemToContestDto } from './dto/add-problem-to-contest.dto';
 import { UpdateContestProblemDto } from './dto/update-contest-problem.dto';
@@ -228,6 +235,49 @@ export class ContestsController {
     const contest = await this.contestsService.getDetailContest(+id, user);
 
     return new GetDetailContestResponseDto(contest);
+  }
+
+  @Get(':id/leaderboard')
+  @ApiOperation({
+    summary: 'Get contest leaderboard with rankings',
+    description:
+      'Retrieve the ranked list of participants for a contest with pagination support.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiContestLeadingDecorator()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  async getLeaderboard(
+    @Param('id') id: number,
+    @Query() query: LeaderboardCursorQueryDto,
+  ): Promise<LeaderboardResponseDto> {
+    return this.contestsService.getLeaderboard(id, query);
+  }
+
+  @Get(':id/submissions/overview')
+  @ApiOperation({
+    summary: 'Get contest submissions overview (instructor/admin only)',
+    description:
+      'Retrieve the grid view of best scores for every student on every problem. Only accessible to instructors and admins.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'The unique identifier of the contest',
+    example: 1,
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiPaginatedContestantDecorator()
+  @Roles(RoleEnum.INSTRUCTOR, RoleEnum.ADMIN)
+  async getSubmissionsOverview(
+    @Param('id') id: string,
+    @Query() query: SubmissionsOverviewCursorQueryDto,
+  ) {
+    return this.contestsService.getSubmissionsOverview(+id, query);
   }
 
   @Post(':id/participate')
@@ -781,9 +831,10 @@ export class ContestsController {
     @Query() query: SubmissionsCursorQueryDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    const problemId = (query as any).problemId
-      ? +(query as any).problemId
-      : undefined;
+    const problemId =
+      'problemId' in query && query['problemId']
+        ? +(query['problemId'] as string)
+        : undefined;
     return this.submissionService.getByContest(
       +contestId,
       query,

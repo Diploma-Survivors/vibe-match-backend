@@ -379,6 +379,11 @@ export class SubmissionService {
     query: SubmissionsCursorQueryDto,
     user: JwtPayload,
   ) {
+    // Check if user is instructor/admin - they can see all submissions
+    const isInstructorOrAdmin =
+      user.roles?.includes(RoleEnum.INSTRUCTOR) ||
+      user.roles?.includes(RoleEnum.ADMIN);
+
     const queryBuilder = this.submissionRepository
       .createQueryBuilder('submission')
       .innerJoinAndSelect('submission.problem', 'problem')
@@ -388,18 +393,22 @@ export class SubmissionService {
       .andWhere(
         'submission.contest_participation_id = :contestParticipationId',
         { contestParticipationId },
-      )
-      .andWhere('user.id = :userId', { userId: user.userId });
+      );
+
+    // Regular users can only see their own submissions
+    if (!isInstructorOrAdmin) {
+      queryBuilder.andWhere('user.id = :userId', { userId: user.userId });
+    }
 
     this.applyFilter(queryBuilder, query.filters);
 
     const countSubmissionsField: CountSubmissionField = {
-      userId: user.userId,
+      userId: isInstructorOrAdmin ? undefined : user.userId,
       problemId: Number(problemId),
       contestParticipationId: Number(contestParticipationId),
     };
 
-    return this.submissionCursorService.paginateSubmissions(
+    return this.submissionCursorService.paginateContestSubmissions(
       queryBuilder,
       query,
       countSubmissionsField,
