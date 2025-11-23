@@ -10,6 +10,7 @@ import { DifficultyLevel } from 'src/modules/problems/enums/difficulty-level.enu
 import { SubmissionStrategyEnum } from 'src/modules/submission/enums/submission-strategy.enum';
 import { User } from 'src/modules/user/entities/user.entity';
 import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
+import { ProblemStatus } from '../enums/problem-status.enum';
 import { ParticipationStatusDto } from './participation-status.dto';
 
 export class ContestProblemDetail {
@@ -49,6 +50,13 @@ export class ContestProblemDetail {
     example: 2000,
   })
   timeLimitMs: number;
+
+  @ApiProperty({
+    description: 'The status of the problem for the user',
+    example: ProblemStatus.UNATTEMPTED,
+    enum: ProblemStatus,
+  })
+  status: ProblemStatus;
 }
 
 export class GetDetailContestResponseDto {

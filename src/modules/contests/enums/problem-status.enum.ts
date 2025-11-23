@@ -1,0 +1,6 @@
+export enum ProblemStatus {
+  UNATTEMPTED = 'UNATTEMPTED',
+  ATTEMPTED = 'ATTEMPTED',
+  SOLVED = 'SOLVED',
+  UNSOLVED = 'UNSOLVED',
+}

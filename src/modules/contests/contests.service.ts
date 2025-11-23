@@ -20,6 +20,8 @@ import { Transactional } from 'typeorm-transactional';
 import { Problem } from '../problems/entities/problem.entity';
 import { ProblemVisibility } from '../problems/enums/problem-visibility.enum';
 import { ProblemsService } from '../problems/problems.service';
+import { Submission } from '../submission/entities/submission.entity';
+import { SubmissionStatus } from '../submission/enums/submission-status.enum';
 import { ContestsCursorQueryDto } from './dto/contests-cursor-query.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { UpdateContestDto } from './dto/update-contest.dto';
@@ -28,6 +30,7 @@ import { UpdateContestProblemDto } from './dto/update-contest-problem.dto';
 import { Contest } from './entities/contest.entity';
 import { ContestProblem } from './entities/contest-problem.entity';
 import { ContestParticipation } from './entities/contest-participations.entity';
+import { ProblemStatus } from './enums/problem-status.enum';
 
 // Import types
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
@@ -44,6 +47,8 @@ export class ContestsService {
     private readonly contestProblemRepository: Repository<ContestProblem>,
     @InjectRepository(ContestParticipation)
     private readonly contestParticipationRepository: Repository<ContestParticipation>,
+    @InjectRepository(Submission)
+    private readonly submissionRepository: Repository<Submission>,
     private readonly problemsService: ProblemsService,
     private readonly contestFilterStrategyFactory: ContestFilterStrategyFactory,
     private readonly contestParticipationService: ContestParticipationService,
@@ -140,14 +145,45 @@ export class ContestsService {
       );
     }
 
-    const problems = contest.contestProblems.map((cp) => ({
-      id: cp.problem.id,
-      title: cp.problem.title,
-      score: cp.score,
-      difficulty: cp.problem.difficulty,
-      memoryLimitKb: cp.problem.memoryLimitKb,
-      timeLimitMs: cp.problem.timeLimitMs,
-    }));
+    // Fetch all submissions for this user in this contest participation
+    const submissions = await this.submissionRepository.find({
+      where: {
+        contestParticipation: { id: participation.id },
+        userId: currentUser.userId,
+      },
+      select: ['problemId', 'status'],
+    });
+
+    // Create a map of problem submissions
+    const problemSubmissionsMap = new Map<number, SubmissionStatus[]>();
+    for (const submission of submissions) {
+      if (!problemSubmissionsMap.has(submission.problemId)) {
+        problemSubmissionsMap.set(submission.problemId, []);
+      }
+      problemSubmissionsMap.get(submission.problemId)!.push(submission.status);
+    }
+
+    // Check if contest has ended
+    const now = new Date();
+    const contestEnded = now > contest.endTime;
+
+    const problems = contest.contestProblems.map((cp) => {
+      const submissionStatuses = problemSubmissionsMap.get(cp.problem.id) || [];
+      const status = this.calculateProblemStatus(
+        submissionStatuses,
+        contestEnded,
+      );
+
+      return {
+        id: cp.problem.id,
+        title: cp.problem.title,
+        score: cp.score,
+        difficulty: cp.problem.difficulty,
+        memoryLimitKb: cp.problem.memoryLimitKb,
+        timeLimitMs: cp.problem.timeLimitMs,
+        status,
+      };
+    });
 
     const sortedProblems = problems.toSorted((a, b) => {
       if (a.score === b.score) {
@@ -167,6 +203,26 @@ export class ContestsService {
       contestProblems: sortedProblems,
       participation: participationStatus,
     };
+  }
+
+  private calculateProblemStatus(
+    submissionStatuses: SubmissionStatus[],
+    contestEnded: boolean,
+  ): ProblemStatus {
+    if (submissionStatuses.length === 0) {
+      return ProblemStatus.UNATTEMPTED;
+    }
+
+    const hasAccepted = submissionStatuses.includes(SubmissionStatus.ACCEPTED);
+    if (hasAccepted) {
+      return ProblemStatus.SOLVED;
+    }
+
+    if (contestEnded) {
+      return ProblemStatus.UNSOLVED;
+    }
+
+    return ProblemStatus.ATTEMPTED;
   }
 
   @Transactional()

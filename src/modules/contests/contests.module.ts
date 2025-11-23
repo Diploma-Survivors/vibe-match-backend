@@ -7,6 +7,7 @@ import { PaginationModule } from 'src/common/pagination/pagination.module';
 
 // Relative imports
 import { ProblemsModule } from '../problems/problems.module';
+import { Submission } from '../submission/entities/submission.entity';
 import { SubmissionModule } from '../submission/submission.module';
 import { ContestsController } from './contests.controller';
 import { ContestsService } from './contests.service';
@@ -30,7 +31,12 @@ import { TeacherContestListStrategy } from './strategies/teacher-contest-list.st
     ContestFilterStrategyFactory,
   ],
   imports: [
-    TypeOrmModule.forFeature([Contest, ContestParticipation, ContestProblem]),
+    TypeOrmModule.forFeature([
+      Contest,
+      ContestParticipation,
+      ContestProblem,
+      Submission,
+    ]),
     ProblemsModule,
     PaginationModule,
     forwardRef(() => SubmissionModule),
