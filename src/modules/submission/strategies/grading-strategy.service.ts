@@ -8,6 +8,8 @@ import { Problem } from '../../problems/entities/problem.entity';
 import { Submission } from '../entities/submission.entity';
 import { SubmissionStrategyEnum } from '../enums/submission-strategy.enum';
 import { GradingStrategyFactory } from './grading-strategy.factory';
+import { ProblemStatus } from '../../contests/enums/problem-status.enum';
+import { SubmissionStatus } from '../enums/submission-status.enum';
 import {
   StrategyContext,
   StrategyResult,
@@ -143,6 +145,7 @@ export class GradingStrategyService {
       problemId: number;
       score: number;
       maxScore: number;
+      status: ProblemStatus;
     }>;
   }> {
     // Get contest participation with full relations
@@ -177,6 +180,7 @@ export class GradingStrategyService {
       problemId: number;
       score: number;
       maxScore: number;
+      status: ProblemStatus;
     }> = [];
 
     // For each problem in the contest, calculate the user's score using the strategy
@@ -190,6 +194,7 @@ export class GradingStrategyService {
       );
 
       let problemScore = 0;
+      let problemStatus = ProblemStatus.UNATTEMPTED;
 
       if (problemSubmissions.length > 0) {
         // Apply contest strategy using the factory pattern
@@ -218,6 +223,15 @@ export class GradingStrategyService {
 
         // Cap the score at the contest's max score for this problem
         problemScore = Math.min(problemScore, problemMaxScore);
+
+        // Determine status
+        const submissionStatuses = problemSubmissions.map((s) => s.status);
+        const hasAccepted = submissionStatuses.includes(
+          SubmissionStatus.ACCEPTED,
+        );
+        problemStatus = hasAccepted
+          ? ProblemStatus.SOLVED
+          : ProblemStatus.ATTEMPTED;
       }
 
       totalScore += problemScore;
@@ -227,6 +241,7 @@ export class GradingStrategyService {
         problemId,
         score: problemScore,
         maxScore: problemMaxScore,
+        status: problemStatus,
       });
     }
 

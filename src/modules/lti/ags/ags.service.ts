@@ -17,6 +17,7 @@ import {
   AgsTokenCache,
 } from './interfaces/ags-token.interface';
 import { ContestParticipation } from '../../contests/entities/contest-participations.entity';
+import { ContestProblemResult } from '../../contests/entities/contest-problem-result.entity';
 
 @Injectable()
 export class AgsService {
@@ -31,6 +32,8 @@ export class AgsService {
     private readonly submissionRepository: Repository<Submission>,
     @InjectRepository(ContestParticipation)
     private readonly contestParticipationRepository: Repository<ContestParticipation>,
+    @InjectRepository(ContestProblemResult)
+    private readonly contestProblemResultRepository: Repository<ContestProblemResult>,
   ) {}
 
   async generateClientAssertionJwt(): Promise<string> {
@@ -214,27 +217,6 @@ export class AgsService {
         return false;
       }
 
-      if (!submission.ltiLaunchSession) {
-        this.logger.debug(
-          `Submission ${submissionId} has no LTI launch session`,
-        );
-        return false;
-      }
-
-      const session = submission.ltiLaunchSession;
-
-      if (!session.agsLineitemUrl) {
-        this.logger.warn(`LTI session ${session.id} has no AGS lineitem URL`);
-        return false;
-      }
-
-      if (!session.agsScopes?.includes(AgsScope.SCORE)) {
-        this.logger.warn(
-          `LTI session ${session.id} does not have AGS SCORE scope`,
-        );
-        return false;
-      }
-
       let scoreToSend: number;
       let maxScore: number;
       let comment: string;
@@ -259,6 +241,28 @@ export class AgsService {
           submission.contestParticipation.id,
           { finalScore: scoreToSend },
         );
+
+        // Update contest_problem_result for each problem
+        for (const problemResult of contestScore.problemBreakdown) {
+          let result = await this.contestProblemResultRepository.findOne({
+            where: {
+              contestParticipation: { id: submission.contestParticipation.id },
+              problem: { id: problemResult.problemId },
+            },
+          });
+
+          if (!result) {
+            result = this.contestProblemResultRepository.create({
+              contestParticipation: submission.contestParticipation,
+              problem: { id: problemResult.problemId },
+            });
+          }
+
+          result.score = problemResult.score;
+          result.status = problemResult.status;
+
+          await this.contestProblemResultRepository.save(result);
+        }
 
         // Build detailed comment
         const breakdown = contestScore.problemBreakdown
@@ -289,6 +293,28 @@ export class AgsService {
         scoreToSend = strategyResult.scoreToSend;
         maxScore = submission.problem.maxScore;
         comment = strategyResult.comment;
+      }
+
+      // LTI Checks
+      if (!submission.ltiLaunchSession) {
+        this.logger.debug(
+          `Submission ${submissionId} has no LTI launch session`,
+        );
+        return false;
+      }
+
+      const session = submission.ltiLaunchSession;
+
+      if (!session.agsLineitemUrl) {
+        this.logger.warn(`LTI session ${session.id} has no AGS lineitem URL`);
+        return false;
+      }
+
+      if (!session.agsScopes?.includes(AgsScope.SCORE)) {
+        this.logger.warn(
+          `LTI session ${session.id} does not have AGS SCORE scope`,
+        );
+        return false;
       }
 
       const scoreDto: SendScoreDto = {

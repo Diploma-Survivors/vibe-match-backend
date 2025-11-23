@@ -33,6 +33,7 @@ import { UpdateContestProblemDto } from './dto/update-contest-problem.dto';
 import { Contest } from './entities/contest.entity';
 import { ContestProblem } from './entities/contest-problem.entity';
 import { ContestParticipation } from './entities/contest-participations.entity';
+import { ContestProblemResult } from './entities/contest-problem-result.entity';
 import { ProblemStatus } from './enums/problem-status.enum';
 
 // Import types
@@ -50,6 +51,8 @@ export class ContestsService {
     private readonly contestProblemRepository: Repository<ContestProblem>,
     @InjectRepository(ContestParticipation)
     private readonly contestParticipationRepository: Repository<ContestParticipation>,
+    @InjectRepository(ContestProblemResult)
+    private readonly contestProblemResultRepository: Repository<ContestProblemResult>,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
     private readonly problemsService: ProblemsService,
@@ -150,6 +153,7 @@ export class ContestsService {
     }
 
     // Fetch all submissions for this user in this contest participation
+    // We still need submissions for the fallback/backfill logic
     const submissions = await this.submissionRepository.find({
       where: {
         contestParticipation: { id: participation.id },
@@ -168,6 +172,17 @@ export class ContestsService {
       problemSubmissionsMap.get(submission.problemId)!.push(submission);
     }
 
+    // Fetch persisted problem results
+    const problemResults = await this.contestProblemResultRepository.find({
+      where: { contestParticipation: { id: participation.id } },
+      relations: ['problem'],
+    });
+
+    const problemResultsMap = new Map<number, ContestProblemResult>();
+    for (const result of problemResults) {
+      problemResultsMap.set(result.problem.id, result);
+    }
+
     // Check if contest has ended
     const now = new Date();
     const contestEnded = now > contest.endTime;
@@ -179,33 +194,58 @@ export class ContestsService {
 
     const problems = await Promise.all(
       contest.contestProblems.map(async (cp) => {
-        const problemSubmissions =
-          problemSubmissionsMap.get(cp.problem.id) || [];
-        const submissionStatuses = problemSubmissions.map((s) => s.status);
-        const status = this.calculateProblemStatus(
-          submissionStatuses,
-          contestEnded,
-        );
-
-        // Calculate user's score for this problem using the contest strategy
         let userScore = 0;
-        if (problemSubmissions.length > 0) {
-          const latestSubmission =
-            problemSubmissions[problemSubmissions.length - 1];
-          const previousSubmissions = problemSubmissions.slice(0, -1);
+        let status = ProblemStatus.UNATTEMPTED;
 
-          const context: StrategyContext = {
-            submission: latestSubmission,
-            previousSubmissions,
-            problem: cp.problem,
-            ltiSession: null,
-          };
+        // Check if we have a persisted result
+        if (problemResultsMap.has(cp.problem.id)) {
+          const result = problemResultsMap.get(cp.problem.id)!;
+          userScore = result.score;
+          status = result.status;
+        } else {
+          // Fallback / Lazy Backfill
+          const problemSubmissions =
+            problemSubmissionsMap.get(cp.problem.id) || [];
+          const submissionStatuses = problemSubmissions.map((s) => s.status);
+          status = this.calculateProblemStatus(
+            submissionStatuses,
+            contestEnded,
+          );
 
-          // Use the strategy's calculateScore method
-          userScore = await strategy.calculateScore(context);
+          if (problemSubmissions.length > 0) {
+            const latestSubmission =
+              problemSubmissions[problemSubmissions.length - 1];
+            const previousSubmissions = problemSubmissions.slice(0, -1);
 
-          // Cap the score at the contest's max score for this problem
-          userScore = Math.min(userScore, cp.score);
+            const context: StrategyContext = {
+              submission: latestSubmission,
+              previousSubmissions,
+              problem: cp.problem,
+              ltiSession: null,
+            };
+
+            // Use the strategy's calculateScore method
+            userScore = await strategy.calculateScore(context);
+
+            // Cap the score at the contest's max score for this problem
+            userScore = Math.min(userScore, cp.score);
+
+            // Persist this result for future reads (Lazy Backfill)
+            // We do this asynchronously to not block the response too much, or await it if we want consistency
+            // Let's await it to be safe and simple
+            try {
+              const newResult = this.contestProblemResultRepository.create({
+                contestParticipation: participation,
+                problem: cp.problem,
+                score: userScore,
+                status: status,
+              });
+              await this.contestProblemResultRepository.save(newResult);
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (error) {
+              // Ignore unique constraint errors if parallel requests happen
+            }
+          }
         }
 
         return {

@@ -9,6 +9,7 @@ import { RedisModule } from '../../shared/redis/redis.module';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { ContestProblem } from '../contests/entities/contest-problem.entity';
 import { Contest } from '../contests/entities/contest.entity';
+import { ContestsModule } from '../contests/contests.module';
 import { Judge0Module } from '../judge0/judge0.module';
 import { Language } from '../language/entities/language.entity';
 import { LtiLaunchSession } from '../lti/entities/lti-launch-session.entity';
@@ -48,6 +49,7 @@ import { SubmissionService } from './submission.service';
     Judge0Module,
     RedisModule,
     forwardRef(() => LtiModule),
+    forwardRef(() => ContestsModule),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {

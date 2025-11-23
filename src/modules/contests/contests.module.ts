@@ -13,6 +13,7 @@ import { ContestsController } from './contests.controller';
 import { ContestsService } from './contests.service';
 import { Contest } from './entities/contest.entity';
 import { ContestParticipation } from './entities/contest-participations.entity';
+import { ContestProblemResult } from './entities/contest-problem-result.entity';
 import { ContestProblem } from './entities/contest-problem.entity';
 import { ContestFilterStrategyFactory } from './services/contest-filter-strategy.factory';
 import { ContestParticipationService } from './services/contest-participation.service';
@@ -35,6 +36,7 @@ import { TeacherContestListStrategy } from './strategies/teacher-contest-list.st
       Contest,
       ContestParticipation,
       ContestProblem,
+      ContestProblemResult,
       Submission,
     ]),
     ProblemsModule,

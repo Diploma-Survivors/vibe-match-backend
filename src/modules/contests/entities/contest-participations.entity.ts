@@ -11,6 +11,7 @@ import {
 import { Submission } from '../../submission/entities/submission.entity';
 import { User } from '../../user/entities/user.entity';
 import { Contest } from './contest.entity';
+import { ContestProblemResult } from './contest-problem-result.entity';
 
 @Entity()
 @Index('uq_participation_contest_user', ['contest', 'user'], { unique: true }) // search participation by contest and user
@@ -48,4 +49,10 @@ export class ContestParticipation {
 
   @OneToMany(() => Submission, (submission) => submission.contestParticipation)
   submissions: Submission[];
+
+  @OneToMany(
+    () => ContestProblemResult,
+    (result) => result.contestParticipation,
+  )
+  problemResults: ContestProblemResult[];
 }
