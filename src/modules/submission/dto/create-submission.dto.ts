@@ -36,15 +36,6 @@ export class CreateSubmissionDto {
   readonly problemId: number;
 
   @ApiProperty({
-    description: 'Contest participation identifier, if applicable',
-    example: 1,
-    nullable: true,
-  })
-  @IsInt()
-  @IsOptional()
-  readonly contestParticipationId?: number;
-
-  @ApiProperty({
     description: 'Test case samples for the submission',
     type: [CreateTestcaseSampleDto],
   })

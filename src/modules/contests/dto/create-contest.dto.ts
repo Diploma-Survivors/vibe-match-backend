@@ -1,5 +1,5 @@
 // NestJS
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // Third-party
 import { Expose, Type } from 'class-transformer';
@@ -17,6 +17,7 @@ import {
 } from 'class-validator';
 
 // Relative imports
+import { SubmissionStrategyEnum } from 'src/modules/submission/enums/submission-strategy.enum';
 import { IsAfterNow } from '../decorators/is-after-now.decorator';
 import { IsGreaterThan } from '../decorators/is-greater-than.decorator';
 import { IsLessThan } from '../decorators/is-less-than.decorator';
@@ -128,6 +129,17 @@ export class CreateContestDto {
   })
   @IsEnum(DeadlineEnforcement)
   deadlineEnforcement: DeadlineEnforcement;
+
+  @ApiPropertyOptional({
+    description:
+      'Submission strategy for all problems in this contest (overrides individual problem strategies when submitting in contest context)',
+    enum: SubmissionStrategyEnum,
+    example: SubmissionStrategyEnum.BEST_SCORE,
+    default: SubmissionStrategyEnum.BEST_SCORE,
+  })
+  @IsOptional()
+  @IsEnum(SubmissionStrategyEnum)
+  submissionStrategy?: SubmissionStrategyEnum;
 
   @ApiProperty({
     description: 'List of problems included in the contest with their scores',

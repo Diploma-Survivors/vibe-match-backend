@@ -76,6 +76,10 @@ export class SubmissionDetailDto {
 
   @ApiProperty({
     description: 'Information about the programming language used.',
+    example: {
+      id: 1,
+      name: 'JavaScript',
+    },
     type: () => LanguageDto,
   })
   @Expose()
@@ -106,4 +110,12 @@ export class SubmissionDetailDto {
   @Expose()
   @Type(() => UserInformationDto)
   user: UserInformationDto;
+
+  @ApiProperty({
+    description: 'Note field for additional information about the submission.',
+    example: 'This submission was made during a contest.',
+    nullable: true,
+  })
+  @Expose()
+  note?: string;
 }

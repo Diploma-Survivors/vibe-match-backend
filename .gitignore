@@ -60,4 +60,6 @@ public.key
 public.json
 research.txt
 .cursor
+CLAUDE.md
 .vscode
+/copilot-instruction

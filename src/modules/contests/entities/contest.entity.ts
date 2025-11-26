@@ -14,6 +14,7 @@ import {
 // Relative imports
 import { Course } from 'src/modules/course/entities/course.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { SubmissionStrategyEnum } from 'src/modules/submission/enums/submission-strategy.enum';
 import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
 import { ContestParticipation } from './contest-participations.entity';
 import { ContestProblem } from './contest-problem.entity';
@@ -68,6 +69,14 @@ export class Contest {
     default: DeadlineEnforcement.STRICT,
   })
   deadlineEnforcement: DeadlineEnforcement;
+
+  @Column({
+    type: 'enum',
+    enum: SubmissionStrategyEnum,
+    default: SubmissionStrategyEnum.BEST_SCORE,
+    name: 'submission_strategy',
+  })
+  submissionStrategy: SubmissionStrategyEnum;
 
   @Index('idx_contest_course_id', { unique: false })
   @Column('int', { name: 'course_id' })
