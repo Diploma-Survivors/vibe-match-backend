@@ -1,3 +1,4 @@
+// NestJS
 import {
   Body,
   ClassSerializerInterceptor,
@@ -18,11 +19,16 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+
+// Shared/Common
 import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Environment } from 'src/common/enums/environment.enum';
 import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+
+// Relative imports
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
 import { CreateTagBulkDto } from './dto/create-tag-bulk.dto';
 import { CreateTagResponseDto } from './dto/create-tag-response.dto';
@@ -44,7 +50,7 @@ export class TagsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
   async create(@Body() createTagDto: CreateTagDto) {
@@ -64,7 +70,7 @@ export class TagsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, EnvironmentGuard)
+  @UseGuards(JwtAuthGuard, EnvironmentGuard, RolesGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   @EnvGuard(Environment.DEVELOPMENT)
   async createBulk(@Body() createTagBulkDto: CreateTagBulkDto) {
@@ -107,7 +113,7 @@ export class TagsController {
   })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Tag not found.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async update(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
     return await this.tagsService.update(+id, updateTagDto);
@@ -122,7 +128,7 @@ export class TagsController {
   })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Tag not found.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   async remove(@Param('id') id: string) {
     return await this.tagsService.remove(+id);
