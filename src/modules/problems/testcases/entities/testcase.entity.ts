@@ -17,8 +17,11 @@ export class Testcase {
   @PrimaryGeneratedColumn('increment', { name: 'testcase_id' })
   id: number;
 
-  @Column('text', { nullable: false })
-  fileUrl: string;
+  @Column({ name: 'key_s3' })
+  keyS3: string;
+
+  @Column({ name: 'testcase_count', default: 0 })
+  testcaseCount: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
   createdAt: Date;
