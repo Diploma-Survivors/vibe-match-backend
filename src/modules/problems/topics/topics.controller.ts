@@ -1,3 +1,4 @@
+// NestJS
 import {
   Body,
   ClassSerializerInterceptor,
@@ -18,11 +19,16 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+
+// Shared/Common
 import { EnvGuard } from 'src/common/decorators/env.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Environment } from 'src/common/enums/environment.enum';
 import { EnvironmentGuard } from 'src/common/guards/environment.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+
+// Relative imports
 import { RoleEnum } from 'src/modules/user/enums/role.enum';
 import { CreateTopicBulkDto } from './dto/create-topic-bulk.dto';
 import { CreateTopicResponseDto } from './dto/create-topic-response.dto';
@@ -44,7 +50,7 @@ export class TopicsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
   async create(@Body() createTopicDto: CreateTopicDto) {
@@ -62,7 +68,7 @@ export class TopicsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, EnvironmentGuard)
+  @UseGuards(JwtAuthGuard, EnvironmentGuard, RolesGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
   @EnvGuard(Environment.DEVELOPMENT)
@@ -113,7 +119,7 @@ export class TopicsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   update(@Param('id') id: string, @Body() updateTopicDto: UpdateTopicDto) {
     return this.topicsService.update(+id, updateTopicDto);
@@ -132,7 +138,7 @@ export class TopicsController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   remove(@Param('id') id: string) {
     return this.topicsService.remove(+id);
