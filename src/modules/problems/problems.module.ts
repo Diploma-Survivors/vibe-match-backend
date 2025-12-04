@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PaginationModule } from 'src/common/pagination/pagination.module';
 
 // Relative imports
+import { ContestProblem } from '../contests/entities/contest-problem.entity';
 import { StoragesModule } from '../storages/storages.module';
 import { Submission } from '../submission/entities/submission.entity';
 import { UserModule } from '../user/user.module';
@@ -22,6 +23,7 @@ import { ProblemStatisticsService } from './services/problem-statistics.service'
 import { ProblemValidationService } from './services/problem-validation.service';
 import { ContestProblemFilterStrategy } from './strategies/contest-problem-filter.strategy';
 import { StudentProblemFilterStrategy } from './strategies/student-problem-filter.strategy';
+import { TeacherProblemFilterStrategy } from './strategies/teacher-problem-filter.strategy';
 import { TagsModule } from './tags/tags.module';
 import { TestcasesModule } from './testcases/testcases.module';
 import { TopicsModule } from './topics/topics.module';
@@ -36,6 +38,7 @@ import { TopicsModule } from './topics/topics.module';
     ProblemFactory,
     StudentProblemFilterStrategy,
     ContestProblemFilterStrategy,
+    TeacherProblemFilterStrategy,
     FileRequiredPipe,
   ],
   imports: [
@@ -51,6 +54,7 @@ import { TopicsModule } from './topics/topics.module';
       ProblemTag,
       ProblemTopic,
       Submission,
+      ContestProblem,
     ]),
   ],
   exports: [ProblemsService],

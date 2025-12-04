@@ -1,14 +1,20 @@
+// NestJS
 import { BadRequestException, Logger } from '@nestjs/common';
 import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger';
+
+// Third-party
 import { plainToInstance, Transform, Type } from 'class-transformer';
 import { IsArray, IsInt, IsOptional, ValidateNested } from 'class-validator';
+
+// Relative imports
 import { CreateTestcaseSampleDto } from '../testcases/dto/create-testcase-sample.dto';
 import { CreateProblemDto } from './create-problem.dto';
 
 export class UpdateTestcaseSample extends PartialType(CreateTestcaseSampleDto) {
   @ApiProperty({
     example: 1,
-    description: 'Testcase Sample ID',
+    description:
+      'Testcase Sample ID. If provided, the sample will be updated, otherwise it will be created a new.',
     required: false,
   })
   @IsOptional()
@@ -18,7 +24,11 @@ export class UpdateTestcaseSample extends PartialType(CreateTestcaseSampleDto) {
 }
 
 export class UpdateProblemDto extends PartialType(
-  OmitType(CreateProblemDto, ['type', 'testcaseSamples'] as const),
+  OmitType(CreateProblemDto, [
+    'type',
+    'testcaseSamples',
+    'visibility',
+  ] as const),
 ) {
   @ApiProperty({
     type: () => [UpdateTestcaseSample],

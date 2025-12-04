@@ -1,11 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { User } from 'src/modules/user/entities/user.entity';
-import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
-import { Testcase } from './../testcases/entities/testcase.entity';
-import { BaseProblemResponseDto } from './base-problem-response.dto';
 import { Tag } from '../tags/entities/tag.entity';
+import { TestcaseSample } from '../testcases/entities/testcase-sample.entity';
 import { Topic } from '../topics/entities/topic.entity';
+import { BaseProblemResponseDto } from './base-problem-response.dto';
 
 class AuthorInfoDto {
   @ApiProperty({
@@ -141,7 +140,7 @@ export class GetProblemForInstructorResponseDto extends BaseProblemResponseDto {
     type: () => TestcaseInfoDto,
     description: 'Information about the testcase of the problem',
   })
-  testcase: Testcase;
+  testcase: TestcaseInfoDto;
 
   @ApiProperty({
     type: () => [TestcaseSampleDto],

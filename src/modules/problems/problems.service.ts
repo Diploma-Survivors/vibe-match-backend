@@ -3,15 +3,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 // Third-party
-import { FindOptionsSelect, FindOptionsWhere, Repository } from 'typeorm';
+import { FindOptionsSelect, Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
 import { SelectQueryBuilder } from 'typeorm/browser';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
 
 // Relative imports
 import { StoragesService } from '../storages/storages.service';
@@ -31,17 +29,17 @@ import { ProblemStatisticsService } from './services/problem-statistics.service'
 import { ProblemValidationService } from './services/problem-validation.service';
 import { ContestProblemFilterStrategy } from './strategies/contest-problem-filter.strategy';
 import { StudentProblemFilterStrategy } from './strategies/student-problem-filter.strategy';
+import { TeacherProblemFilterStrategy } from './strategies/teacher-problem-filter.strategy';
 import { TagsService } from './tags/tags.service';
 import { TestcasesService } from './testcases/testcases.service';
 import { TopicsService } from './topics/topics.service';
 
 // Type imports
+import { ConfigService } from '@nestjs/config';
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 @Injectable()
 export class ProblemsService {
-  private readonly logger = new Logger(ProblemsService.name);
-
   constructor(
     @InjectRepository(Problem)
     private readonly problemsRepository: Repository<Problem>,
@@ -61,6 +59,8 @@ export class ProblemsService {
     private readonly problemFactory: ProblemFactory,
     private readonly studentProblemStrategy: StudentProblemFilterStrategy,
     private readonly contestCreationProblemStrategy: ContestProblemFilterStrategy,
+    private readonly teacherProblemStrategy: TeacherProblemFilterStrategy,
+    private readonly configService: ConfigService,
   ) {}
 
   getQueryBuilder(): SelectQueryBuilder<Problem> {
@@ -105,7 +105,7 @@ export class ProblemsService {
         }),
         this.testcasesService.findTestcaseOne({
           where: { problemId: problem.id },
-          select: ['id', 'fileUrl'],
+          select: ['id', 'keyS3'],
         }),
         this.testcasesService.findTestcaseSamples({
           where: { problemId: problem.id },
@@ -118,12 +118,20 @@ export class ProblemsService {
       throw new BadRequestException('Testcase not found');
     }
 
+    const bucket = this.configService.get<string>(
+      'aws.s3.bucketName',
+    ) as string;
+    const keyS3 = testcase.keyS3;
+
     const detailProblem = {
       ...problem,
       author,
       tags,
       topics,
-      testcase,
+      testcase: {
+        id: testcase.id,
+        fileUrl: await this.storagesService.getPresignedUrl(bucket, keyS3),
+      },
       testcaseSamples,
       quickStats,
     };
@@ -189,6 +197,19 @@ export class ProblemsService {
     return this.contestCreationProblemStrategy.findWithCursorPagination(query);
   }
 
+  async findProblemsForManagement(
+    query: ProblemsCursorQueryDto,
+    currentUser: JwtPayload,
+  ) {
+    query.filters = {
+      ...query.filters,
+      authorId: currentUser.userId,
+      courseId: currentUser.courseId,
+    };
+
+    return this.teacherProblemStrategy.findWithCursorPagination(query);
+  }
+
   async findById(id: number, select?: FindOptionsSelect<Problem>) {
     return await this.problemsRepository.findOne({ where: { id }, select });
   }
@@ -224,7 +245,7 @@ export class ProblemsService {
       id: true,
       authorId: true,
     });
-    if (!problem || problem.authorId !== currentUser.userId) {
+    if (!problem || !(problem.authorId === currentUser.userId)) {
       throw new ForbiddenException('You do not have access to this problem');
     }
 
@@ -280,8 +301,8 @@ export class ProblemsService {
     }
 
     if (testcaseSamples) {
-      await Promise.all(
-        testcaseSamples.map(async (sample) => {
+      await Promise.all([
+        ...testcaseSamples.map(async (sample) => {
           if (sample?.id) {
             await this.testcasesService.updateTestcaseSample(
               { id: sample.id, problemId: id },
@@ -295,7 +316,13 @@ export class ProblemsService {
             });
           }
         }),
-      );
+        await this.testcasesService.deleteExtraTestcaseSamples(
+          id,
+          testcaseSamples
+            .filter((sample) => sample.id)
+            .map((sample) => sample.id as number),
+        ),
+      ]);
     }
 
     if (!testcaseFile) {
@@ -304,18 +331,17 @@ export class ProblemsService {
 
     const existingTestcase = await this.testcasesService.findTestcaseOne({
       where: { problemId: id },
-      select: ['id', 'fileUrl'],
+      select: ['id', 'keyS3'],
     });
     if (!existingTestcase) {
       throw new BadRequestException('Testcase not found');
     }
 
-    const keyS3 = this.storagesService.getKeyFromUrl(existingTestcase.fileUrl);
     await this.testcasesService.uploadAndSaveFileTestcase(
       testcaseFile,
       currentUser,
       id,
-      keyS3,
+      existingTestcase.keyS3,
     );
   }
 
@@ -347,13 +373,6 @@ export class ProblemsService {
       solvedUsers,
       averageAttempts,
     };
-  }
-
-  async update(
-    where: FindOptionsWhere<Problem>,
-    updateData: QueryDeepPartialEntity<Problem>,
-  ) {
-    await this.problemsRepository.update(where, updateData);
   }
 
   async remove(id: string) {
