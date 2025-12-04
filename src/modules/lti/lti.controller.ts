@@ -1,3 +1,7 @@
+// Built-in
+import type { Response } from 'express';
+
+// NestJS
 import {
   Body,
   Controller,
@@ -8,11 +12,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import type { Response } from 'express';
+
+// Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { SkipTransformResponse } from 'src/common/decorators/skip-transform.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+
+// Relative imports
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { GetJwksResponseDto } from './dto/get-jwks-response.dto';
@@ -194,7 +202,7 @@ export class LtiController {
     description: 'Bad Request - Invalid input data.',
   })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.INSTRUCTOR)
   public async handleDeepLinkingResponse(
     @Body() ltiDeepLinkingResponse: LtiResourceLinkDto,
@@ -204,14 +212,11 @@ export class LtiController {
     const { deviceId, ...ltiDeepLinking } = ltiDeepLinkingResponse;
 
     const { jwt, deepLinkReturnUrl } =
-      (await this.ltiService.handleDeepLinkingResponse(
+      await this.ltiService.handleDeepLinkingResponse(
         deviceId as string,
-        user.courseId as number,
-        ltiDeepLinking,
-      )) as {
-        jwt: string;
-        deepLinkReturnUrl: string;
-      };
+        user,
+        ltiDeepLinking as LtiResourceLinkDto,
+      );
 
     const htmlResponse = `
       <!DOCTYPE html>

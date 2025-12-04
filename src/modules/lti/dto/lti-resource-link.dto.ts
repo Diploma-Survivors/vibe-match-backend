@@ -1,5 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,9 +11,8 @@ import {
   IsUrl,
   ValidateNested,
 } from 'class-validator';
+import { ContentType } from 'src/common/enums/content-type.enum';
 import { ContentItemType } from '../enums/content-item-type.enum';
-import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 
 class LtiResourceImageDto {
   @ApiProperty({
@@ -176,6 +178,16 @@ export class LtiResourceLinkDto {
   @IsString()
   deviceId?: string;
 
+  @ApiProperty({
+    description:
+      'Type of content being linked. This is type of "System" content',
+    example: ContentType.CONTEST,
+    enum: ContentType,
+  })
+  @IsEnum(ContentType)
+  contentType?: ContentType;
+
+  // This field is used to LMS to identify the type of content item being linked
   type?: ContentItemType;
 
   @ApiProperty({
