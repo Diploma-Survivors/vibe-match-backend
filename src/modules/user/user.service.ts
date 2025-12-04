@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOneOptions, Repository } from 'typeorm';
+import { DeepPartial, FindOneOptions, Repository } from 'typeorm';
 import {
   LTI_ROLES,
   LTI_ROLES_ARRAY,
 } from '../../modules/lti/constants/lti.constants';
 import { IdTokenPayloadDto } from '../lti/dto/id-token-payload.dto';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { AuthTypeEnum } from './enums/auth-type.enum';
@@ -21,8 +20,8 @@ export class UserService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  create(createUserDto: CreateUserDto) {
-    const user = this.userRepository.create(createUserDto);
+  create(dto: DeepPartial<User>) {
+    const user = this.userRepository.create(dto);
     return this.userRepository.save(user);
   }
 

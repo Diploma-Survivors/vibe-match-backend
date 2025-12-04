@@ -1,15 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
-  Entity,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  Unique,
   CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
-import { User } from '../../user/entities/user.entity';
 import { Course } from '../../course/entities/course.entity';
+import { User } from '../../user/entities/user.entity';
 import { RoleEnum } from '../../user/enums/role.enum';
 
 @Entity()
