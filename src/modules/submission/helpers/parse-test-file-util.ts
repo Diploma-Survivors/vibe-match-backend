@@ -1,9 +1,9 @@
-import { CreateSubmissionDto } from 'src/modules/submission/dto/create-submission.dto';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { StoragesService } from 'src/modules/storages/storages.service';
+import { CreateSubmissionDto } from 'src/modules/submission/dto/create-submission.dto';
 import { Judge0SubmissionPayload } from '../../judge0/judge0.interface';
 import { Problem } from '../../problems/entities/problem.entity';
-import { ConfigService } from '@nestjs/config';
-import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class TestcaseParserUtil {
@@ -30,8 +30,14 @@ export class TestcaseParserUtil {
     sourceBase64?: string,
     additionalFilesBase64?: string,
   ): Promise<Judge0SubmissionPayload[]> {
+    const bucket = this.configService.get<string>(
+      'aws.s3.bucketName',
+    ) as string;
     const source = this.configService.get<boolean>('useAWS')
-      ? String(problem.testcase.fileUrl)
+      ? await this.storagesService.getPresignedUrl(
+          bucket,
+          problem.testcase.keyS3,
+        )
       : 'src/modules/submission/testcase.txt';
 
     const buffer = await this.storagesService.readAuto(source);
