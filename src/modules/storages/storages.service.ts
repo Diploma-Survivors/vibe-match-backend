@@ -1,3 +1,13 @@
+// Built-in
+import * as fs from 'node:fs/promises';
+import * as readline from 'node:readline';
+import { Readable } from 'node:stream';
+
+// NestJS
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+// Third-party
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -5,15 +15,21 @@ import {
   S3Client,
   S3ClientConfig,
 } from '@aws-sdk/client-s3';
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as fs from 'node:fs/promises';
-import * as readline from 'node:readline';
-import { Readable } from 'node:stream';
+import { Progress, Upload } from '@aws-sdk/lib-storage';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+// Relative imports
 import { FileUploadOptions } from './interfaces/file-update-options.interface';
+
+export interface UploadProgress {
+  loaded: number;
+  total?: number;
+  percent: number;
+}
 
 @Injectable()
 export class StoragesService {
+  private readonly logger = new Logger(StoragesService.name);
   private readonly client: S3Client;
   private readonly useAWS: boolean;
 
@@ -49,6 +65,61 @@ export class StoragesService {
     );
   }
 
+  async uploadStream(
+    bucket: string,
+    key: string,
+    stream: Readable,
+    contentType: string = 'application/x-ndjson',
+    onProgress?: (progress: UploadProgress) => void,
+  ): Promise<{ location: string }> {
+    this.logger.log(`Starting upload to s3://${bucket}/${key}`);
+
+    const upload = new Upload({
+      client: this.client,
+      params: {
+        Bucket: bucket,
+        Key: key,
+        Body: stream,
+        ContentType: contentType,
+      },
+      partSize: 10 * 1024 * 1024, // 10MB parts
+      queueSize: 4, // Upload 4 parts in parallel
+    });
+
+    // Track progress
+    upload.on('httpUploadProgress', (progress: Progress) => {
+      const percent =
+        progress.total && progress.loaded
+          ? Math.round((progress.loaded / progress.total) * 100)
+          : 0;
+
+      this.logger.debug(
+        `Upload progress: ${percent}% (${progress.loaded}/${progress.total || '?'} bytes)`,
+      );
+
+      if (onProgress) {
+        onProgress({
+          loaded: progress.loaded ?? 0,
+          total: progress.total,
+          percent,
+        });
+      }
+    });
+
+    try {
+      const result = await upload.done();
+
+      this.logger.log(`Upload completed: ${result.Location ?? key}`);
+
+      return {
+        location: result.Location ?? this.getObjectUrl(bucket, key),
+      };
+    } catch (error) {
+      this.logger.error(`Upload failed: ${error.message}`);
+      throw error;
+    }
+  }
+
   async delete(bucket: string, key: string) {
     await this.client.send(
       new DeleteObjectCommand({
@@ -56,6 +127,23 @@ export class StoragesService {
         Key: key,
       }),
     );
+  }
+
+  async getPresignedUrl(
+    bucket: string,
+    key: string,
+    expiresIn?: number,
+  ): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    });
+
+    return getSignedUrl(this.client, command, {
+      expiresIn:
+        expiresIn ??
+        this.configService.get<number>('aws.s3.presignedUrlExpiresIn'),
+    });
   }
 
   getKeyFromUrl(url: string): string {

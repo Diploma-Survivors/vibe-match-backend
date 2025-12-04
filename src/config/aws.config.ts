@@ -6,5 +6,8 @@ export const awsConfig = registerAs('aws', () => ({
   s3: {
     region: process.env.AWS_S3_REGION,
     bucketName: process.env.AWS_S3_BUCKET_NAME,
+    presignedUrlExpiresIn: Number.parseInt(
+      process.env.AWS_S3_PRESIGNED_URL_EXPIRES_IN!,
+    ),
   },
 }));
