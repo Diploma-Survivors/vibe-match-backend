@@ -9,17 +9,19 @@ export class ProblemResultDto {
   problemId: number;
 
   @ApiProperty({
-    description: 'Score achieved for this problem',
+    description: 'Score achieved for this problem (null if unattempted)',
     example: 100,
+    nullable: true,
   })
-  score: number;
+  score: number | null;
 
   @ApiProperty({
     description:
-      'Time taken to solve this problem (formatted as MM:SS or HH:MM:SS)',
+      'Time taken to solve this problem (formatted as MM:SS or HH:MM:SS, null if unattempted)',
     example: '15:23',
+    nullable: true,
   })
-  time: string;
+  time: string | null;
 
   @ApiProperty({
     description: 'Status of the problem solution',

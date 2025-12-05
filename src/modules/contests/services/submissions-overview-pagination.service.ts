@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 // Third-party
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 
 // Shared/Common
 import { BaseCursorPaginationService } from 'src/common/pagination/services/base-cursor-pagination.service';
@@ -44,21 +44,30 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
   protected buildBaseQuery(
     query: SubmissionsOverviewCursorQueryDto & { contestId: number },
   ): SelectQueryBuilder<ContestParticipation> {
-    return this.contestParticipationRepository
-      .createQueryBuilder('cp')
-      .leftJoinAndSelect('cp.user', 'u')
-      .where('cp.contest.id = :contestId', {
-        contestId: query.contestId,
-      });
+    return (
+      this.contestParticipationRepository
+        .createQueryBuilder('cp')
+        .leftJoinAndSelect('cp.user', 'u')
+        .where('cp.contest.id = :contestId', {
+          contestId: query.contestId,
+        })
+        // Exclude admin users - roles is stored as simple-array (comma-separated string)
+        .andWhere("(u.roles IS NULL OR u.roles NOT LIKE '%ADMIN%')")
+    );
   }
 
   protected async applyFilters(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _queryBuilder: SelectQueryBuilder<ContestParticipation>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _query: SubmissionsOverviewCursorQueryDto,
+    queryBuilder: SelectQueryBuilder<ContestParticipation>,
+    query: SubmissionsOverviewCursorQueryDto,
   ): Promise<void> {
-    // No additional filters for submissions overview
+    // Apply name filter if provided
+    if (query.filters?.name) {
+      queryBuilder.andWhere(
+        '(u.firstName ILIKE :name OR u.lastName ILIKE :name OR u.email ILIKE :name)',
+        { name: `%${query.filters.name}%` },
+      );
+    }
+    await Promise.resolve();
   }
 
   protected selectFields(
@@ -81,10 +90,23 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
       .addSelect('u.id', 'userId')
       .addSelect("COALESCE(u.firstName, '')", 'userFirstName')
       .addSelect("COALESCE(u.lastName, '')", 'userLastName')
-      .addSelect("COALESCE(u.email, '')", 'userEmail')
-      .orderBy('u.lastName', 'ASC')
-      .addOrderBy('u.firstName', 'ASC')
-      .addOrderBy(`${alias}.${defaultSortField}`, 'ASC');
+      .addSelect("COALESCE(u.email, '')", 'userEmail');
+  }
+
+  /**
+   * Override to search by user fields
+   */
+  protected applyKeywordFilter(
+    queryBuilder: SelectQueryBuilder<ContestParticipation>,
+    keyword: string,
+  ): void {
+    queryBuilder.andWhere(
+      new Brackets((qb) => {
+        qb.where('u.firstName ILIKE :keyword', { keyword: `%${keyword}%` })
+          .orWhere('u.lastName ILIKE :keyword', { keyword: `%${keyword}%` })
+          .orWhere('u.email ILIKE :keyword', { keyword: `%${keyword}%` });
+      }),
+    );
   }
 
   /**
@@ -94,9 +116,22 @@ export class SubmissionsOverviewPaginationService extends BaseCursorPaginationSe
     query: SubmissionsOverviewCursorQueryDto & { contestId: number },
   ): Promise<number> {
     type CountRaw = { count: string };
-    const result = await this.contestParticipationRepository
+    const countQb = this.contestParticipationRepository
       .createQueryBuilder('cp')
+      .leftJoin('cp.user', 'u')
       .where('cp.contest.id = :contestId', { contestId: query.contestId })
+      // Exclude admin users - roles is stored as simple-array (comma-separated string)
+      .andWhere("(u.roles IS NULL OR u.roles NOT LIKE '%ADMIN%')");
+
+    // Apply name filter to count query if provided
+    if (query.filters?.name) {
+      countQb.andWhere(
+        '(u.firstName ILIKE :name OR u.lastName ILIKE :name OR u.email ILIKE :name)',
+        { name: `%${query.filters.name}%` },
+      );
+    }
+
+    const result = await countQb
       .select('COUNT(*)', 'count')
       .getRawOne<CountRaw | undefined>();
 

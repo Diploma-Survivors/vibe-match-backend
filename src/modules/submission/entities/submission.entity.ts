@@ -101,4 +101,7 @@ export class Submission {
 
   @Column({ name: 'ags_error', type: 'text', nullable: true })
   agsError: string | null;
+
+  @Column({ name: 'is_used_for_final_score', type: 'boolean', default: false })
+  isUsedForFinalScore: boolean;
 }

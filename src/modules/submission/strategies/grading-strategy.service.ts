@@ -183,6 +183,10 @@ export class GradingStrategyService {
       status: ProblemStatus;
     }> = [];
 
+    // Track all submission IDs to mark
+    const submissionsToMark: number[] = [];
+    const submissionsToUnmark: number[] = [];
+
     // For each problem in the contest, calculate the user's score using the strategy
     for (const contestProblem of contestProblems) {
       const problemId = contestProblem.problemId;
@@ -232,6 +236,20 @@ export class GradingStrategyService {
         problemStatus = hasAccepted
           ? ProblemStatus.SOLVED
           : ProblemStatus.ATTEMPTED;
+
+        // Determine which submissions are used for final score based on strategy
+        const scoredSubmissionIds = this.determineScoredSubmissions(
+          problemSubmissions,
+          contestStrategy,
+        );
+
+        submissionsToMark.push(...scoredSubmissionIds);
+
+        // Mark other submissions as NOT used
+        const unscoredIds = problemSubmissions
+          .filter((s) => !scoredSubmissionIds.includes(s.id))
+          .map((s) => s.id);
+        submissionsToUnmark.push(...unscoredIds);
       }
 
       totalScore += problemScore;
@@ -245,6 +263,25 @@ export class GradingStrategyService {
       });
     }
 
+    // Update isUsedForFinalScore field for all submissions in this participation
+    if (submissionsToMark.length > 0) {
+      await this.submissionRepository.update(submissionsToMark, {
+        isUsedForFinalScore: true,
+      });
+      this.logger.log(
+        `Marked ${submissionsToMark.length} submissions as used for final score`,
+      );
+    }
+
+    if (submissionsToUnmark.length > 0) {
+      await this.submissionRepository.update(submissionsToUnmark, {
+        isUsedForFinalScore: false,
+      });
+      this.logger.log(
+        `Unmarked ${submissionsToUnmark.length} submissions as not used for final score`,
+      );
+    }
+
     this.logger.log(
       `Contest score calculated for participation ${contestParticipationId}: ${totalScore}/${totalMaxScore}`,
     );
@@ -254,6 +291,50 @@ export class GradingStrategyService {
       maxScore: totalMaxScore,
       problemBreakdown,
     };
+  }
+
+  private determineScoredSubmissions(
+    problemSubmissions: Submission[],
+    strategy: SubmissionStrategyEnum,
+  ): number[] {
+    if (problemSubmissions.length === 0) {
+      return [];
+    }
+
+    switch (strategy) {
+      case SubmissionStrategyEnum.SINGLE_SUBMISSION:
+        // Only one submission should exist
+        return [problemSubmissions[0].id];
+
+      case SubmissionStrategyEnum.BEST_SCORE: {
+        // Find submission with highest score
+        const bestSubmission = problemSubmissions.reduce((best, current) =>
+          (current.score || 0) > (best.score || 0) ? current : best,
+        );
+        return [bestSubmission.id];
+      }
+
+      case SubmissionStrategyEnum.LATEST_SCORE: {
+        // Find most recent submission
+        const latestSubmission = problemSubmissions.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0];
+        return [latestSubmission.id];
+      }
+
+      case SubmissionStrategyEnum.AVERAGE_SCORE:
+        // All submissions are used
+        return problemSubmissions.map((s) => s.id);
+
+      default: {
+        // Default to best score
+        const defaultBest = problemSubmissions.reduce((best, current) =>
+          (current.score || 0) > (best.score || 0) ? current : best,
+        );
+        return [defaultBest.id];
+      }
+    }
   }
 
   private async findPreviousSubmissions(

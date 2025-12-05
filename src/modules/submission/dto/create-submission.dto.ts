@@ -66,5 +66,5 @@ export class CreateSubmissionDto {
   })
   @IsString()
   @IsOptional()
-  readonly notes?: string;
+  readonly note?: string;
 }

@@ -14,6 +14,8 @@ import { MatchMode } from 'src/common/pagination/enums/match-mode.enum';
 import { ContestParticipation } from '../entities/contest-participations.entity';
 import { LeaderboardRankingDto } from '../dto/leaderboard-response.dto';
 import { LeaderboardCursorQueryDto } from '../dto/leaderboard-cursor-query.dto';
+import { Contest } from '../entities/contest.entity';
+import { ProblemStatus } from '../enums/problem-status.enum';
 
 // use entity types (Submission, ContestProblem, ContestParticipation) for clarity
 /**
@@ -31,16 +33,17 @@ export class LeaderboardPaginationService {
   async calculateRankings(
     contestId: number,
     query: LeaderboardCursorQueryDto,
+    contest: Contest,
   ): Promise<PaginationCursorResponseDto<LeaderboardRankingDto>> {
     const { limit, isBackward } = this.validatePagination(query);
 
-    // Actually, for complex sort we need QueryBuilder
-    const qb = this.contestParticipationRepository
+    // Step 1: Query for IDs only (to handle pagination correctly with joins)
+    const idQb = this.contestParticipationRepository
       .createQueryBuilder('cp')
-      .leftJoinAndSelect('cp.user', 'u')
-      .leftJoinAndSelect('cp.problemResults', 'pr')
-      .leftJoinAndSelect('pr.problem', 'p')
-      .where('cp.contestId = :contestId', { contestId });
+      .select('cp.id', 'cp_id') // Explicit alias to ensure consistent column naming
+      .leftJoin('cp.user', 'u')
+      .where('cp.contestId = :contestId', { contestId })
+      .andWhere("(u.roles IS NULL OR u.roles NOT LIKE '%ADMIN%')");
 
     const { filters, matchMode } = query;
     const conditions: { query: string; params: ObjectLiteral }[] = [];
@@ -54,7 +57,7 @@ export class LeaderboardPaginationService {
     }
 
     if (conditions.length > 0) {
-      qb.andWhere(
+      idQb.andWhere(
         new Brackets((qb) => {
           conditions.forEach((condition, index) => {
             if (index === 0) {
@@ -71,31 +74,71 @@ export class LeaderboardPaginationService {
       );
     }
 
-    // Sort by finalScore DESC
-    qb.orderBy('cp.finalScore', 'DESC', 'NULLS LAST');
+    // Sort by finalScore using query sortOrder parameter
+    // For DESC: highest scores first, nulls last
+    // For ASC: lowest scores first, nulls last (treat null as highest value)
+    // Sort by finalScore using query sortOrder parameter
+    // For DESC: highest scores first, nulls last
+    // For ASC: lowest scores first, nulls last (treat null as highest value)
+    const sortDirection =
+      query.sortOrder?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    idQb.orderBy('COALESCE(cp.finalScore, 0)', sortDirection);
 
-    // Add computed columns for sorting to avoid "alias not found" error
-    // We use addSelect to define the alias, then order by it.
-    // Note: These extra columns won't be mapped to the entity but are needed for sorting.
-    qb.addSelect(
+    // Add computed columns for sorting
+    idQb.addSelect(
       'CASE WHEN cp.finishedAt IS NULL THEN 1 ELSE 0 END',
       'status_order',
     );
-    qb.addSelect(
+    idQb.addSelect(
       'EXTRACT(EPOCH FROM (COALESCE(cp.finishedAt, NOW()) - cp.startTime))',
       'time_taken',
     );
 
-    qb.addOrderBy('status_order', 'ASC');
-    qb.addOrderBy('time_taken', 'ASC');
+    idQb.addOrderBy('status_order', 'ASC');
+    idQb.addOrderBy('time_taken', 'ASC');
 
     // Tie-breaker
-    qb.addOrderBy('cp.id', 'ASC');
+    idQb.addOrderBy('cp.id', 'ASC');
 
     // Use limit to fetch one extra result to check if there are more
-    qb.limit(limit + 1);
+    idQb.limit(limit + 1);
 
-    const results = await qb.getMany();
+    // Handle cursor pagination for Step 1
+    if (query.after) {
+      const afterRank = decodeCursor<{ rank: number }>(query.after).rank;
+      idQb.offset(afterRank);
+    } else if (query.before) {
+      const beforeRank = decodeCursor<{ rank: number }>(query.before).rank;
+      const offset = Math.max(0, beforeRank - limit - 1);
+      idQb.offset(offset);
+    }
+
+    const idResults = await idQb.getRawMany<{ cp_id: number }>();
+    const ids = idResults.map((r) => r.cp_id);
+    const hasMore = ids.length > limit;
+
+    if (hasMore) {
+      ids.pop(); // Remove the extra result
+    }
+
+    // Step 2: Fetch full entities for the IDs
+    let results: ContestParticipation[] = [];
+    if (ids.length > 0) {
+      const qb = this.contestParticipationRepository
+        .createQueryBuilder('cp')
+        .leftJoinAndSelect('cp.user', 'u')
+        .leftJoinAndSelect('cp.problemResults', 'pr')
+        .leftJoinAndSelect('pr.problem', 'p')
+        .whereInIds(ids);
+
+      // We need to maintain the order from Step 1
+      // Postgres doesn't guarantee order with WHERE IN, so we need to re-sort in memory or use CASE
+      // Simpler to re-sort in memory since we have the IDs in order
+      const unsortedResults = await qb.getMany();
+      results = ids
+        .map((id) => unsortedResults.find((r) => r.id === id))
+        .filter((r) => !!r);
+    }
 
     // Calculate starting rank based on cursor
     let startRank = 1;
@@ -107,17 +150,12 @@ export class LeaderboardPaginationService {
       startRank = Math.max(1, beforeRank - limit);
     }
 
-    // Check if there are more results
-    const hasMore = results.length > limit;
-    if (hasMore) {
-      results.pop(); // Remove the extra result
-    }
-
-    // Get total count separately
+    // Get total count separately (must also exclude admin users)
     const countQb = this.contestParticipationRepository
       .createQueryBuilder('cp')
       .leftJoin('cp.user', 'u')
-      .where('cp.contestId = :contestId', { contestId });
+      .where('cp.contestId = :contestId', { contestId })
+      .andWhere("(u.roles IS NULL OR u.roles NOT LIKE '%ADMIN%')");
 
     if (conditions.length > 0) {
       countQb.andWhere(
@@ -142,9 +180,34 @@ export class LeaderboardPaginationService {
     // Map to DTO
     const rankings: LeaderboardRankingDto[] = results.map((p, index) => {
       const rank = startRank + index;
-      const totalTimeMs = p.finishedAt
-        ? p.finishedAt.getTime() - p.startTime.getTime()
-        : new Date().getTime() - p.startTime.getTime();
+
+      // Calculate total time based on contest type and participation state
+      let totalTimeMs: number;
+      const now = new Date();
+
+      if (p.finishedAt) {
+        // User finished the contest
+        totalTimeMs = p.finishedAt.getTime() - p.startTime.getTime();
+      } else if (contest.durationMinutes) {
+        // Limited time contest - user hasn't finished
+        const userDeadline = new Date(
+          p.startTime.getTime() + contest.durationMinutes * 60 * 1000,
+        );
+        const contestEnded = now > contest.endTime;
+
+        if (contestEnded) {
+          // Contest has ended, use the earlier of user deadline or contest end time
+          const effectiveDeadline =
+            userDeadline < contest.endTime ? userDeadline : contest.endTime;
+          totalTimeMs = effectiveDeadline.getTime() - p.startTime.getTime();
+        } else {
+          // Contest still ongoing
+          totalTimeMs = now.getTime() - p.startTime.getTime();
+        }
+      } else {
+        // Unlimited time contest - use elapsed time
+        totalTimeMs = now.getTime() - p.startTime.getTime();
+      }
 
       return {
         id: p.id,
@@ -160,14 +223,33 @@ export class LeaderboardPaginationService {
         finalScore: p.finalScore ?? 0,
         rank,
         totalTime: this.formatDuration(totalTimeMs),
-        problemResults: p.problemResults.map((pr) => ({
-          problemId: pr.problem.id,
-          score: pr.score,
-          time: this.formatDuration(
-            pr.updatedAt.getTime() - p.startTime.getTime(),
-          ),
-          status: pr.status,
-        })),
+        // Map over ALL contest problems, not just ones with results
+        problemResults: contest.contestProblems.map((cp) => {
+          // Find if user has a result for this problem
+          const existingResult = p.problemResults.find(
+            (pr) => pr.problem.id === cp.problemId,
+          );
+
+          if (existingResult) {
+            // User has attempted this problem
+            const problemTimeMs =
+              existingResult.updatedAt.getTime() - p.startTime.getTime();
+            return {
+              problemId: cp.problemId,
+              score: existingResult.score,
+              time: this.formatDuration(problemTimeMs),
+              status: existingResult.status,
+            };
+          } else {
+            // User hasn't attempted this problem
+            return {
+              problemId: cp.problemId,
+              score: 0,
+              time: null,
+              status: ProblemStatus.UNATTEMPTED,
+            };
+          }
+        }),
       };
     });
 

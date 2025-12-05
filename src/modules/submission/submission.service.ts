@@ -296,7 +296,7 @@ export class SubmissionService {
   ): Promise<SubmissionDetailDto> {
     const submission = await this.submissionRepository.findOne({
       where: { id: submissionId },
-      relations: ['user', 'language'],
+      relations: ['user', 'language', 'problem'],
     });
     if (!submission) throw new NotFoundException('Submission not found');
     if (
@@ -312,9 +312,14 @@ export class SubmissionService {
       );
     }
 
-    return plainToInstance(SubmissionDetailDto, submission, {
+    const dto = plainToInstance(SubmissionDetailDto, submission, {
       excludeExtraneousValues: true,
     });
+
+    // Add maxScore from problem
+    dto.maxScore = submission.problem.maxScore;
+
+    return dto;
   }
 
   async getListSubmissionOfUserInOneProblem(

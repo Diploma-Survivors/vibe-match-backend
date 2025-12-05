@@ -47,7 +47,7 @@ export class ContestParticipation {
   })
   finishedAt: Date | null;
 
-  @Column({ name: 'final_score', type: 'float', nullable: true })
+  @Column({ name: 'final_score', type: 'float', default: 0 })
   finalScore: number;
 
   @OneToMany(() => Submission, (submission) => submission.contestParticipation)

@@ -30,6 +30,13 @@ export class SubmissionDetailDto {
   score: number;
 
   @ApiProperty({
+    description: 'The maximum score possible for the problem.',
+    example: 100,
+  })
+  @Expose()
+  maxScore: number;
+
+  @ApiProperty({
     description: 'The execution time in milliseconds.',
     example: 45.5,
     nullable: true,
@@ -118,4 +125,12 @@ export class SubmissionDetailDto {
   })
   @Expose()
   note?: string;
+
+  @ApiProperty({
+    description:
+      'Indicates if this submission is used for calculating the final score based on contest strategy',
+    example: true,
+  })
+  @Expose()
+  isUsedForFinalScore: boolean;
 }

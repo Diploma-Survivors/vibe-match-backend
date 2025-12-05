@@ -142,7 +142,7 @@ export class SubmissionController {
   @ApiBearerAuth()
   @ApiPaginatedContestSubmissionsResponse()
   @UseGuards(JwtAuthGuard)
-  async getByContestAndProblem(
+  async getByContestParticipationAndProblem(
     @Param('contestParticipationId') contestParticipationId: number,
     @Param('problemId') problemId: number,
     @Query() query: SubmissionsCursorQueryDto,

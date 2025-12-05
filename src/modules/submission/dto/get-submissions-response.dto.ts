@@ -137,4 +137,12 @@ export class ContestSubmissionDto {
   @Expose()
   @Type(() => UserInformationDto)
   user: UserInformationDto;
+
+  @ApiProperty({
+    description:
+      'Indicates if this submission is used for calculating the final score based on contest strategy',
+    example: true,
+  })
+  @Expose()
+  isUsedForFinalScore: boolean;
 }

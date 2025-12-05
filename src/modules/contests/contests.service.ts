@@ -174,7 +174,7 @@ export class ContestsService {
         userId: currentUser.userId,
       },
       relations: ['problem'],
-      order: { createdAt: 'ASC' },
+      order: { createdAt: 'DESC' },
     });
 
     // Create a map of problem submissions
@@ -209,7 +209,7 @@ export class ContestsService {
     const problems = await Promise.all(
       contest.contestProblems.map(async (cp) => {
         let userScore = 0;
-        let status = ProblemStatus.UNATTEMPTED;
+        let status: ProblemStatus;
 
         // Check if we have a persisted result
         if (problemResultsMap.has(cp.problem.id)) {
@@ -251,12 +251,13 @@ export class ContestsService {
               const newResult = this.contestProblemResultRepository.create({
                 contestParticipation: participation,
                 problem: cp.problem,
+
                 score: userScore,
                 status: status,
               });
               await this.contestProblemResultRepository.save(newResult);
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            } catch (error) {
+            } catch (error: unknown) {
               // Ignore unique constraint errors if parallel requests happen
             }
           }
@@ -269,6 +270,7 @@ export class ContestsService {
           memoryLimitKb: cp.problem.memoryLimitKb,
           timeLimitMs: cp.problem.timeLimitMs,
           maxScore: cp.score,
+
           userScore,
           status,
         };
@@ -631,6 +633,7 @@ export class ContestsService {
     const rankings = await this.leaderboardPaginationService.calculateRankings(
       contestId,
       query,
+      contest,
     );
 
     return {
