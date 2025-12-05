@@ -43,7 +43,7 @@ export class LeaderboardPaginationService {
       .select('cp.id', 'cp_id') // Explicit alias to ensure consistent column naming
       .leftJoin('cp.user', 'u')
       .where('cp.contestId = :contestId', { contestId })
-      .andWhere("(u.roles IS NULL OR u.roles NOT LIKE '%ADMIN%')");
+      .andWhere("(u.roles = 'STUDENT')");
 
     const { filters, matchMode } = query;
     const conditions: { query: string; params: ObjectLiteral }[] = [];
@@ -155,7 +155,7 @@ export class LeaderboardPaginationService {
       .createQueryBuilder('cp')
       .leftJoin('cp.user', 'u')
       .where('cp.contestId = :contestId', { contestId })
-      .andWhere("(u.roles IS NULL OR u.roles NOT LIKE '%ADMIN%')");
+      .andWhere("(u.roles = 'STUDENT')");
 
     if (conditions.length > 0) {
       countQb.andWhere(
