@@ -4,8 +4,3 @@ export interface AgsAccessTokenResponse {
   expires_in: number;
   scope: string;
 }
-
-export interface AgsTokenCache {
-  token: string;
-  expiresAt: number;
-}

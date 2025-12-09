@@ -3,24 +3,23 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios, { AxiosError } from 'axios';
 import * as jose from 'jose';
+import { RedisService } from 'src/shared/redis/redis.service';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Submission } from '../../submission/entities/submission.entity';
 import { GradingStrategyService } from '../../submission/strategies/grading-strategy.service';
+import { LtiDeployment } from '../entities/lti-deployment.entity';
 import { KeysService } from '../keys.service';
+import { AGS_TOKEN_KEY_PREFIX } from './constants/token';
 import { SendScoreDto } from './dto/send-score.dto';
 import { AgsActivityProgress } from './enums/ags-activity-progress.enum';
 import { AgsGradingProgress } from './enums/ags-grading-progress.enum';
 import { AgsScope } from './enums/ags-scope.enum';
-import {
-  AgsAccessTokenResponse,
-  AgsTokenCache,
-} from './interfaces/ags-token.interface';
+import { AgsAccessTokenResponse } from './interfaces/ags-token.interface';
 
 @Injectable()
 export class AgsService {
   private readonly logger = new Logger(AgsService.name);
-  private tokenCache: AgsTokenCache | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -28,13 +27,15 @@ export class AgsService {
     private readonly gradingStrategyService: GradingStrategyService,
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
+    @InjectRepository(LtiDeployment)
+    private readonly ltiDeploymentRepository: Repository<LtiDeployment>,
+    private readonly redisService: RedisService,
   ) {}
 
-  async generateClientAssertionJwt(): Promise<string> {
-    const clientId = this.configService.get<string>('lti.clientId') as string;
-    const accessTokenUrl = this.configService.get<string>(
-      'lti.accessTokenUrl',
-    ) as string;
+  async generateClientAssertionJwt(
+    clientId: string,
+    accessTokenUrl: string,
+  ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
 
     const payload = {
@@ -66,24 +67,25 @@ export class AgsService {
     return jwt;
   }
 
-  async getAccessToken(): Promise<string> {
+  async getAccessToken(ltiDeployment: LtiDeployment): Promise<string> {
     const tokenExpiryBuffer =
       this.configService.get<number>('lti.ags.tokenExpiryBuffer') ?? 60;
-    const now = Math.floor(Date.now() / 1000);
 
-    if (
-      this.tokenCache &&
-      this.tokenCache.expiresAt > now + tokenExpiryBuffer
-    ) {
+    const token = await this.redisService.get(
+      `${AGS_TOKEN_KEY_PREFIX}${ltiDeployment.id}`,
+    );
+
+    if (token) {
       this.logger.debug('Using cached AGS access token');
-      return this.tokenCache.token;
+      return token;
     }
 
     this.logger.debug('Requesting new AGS access token from Moodle');
-    const clientAssertion = await this.generateClientAssertionJwt();
-    const accessTokenUrl = this.configService.get<string>(
-      'lti.accessTokenUrl',
-    ) as string;
+    const { clientId, tokenUrl: accessTokenUrl } = ltiDeployment;
+    const clientAssertion = await this.generateClientAssertionJwt(
+      clientId,
+      accessTokenUrl,
+    );
     const requestTimeout =
       this.configService.get<number>('lti.ags.requestTimeout') ?? 10000;
 
@@ -118,10 +120,11 @@ export class AgsService {
       );
 
       const tokenResponse = response.data;
-      this.tokenCache = {
-        token: tokenResponse.access_token,
-        expiresAt: now + tokenResponse.expires_in,
-      };
+      await this.redisService.set(
+        `${AGS_TOKEN_KEY_PREFIX}${ltiDeployment.id}`,
+        tokenResponse.access_token,
+        tokenResponse.expires_in * 1000 - tokenExpiryBuffer * 1000,
+      );
 
       this.logger.log('AGS access token obtained successfully');
       return tokenResponse.access_token;
@@ -147,8 +150,9 @@ export class AgsService {
   async sendScore(
     lineitemUrl: string,
     scoreDto: SendScoreDto,
+    ltiDeployment: LtiDeployment,
   ): Promise<boolean> {
-    const accessToken = await this.getAccessToken();
+    const accessToken = await this.getAccessToken(ltiDeployment);
 
     // Parse URL and insert /scores before query string
     const url = new URL(lineitemUrl);
@@ -245,8 +249,18 @@ export class AgsService {
         gradingProgress: AgsGradingProgress.FULLY_GRADED,
       };
 
+      const ltiDeployment = await this.ltiDeploymentRepository.findOne({
+        where: { id: session.ltiDeploymentId },
+      });
+      if (!ltiDeployment) {
+        this.logger.error(
+          `LTI Deployment ${session.ltiDeploymentId} not found for LTI session ${session.id}`,
+        );
+        return false;
+      }
+
       // Send score to Moodle
-      await this.sendScore(session.agsLineitemUrl, scoreDto);
+      await this.sendScore(session.agsLineitemUrl, scoreDto, ltiDeployment);
 
       this.logger.log(
         `Grade passback successful for submission ${submissionId} (score: ${strategyResult.scoreToSend})`,
