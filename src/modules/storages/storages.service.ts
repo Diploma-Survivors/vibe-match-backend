@@ -115,7 +115,7 @@ export class StoragesService {
         location: result.Location ?? this.getObjectUrl(bucket, key),
       };
     } catch (error) {
-      this.logger.error(`Upload failed: ${error.message}`);
+      this.logger.error(`Upload failed: ${(error as Error)?.message}`);
       throw error;
     }
   }
