@@ -25,6 +25,12 @@ export async function seedProblems(dataSource: DataSource) {
     return;
   }
 
+  const countProblems = await problemRepository.count();
+  if (countProblems > 0) {
+    console.log('Problems already seeded. Skipping problem seeding.');
+    return;
+  }
+
   const tags = await tagRepository.find();
   const topics = await topicRepository.find();
 
