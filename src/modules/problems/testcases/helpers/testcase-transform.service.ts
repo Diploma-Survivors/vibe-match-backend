@@ -1,12 +1,17 @@
 // Built-in
 import { createReadStream } from 'node:fs';
-import { Readable, Transform } from 'node:stream';
+import { PassThrough, Readable, Transform } from 'node:stream';
 
 // NestJS
 import { Injectable, Logger } from '@nestjs/common';
 
 // Third-party
+import { chain } from 'stream-chain';
+import { parser } from 'stream-json';
 import { streamArray } from 'stream-json/streamers/StreamArray';
+import stripBomStream from 'strip-bom-stream';
+
+// Relative imports
 import { TestcaseFormat } from '../constants/testcases.constant';
 
 /**
@@ -54,7 +59,7 @@ class TestcaseNDJSONTransform extends Transform {
       this.logger.error(
         `Transform error at testcase ${this.testcaseId}: ${message}`,
       );
-      callback(error);
+      callback(error as unknown as Error);
     }
   }
 
@@ -77,12 +82,29 @@ export class TestcaseTransformService {
   createTransformStream(filePath: string): Readable {
     this.logger.log(`Creating transform stream for: ${filePath}`);
 
-    const fileStream = createReadStream(filePath, { encoding: 'utf8' });
-    const jsonParser = streamArray();
+    const spy = new PassThrough();
 
-    const ndjsonTransform = new TestcaseNDJSONTransform(this.logger);
+    // Chỉ xem chunk đầu tiên
+    spy.once('data', (chunk: Buffer) => {
+      // Convert vài ký tự đầu sang String để xem
+      const startString = chunk.toString('utf8').substring(0, 50);
 
-    // Pipeline: File → Parse JSON Array → Transform to NDJSON
-    return fileStream.pipe(jsonParser).pipe(ndjsonTransform);
+      // In ra dạng HEX để bắt tận tay mấy ký tự ẩn (BOM, null byte...)
+      const startHex = chunk.subarray(0, 10).toString('hex');
+
+      this.logger.warn(`[SPY] First bytes (Hex): ${startHex}`);
+      this.logger.warn(`[SPY] First chars (Text): '${startString}'`);
+    });
+
+    // Pipeline: File → Strip BOM -> Parse JSON Array -> Stream Array → Transform to NDJSON
+    const pipeline = chain([
+      createReadStream(filePath),
+      stripBomStream(),
+      parser(),
+      streamArray(),
+      new TestcaseNDJSONTransform(this.logger),
+    ]);
+
+    return pipeline;
   }
 }

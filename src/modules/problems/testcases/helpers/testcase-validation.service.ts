@@ -5,7 +5,12 @@ import { createReadStream } from 'node:fs';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 // Third-party
+import { chain } from 'stream-chain';
+import { parser } from 'stream-json';
 import { streamArray } from 'stream-json/streamers/StreamArray';
+import stripBomStream from 'strip-bom-stream';
+
+// Relative imports
 import { TestcaseFormat } from '../constants/testcases.constant';
 
 /**
@@ -46,24 +51,27 @@ export class TestcaseValidationService {
     this.logger.log(`Starting validation for file: ${filePath}`);
 
     return new Promise((resolve, reject) => {
-      const fileStream = createReadStream(filePath, { encoding: 'utf8' });
-      const jsonParser = streamArray(); // Parse JSON array
-
       let testcaseCount = 0;
       const errors: ValidationError[] = [];
       const warnings: string[] = [];
       let shouldAbort = false;
 
-      fileStream
-        .pipe(jsonParser)
-        .on('data', (data: { key: number; value: TestcaseFormat }) => {
-          const testcase = data.value;
-          testcaseCount++;
+      const pipeline = chain([
+        createReadStream(filePath),
+        stripBomStream(),
+        parser(),
+        streamArray(),
+      ]);
 
+      pipeline
+        .on('data', (data: { key: number; value: TestcaseFormat }) => {
           // Check if should stop early
           if (shouldAbort) {
             return;
           }
+
+          const testcase = data.value;
+          testcaseCount++;
 
           // Validate testcase structure and content
           this.validateTestcase(testcase, testcaseCount, errors, warnings);
@@ -74,7 +82,13 @@ export class TestcaseValidationService {
               `Stopping validation: too many errors (${errors.length})`,
             );
             shouldAbort = true;
-            fileStream.destroy();
+            pipeline.destroy();
+            resolve({
+              isValid: false,
+              testcaseCount,
+              errors,
+              warnings,
+            });
             return;
           }
 
@@ -86,7 +100,13 @@ export class TestcaseValidationService {
               message: `Too many testcases (maximum: ${this.MAX_TESTCASES})`,
             });
             shouldAbort = true;
-            fileStream.destroy();
+            pipeline.destroy();
+            resolve({
+              isValid: false,
+              testcaseCount,
+              errors,
+              warnings,
+            });
             return;
           }
 
@@ -96,6 +116,8 @@ export class TestcaseValidationService {
           }
         })
         .on('end', () => {
+          if (shouldAbort) return;
+
           // Validation completed
           const isValid = errors.length === 0;
 
@@ -112,6 +134,7 @@ export class TestcaseValidationService {
           });
         })
         .on('error', (error) => {
+          if (shouldAbort) return;
           this.logger.error(`Validation stream error: ${error.message}`);
 
           // Parse JSON syntax errors
