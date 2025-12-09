@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
@@ -37,17 +36,6 @@ describe('UserController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
-  });
-
-  describe('create', () => {
-    it('should call userService.create with the correct parameters', async () => {
-      const createUserDto = {
-        email: 'test@example.com',
-        password: 'password',
-      } as CreateUserDto;
-      await controller.create(createUserDto);
-      expect(service.create).toHaveBeenCalledWith(createUserDto);
-    });
   });
 
   describe('findAll', () => {

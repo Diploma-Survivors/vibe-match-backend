@@ -6,6 +6,7 @@ import {
   LTI_ROLES_ARRAY,
 } from '../../modules/lti/constants/lti.constants';
 import { IdTokenPayloadDto } from '../lti/dto/id-token-payload.dto';
+import { LtiDeployment } from '../lti/entities/lti-deployment.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { AuthTypeEnum } from './enums/auth-type.enum';
@@ -43,16 +44,16 @@ export class UserService {
 
   public async findOrCreateByLtiClaims(
     claims: IdTokenPayloadDto,
+    ltiDeployment: LtiDeployment,
   ): Promise<User> {
     const ltiSubjectId = claims.sub;
-    const ltiPlatformId = claims.iss;
     const ltiRoles = claims.roles || [];
     const internalRoles = this.mapLtiRolesToInternalRoles(ltiRoles);
 
     let user = await this.userRepository.findOne({
       where: {
         ltiSubjectId: ltiSubjectId,
-        ltiPlatformId: ltiPlatformId,
+        tenantId: ltiDeployment.tenantId,
       },
     });
 
@@ -63,11 +64,10 @@ export class UserService {
     if (!user) {
       user = this.userRepository.create({
         ltiSubjectId,
-        ltiPlatformId,
+        tenantId: ltiDeployment.tenantId,
         email,
         firstName,
         lastName,
-
         roles: internalRoles,
         authType: AuthTypeEnum.LTI,
       });

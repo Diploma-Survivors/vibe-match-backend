@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   Unique,
@@ -9,9 +12,11 @@ import {
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { AuthTypeEnum } from '../enums/auth-type.enum';
 import { RoleEnum } from '../enums/role.enum';
+import { Tenant } from './tenant.entity';
 
 @Entity()
-@Unique(['ltiSubjectId', 'ltiPlatformId'])
+@Unique(['ltiSubjectId', 'tenantId'])
+@Index('idx_user_tenant_id', ['tenantId'])
 export class User {
   @ApiProperty({
     description: 'User unique identifier',
@@ -78,12 +83,20 @@ export class User {
   ltiSubjectId: string | null;
 
   @ApiProperty({
-    description: 'LTI Platform ID (issuer URL)',
-    example: 'http://localhost:8888',
+    description: 'Tenant ID',
+    example: 1,
+  })
+  @Column({ name: 'tenant_id' })
+  tenantId: number;
+
+  @ApiProperty({
+    description: 'Tenant associated with the user',
+    type: () => Tenant,
     nullable: true,
   })
-  @Column({ type: 'varchar', nullable: true })
-  ltiPlatformId: string | null;
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant;
 
   @ApiProperty({
     description: 'Refresh tokens associated with this user',

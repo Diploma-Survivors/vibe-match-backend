@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { LTI_ROLES } from '../lti/constants/lti.constants';
 import { IdTokenPayloadDto } from '../lti/dto/id-token-payload.dto';
+import { LtiDeployment } from '../lti/entities/lti-deployment.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from './entities/user.entity';
 import { RoleEnum } from './enums/role.enum';
@@ -97,13 +98,31 @@ describe('UserService', () => {
       email: 'email',
     } as IdTokenPayloadDto;
 
+    const ltiDeployment = {
+      id: 1,
+      name: 'Test Deployment',
+      issuerUrl: 'https://lms.example.com',
+      clientId: 'client123',
+      deploymentId: 'deployment123',
+      authenticationUrl: 'https://lms.example.com/auth',
+      jwksUrl: 'https://lms.example.com/jwks',
+      tokenUrl: 'https://lms.example.com/token',
+      isActive: true,
+      tenantId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as LtiDeployment;
+
     it('should create a user if not found', async () => {
       mockUserRepository.findOne.mockResolvedValue(null);
       const newUser = { id: 1 };
       mockUserRepository.create.mockReturnValue(newUser);
       mockUserRepository.save.mockResolvedValue(newUser);
 
-      const result = await service.findOrCreateByLtiClaims(claims);
+      const result = await service.findOrCreateByLtiClaims(
+        claims,
+        ltiDeployment,
+      );
 
       expect(mockUserRepository.create).toHaveBeenCalled();
       expect(mockUserRepository.save).toHaveBeenCalledWith(newUser);
@@ -120,7 +139,7 @@ describe('UserService', () => {
       };
       mockUserRepository.findOne.mockResolvedValue(existingUser);
 
-      await service.findOrCreateByLtiClaims(claims);
+      await service.findOrCreateByLtiClaims(claims, ltiDeployment);
 
       expect(mockUserRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -142,7 +161,7 @@ describe('UserService', () => {
       };
       mockUserRepository.findOne.mockResolvedValue(existingUser);
 
-      await service.findOrCreateByLtiClaims(claims);
+      await service.findOrCreateByLtiClaims(claims, ltiDeployment);
 
       expect(mockUserRepository.save).not.toHaveBeenCalled();
     });
