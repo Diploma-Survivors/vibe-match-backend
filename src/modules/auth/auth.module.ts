@@ -1,23 +1,26 @@
-import { Module, Logger } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { Logger, Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigService, ConfigModule } from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { RedisModule } from 'src/shared/redis/redis.module';
+import { UserCourseModule } from '../user-course/user-course.module';
+import { Tenant } from '../user/entities/tenant.entity';
+import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { Auth } from './entities/auth.entity';
 import { JwtAuthService } from './jwt-auth.service';
-import { UserModule } from '../user/user.module';
 import { RefreshTokenModule } from './refresh-token.module';
-import { PassportModule } from '@nestjs/passport';
 import { JwtAuthStrategy } from './strategies/jwt-auth.strategy';
-import { RedisModule } from 'src/shared/redis/redis.module';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Auth]),
+    TypeOrmModule.forFeature([Auth, Tenant]),
     UserModule,
+    UserCourseModule,
     RefreshTokenModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({

@@ -1,3 +1,7 @@
+// Built-in
+import type { Response } from 'express';
+
+// NestJS
 import {
   Body,
   Controller,
@@ -5,32 +9,38 @@ import {
   Get,
   Logger,
   Param,
-  Patch,
   Post,
   Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
+
+// Shared/Common
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtRefreshGuard } from 'src/common/guards/jwt-refresh.guard';
+
+// Relative Imports
 import { JwtConfig } from '../../config/auth.config';
 import { AuthService } from './auth.service';
-import { CreateAuthDto } from './dto/create-auth.dto';
+import { AuthResponseDto } from './dto/auth-response.dto';
 import { LogoutResponseDto } from './dto/logout-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RefreshTokenResponseDto } from './dto/refresh-token.response.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
-import type { JwtPayload } from './interfaces/jwt.interface';
+import { SignInDto } from './dto/sign-in.dto';
+import { SignUpResponseDto } from './dto/sign-up-response.dto';
+import { SignUpDto } from './dto/sign-up.dto';
 import { JwtAuthService } from './jwt-auth.service';
+
+// Types Imports
+import type { JwtPayload } from './interfaces/jwt.interface';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -114,18 +124,39 @@ export class AuthController {
     res.status(200).send({ message: 'Logged out successfully' });
   }
 
-  @Post()
-  @ApiOperation({ summary: 'Create authentication record' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('sign-up')
+  @ApiOperation({ summary: 'Register a new user account' })
   @ApiResponse({
     status: 201,
-    description: 'Authentication record created successfully',
+    description: 'User registered successfully',
+    type: () => SignUpResponseDto,
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad request - invalid auth data',
+    description: 'Bad request - user already exists or invalid data',
   })
-  create(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.create(createAuthDto);
+  async signUp(@Body() dto: SignUpDto): Promise<SignUpResponseDto> {
+    await this.authService.signUp(dto);
+    return {
+      message: 'User registered successfully',
+    };
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('sign-in')
+  @ApiOperation({ summary: 'Sign in to user account' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sign in successful',
+    type: () => AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid credentials',
+  })
+  async signIn(@Body() dto: SignInDto): Promise<AuthResponseDto> {
+    return this.authService.signIn(dto);
   }
 
   @Get()
@@ -150,20 +181,6 @@ export class AuthController {
   })
   findOne(@Param('id') id: string) {
     return this.authService.findOne(+id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update authentication record by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Auth record updated successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Auth record not found',
-  })
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
-    return this.authService.update(+id, updateAuthDto);
   }
 
   @Delete(':id')
