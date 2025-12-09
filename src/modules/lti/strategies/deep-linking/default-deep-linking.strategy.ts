@@ -8,13 +8,17 @@ import {
 import { ConfigService } from '@nestjs/config';
 
 // Relative imports
+import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
 import { RedisService } from 'src/shared/redis/redis.service';
+import { Repository } from 'typeorm';
 import { LTI_ROLES, LTI_VERSIONS } from '../../constants/lti.constants';
 import { LTI_DEEP_LINKING_PREFIX } from '../../constants/redis.constants';
 import { LtiDeepLinkingRequestDto } from '../../dto/lti-deep-linking-request.dto';
 import { LtiDeepLinkingJwtPayloadDto } from '../../dto/lti-deep-linking-response.dto';
 import { LtiResourceLinkDto } from '../../dto/lti-resource-link.dto';
+import { LtiDeployment } from '../../entities/lti-deployment.entity';
+import { LtiLaunchSession } from '../../entities/lti-launch-session.entity';
 import { ContentItemType } from '../../enums/content-item-type.enum';
 import { LtiMessageType } from '../../enums/lti-message-type.enum';
 import { LtiLaunchResponse } from '../../interfaces/lti.interface';
@@ -35,6 +39,10 @@ export class DefaultDeepLinkingStrategy implements DeepLinkingStrategy {
     private readonly keysService: KeysService,
     private readonly deepLinkingContentStrategyFactory: DeepLinkingContentStrategyFactory,
     private readonly ltiUtilService: LtiUtilService,
+    @InjectRepository(LtiDeployment)
+    private readonly ltiDeploymentRepository: Repository<LtiDeployment>,
+    @InjectRepository(LtiLaunchSession)
+    private readonly ltiLaunchSessionRepository: Repository<LtiLaunchSession>,
   ) {}
 
   public async handleRequest(
@@ -50,7 +58,7 @@ export class DefaultDeepLinkingStrategy implements DeepLinkingStrategy {
       nonce,
     );
 
-    const clientId = this.configService.get<string>('lti.clientId');
+    const clientId = claims.aud?.[0];
 
     if (claims.azp && claims.azp !== clientId) {
       throw new UnauthorizedException('Invalid authorized party (azp) claim');
@@ -62,10 +70,25 @@ export class DefaultDeepLinkingStrategy implements DeepLinkingStrategy {
       );
     }
 
-    const user = await this.ltiUtilService.upsertUserFromClaims(claims);
+    const ltiDeployment = await this.ltiDeploymentRepository.findOne({
+      where: {
+        issuerUrl: claims.iss,
+        clientId: claims.aud?.[0] || '',
+        deploymentId: claims.deploymentId,
+      },
+    });
+    if (!ltiDeployment) {
+      throw new BadRequestException('LTI deployment not found');
+    }
+
+    const user = await this.ltiUtilService.upsertUserFromClaims(
+      claims,
+      ltiDeployment,
+    );
     const course = await this.ltiUtilService.processCourseAndEnrollUser(
       claims,
       user,
+      ltiDeployment,
     );
     const tokens = await this.ltiUtilService.issueTokens(user, claims, course);
 
@@ -177,9 +200,17 @@ export class DefaultDeepLinkingStrategy implements DeepLinkingStrategy {
     };
     this.logger.debug(`Deep Linking Data from Redis: ${deepLinkingDataString}`);
 
-    const clientId = this.configService.get<string>('lti.clientId');
-    const platformId = this.configService.get<string>('lti.platformId');
-    const deploymentId = this.configService.get<string>('lti.deploymentId');
+    const ltiSession = await this.ltiLaunchSessionRepository.findOne({
+      where: { id: user.ltiSessionId },
+      relations: ['ltiDeployment'],
+    });
+    if (!ltiSession) {
+      throw new BadRequestException('LTI launch session not found');
+    }
+
+    const clientId = ltiSession.ltiDeployment.clientId;
+    const platformId = ltiSession.ltiDeployment.issuerUrl;
+    const deploymentId = ltiSession.ltiDeployment.deploymentId;
 
     const jwtPayload = new LtiDeepLinkingJwtPayloadDto({
       iss: clientId,

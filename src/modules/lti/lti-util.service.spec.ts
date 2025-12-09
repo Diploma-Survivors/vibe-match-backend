@@ -1,6 +1,7 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { JWTVerifyResult } from 'jose';
 import { JwtAuthService } from 'src/modules/auth/jwt-auth.service';
 import { CourseService } from 'src/modules/course/services/course.service';
@@ -14,6 +15,7 @@ import { RoleEnum } from '../user/enums/role.enum';
 import { LTI_VERSIONS } from './constants/lti.constants';
 import { LTI_STATE_PREFIX } from './constants/redis.constants';
 import { IdTokenPayloadDto } from './dto/id-token-payload.dto';
+import { LtiDeployment } from './entities/lti-deployment.entity';
 import { LtiMessageType } from './enums/lti-message-type.enum';
 import { LtiUtilService } from './lti-util.service';
 
@@ -35,6 +37,7 @@ describe('LtiUtilService', () => {
   };
   const mockCourseService = { findOrCreateByLtiContextClaims: jest.fn() };
   const mockUserCourseService = { enrollUserInCourse: jest.fn() };
+  const mockLtiDeploymentRepository = {};
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +49,10 @@ describe('LtiUtilService', () => {
         { provide: JwtAuthService, useValue: mockJwtAuthService },
         { provide: CourseService, useValue: mockCourseService },
         { provide: UserCourseService, useValue: mockUserCourseService },
+        {
+          provide: getRepositoryToken(LtiDeployment),
+          useValue: mockLtiDeploymentRepository,
+        },
       ],
     }).compile();
 
@@ -151,23 +158,58 @@ describe('LtiUtilService', () => {
   });
 
   describe('upsertUserFromClaims', () => {
+    const ltiDeployment = {
+      id: 1,
+      name: 'Test Deployment',
+      issuerUrl: 'https://lms.example.com',
+      clientId: 'client123',
+      deploymentId: 'deployment123',
+      authenticationUrl: 'https://lms.example.com/auth',
+      jwksUrl: 'https://lms.example.com/jwks',
+      tokenUrl: 'https://lms.example.com/token',
+      isActive: true,
+      tenantId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as LtiDeployment;
+
     it('should upsert user from claims', async () => {
       const claims = {} as IdTokenPayloadDto;
       const user: User = { id: 1, email: 'test@test.com' } as User;
       mockUserService.findOrCreateByLtiClaims.mockResolvedValue(user);
-      const result = await service.upsertUserFromClaims(claims);
+      const result = await service.upsertUserFromClaims(claims, ltiDeployment);
       expect(result).toEqual(user);
       expect(mockUserService.findOrCreateByLtiClaims).toHaveBeenCalledWith(
         claims,
+        ltiDeployment,
       );
     });
   });
 
   describe('processCourseAndEnrollUser', () => {
+    const ltiDeployment = {
+      id: 1,
+      name: 'Test Deployment',
+      issuerUrl: 'https://lms.example.com',
+      clientId: 'client123',
+      deploymentId: 'deployment123',
+      authenticationUrl: 'https://lms.example.com/auth',
+      jwksUrl: 'https://lms.example.com/jwks',
+      tokenUrl: 'https://lms.example.com/token',
+      isActive: true,
+      tenantId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as LtiDeployment;
+
     it('should return null if no context in claims', async () => {
       const claims = {} as IdTokenPayloadDto;
       const user = { id: 1 } as User;
-      const result = await service.processCourseAndEnrollUser(claims, user);
+      const result = await service.processCourseAndEnrollUser(
+        claims,
+        user,
+        ltiDeployment,
+      );
       expect(result).toBeNull();
     });
 
@@ -178,11 +220,15 @@ describe('LtiUtilService', () => {
       mockCourseService.findOrCreateByLtiContextClaims.mockResolvedValue(
         course,
       );
-      const result = await service.processCourseAndEnrollUser(claims, user);
+      const result = await service.processCourseAndEnrollUser(
+        claims,
+        user,
+        ltiDeployment,
+      );
       expect(result).toEqual(course);
       expect(
         mockCourseService.findOrCreateByLtiContextClaims,
-      ).toHaveBeenCalledWith(claims);
+      ).toHaveBeenCalledWith(claims, ltiDeployment);
       expect(mockUserCourseService.enrollUserInCourse).toHaveBeenCalledWith(
         user,
         course,

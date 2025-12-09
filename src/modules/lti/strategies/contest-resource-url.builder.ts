@@ -28,6 +28,9 @@ export class ContestResourceUrlBuilder extends BaseResourceUrlBuilder {
       );
     }
 
-    return baseUrl.replace('{{CONTENT_ID}}', customParams?.['contestId']);
+    return baseUrl.replace(
+      '{{CONTENT_ID}}',
+      customParams?.['contestId'] as string,
+    );
   }
 }

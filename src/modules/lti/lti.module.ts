@@ -14,6 +14,7 @@ import { Submission } from '../submission/entities/submission.entity';
 import { SubmissionModule } from '../submission/submission.module';
 import { UserCourseModule } from '../user-course/user-course.module';
 import { AgsService } from './ags/ags.service';
+import { LtiDeployment } from './entities/lti-deployment.entity';
 import { LtiLaunchSession } from './entities/lti-launch-session.entity';
 import { KeysService } from './keys.service';
 import { LtiUtilService } from './lti-util.service';
@@ -31,7 +32,7 @@ import { ResourceUrlFactory } from './strategies/resource-url.factory';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([LtiLaunchSession, Submission]),
+    TypeOrmModule.forFeature([LtiLaunchSession, LtiDeployment, Submission]),
     UserModule,
     AuthModule,
     RedisModule,

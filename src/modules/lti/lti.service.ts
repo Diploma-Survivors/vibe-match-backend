@@ -28,6 +28,7 @@ import { ResourceUrlFactory } from './strategies/resource-url.factory';
 // Type imports
 import { ContentType } from 'src/common/enums/content-type.enum';
 import { type JwtPayload } from '../auth/interfaces/jwt.interface';
+import { LtiDeployment } from './entities/lti-deployment.entity';
 
 const LTI_STATE_TTL_SECONDS = 300;
 
@@ -40,6 +41,8 @@ export class LtiService {
     private readonly redisService: RedisService,
     @InjectRepository(LtiLaunchSession)
     private readonly ltiLaunchSessionRepository: Repository<LtiLaunchSession>,
+    @InjectRepository(LtiDeployment)
+    private readonly ltiDeploymentRepository: Repository<LtiDeployment>,
     private readonly resourceUrlFactory: ResourceUrlFactory,
     private readonly deepLinkingFactory: DeepLinkingFactory,
     private readonly ltiUtilService: LtiUtilService,
@@ -53,15 +56,27 @@ export class LtiService {
   public async handleLoginInitiation(
     ltiLoginInitiationDto: LtiLoginInitiationDto,
   ): Promise<string> {
-    const { iss, loginHint, targetLinkUri, ltiMessageHint } =
-      ltiLoginInitiationDto;
+    const {
+      iss,
+      clientId,
+      ltiDeploymentId,
+      loginHint,
+      targetLinkUri,
+      ltiMessageHint,
+    } = ltiLoginInitiationDto;
 
-    // Validate the issuer (iss) against the configured platform ID
-    const platformId = this.configService.get<string>(
-      'lti.platformId',
-    ) as string;
-    if (iss !== platformId) {
-      throw new BadRequestException('Invalid issuer');
+    // Validate LTI deployment configuration
+    const ltiDeployment = await this.ltiDeploymentRepository.findOne({
+      where: {
+        issuerUrl: iss,
+        clientId,
+        deploymentId: ltiDeploymentId,
+      },
+    });
+    if (!ltiDeployment) {
+      throw new BadRequestException(
+        'LTI deployment not found, please config it',
+      );
     }
 
     // Generate state and nonce for CSRF protection and replay attack prevention
@@ -85,10 +100,7 @@ export class LtiService {
       `Stored state '${state}' in Redis: ${JSON.stringify(stateData)}`,
     );
 
-    const authenticationRequestUrl = this.configService.get<string>(
-      'lti.authenticationRequestUrl',
-    ) as string;
-    const clientId = this.configService.get<string>('lti.clientId') as string;
+    const authenticationRequestUrl = ltiDeployment.authenticationUrl;
 
     // Construct the redirect URL to the LMS authentication endpoint
     const redirectUrl = new URL(authenticationRequestUrl);
@@ -127,13 +139,30 @@ export class LtiService {
       nonce,
     );
 
+    const ltiDeployment = await this.ltiDeploymentRepository.findOne({
+      where: {
+        issuerUrl: claims.iss,
+        clientId: claims.aud?.[0] || '',
+        deploymentId: claims.deploymentId,
+      },
+    });
+    if (!ltiDeployment) {
+      throw new BadRequestException(
+        'LTI deployment not found, please config it',
+      );
+    }
+
     // Update or create the user in the local database based on LTI claims
-    const user = await this.ltiUtilService.upsertUserFromClaims(claims);
+    const user = await this.ltiUtilService.upsertUserFromClaims(
+      claims,
+      ltiDeployment,
+    );
 
     // Process the course information and enroll the user if course context is provided
     const course = await this.ltiUtilService.processCourseAndEnrollUser(
       claims,
       user,
+      ltiDeployment,
     );
 
     // Extract AGS endpoint from claims and save LTI launch session if present
@@ -171,8 +200,7 @@ export class LtiService {
         contextId: claims.context.id,
         agsLineitemUrl: agsEndpoint.lineitem,
         agsScopes: agsEndpoint.scope,
-        deploymentId: claims.deploymentId,
-        platformIssuer: claims.iss,
+        ltiDeployment,
       });
       this.logger.log(
         `LTI launch session created: ${ltiSession.id} for user ${user.id}`,
@@ -246,8 +274,7 @@ export class LtiService {
     contextId: string;
     agsLineitemUrl: string | null;
     agsScopes: string[] | null;
-    deploymentId: string;
-    platformIssuer: string;
+    ltiDeployment: LtiDeployment;
   }): Promise<LtiLaunchSession> {
     const sessionTtl =
       this.configService.get<number>('lti.ags.sessionTtl') ?? 86400; // Default: 24 hours
@@ -262,8 +289,7 @@ export class LtiService {
       contextId: params.contextId,
       agsLineitemUrl: params.agsLineitemUrl,
       agsScopes: params.agsScopes,
-      deploymentId: params.deploymentId,
-      platformIssuer: params.platformIssuer,
+      ltiDeployment: params.ltiDeployment,
       expiresAt,
     });
 

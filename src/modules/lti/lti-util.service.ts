@@ -5,7 +5,6 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 // Third-party
 import { plainToInstance } from 'class-transformer';
@@ -15,6 +14,7 @@ import * as jose from 'jose';
 import { RedisService } from 'src/shared/redis/redis.service';
 
 // Relative imports
+import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
 import { JwtAuthService } from 'src/modules/auth/jwt-auth.service';
 import { Course } from 'src/modules/course/entities/course.entity';
@@ -22,9 +22,11 @@ import { CourseService } from 'src/modules/course/services/course.service';
 import { UserCourseService } from 'src/modules/user-course/services/user-course.service';
 import { User } from 'src/modules/user/entities/user.entity';
 import { UserService } from 'src/modules/user/user.service';
-import { LTI_VERSIONS } from './constants/lti.constants';
+import { Repository } from 'typeorm';
+import { LTI_CLAIMS, LTI_VERSIONS } from './constants/lti.constants';
 import { LTI_STATE_PREFIX } from './constants/redis.constants';
 import { IdTokenPayloadDto } from './dto/id-token-payload.dto';
+import { LtiDeployment } from './entities/lti-deployment.entity';
 import { LtiMessageType } from './enums/lti-message-type.enum';
 import {
   LtiClaims,
@@ -37,12 +39,13 @@ export class LtiUtilService {
   private readonly logger = new Logger(LtiUtilService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly userService: UserService,
     private readonly jwtAuthService: JwtAuthService,
     private readonly courseService: CourseService,
     private readonly userCourseService: UserCourseService,
+    @InjectRepository(LtiDeployment)
+    private readonly ltiDeploymentRepository: Repository<LtiDeployment>,
   ) {}
 
   public async validateAndGetNonceFromState(state: string): Promise<string> {
@@ -98,24 +101,35 @@ export class LtiUtilService {
   public async verifyJwtFromPlatform(
     idToken: string,
   ): Promise<jose.JWTVerifyResult> {
-    const platformPublicKeysetUrl = this.configService.get<string>(
-      'lti.publicKeysetUrl',
-    ) as string;
-    const clientId = this.configService.get<string>('lti.clientId') as string;
-    const platformId = this.configService.get<string>(
-      'lti.platformId',
-    ) as string;
-
-    let decodedJwt: jose.JWTVerifyResult;
     try {
-      const JWKS = jose.createRemoteJWKSet(new URL(platformPublicKeysetUrl));
-      decodedJwt = await jose.jwtVerify(idToken, JWKS, {
+      const decodedJwt = jose.decodeJwt(idToken);
+      const clientId = Array.isArray(decodedJwt.aud)
+        ? decodedJwt.aud?.[0]
+        : decodedJwt.aud;
+      const platformId = decodedJwt.iss;
+      const deploymentId = decodedJwt?.[LTI_CLAIMS.DEPLOYMENT_ID] as string;
+
+      const ltiDeployment = await this.ltiDeploymentRepository.findOne({
+        where: {
+          issuerUrl: platformId,
+          clientId,
+          deploymentId,
+        },
+      });
+      if (!ltiDeployment) {
+        throw new UnauthorizedException(
+          'LTI Deployment not found for the given issuer, client ID, and deployment ID',
+        );
+      }
+
+      const JWKS = jose.createRemoteJWKSet(new URL(ltiDeployment.jwksUrl));
+      const verifiedJwt = await jose.jwtVerify(idToken, JWKS, {
         audience: clientId,
         issuer: platformId,
         clockTolerance: 5,
       });
 
-      return decodedJwt;
+      return verifiedJwt;
     } catch (error) {
       this.logger.error(`JWT verification failed: ${(error as Error).message}`);
       throw new UnauthorizedException(
@@ -129,8 +143,14 @@ export class LtiUtilService {
     return claims;
   }
 
-  public async upsertUserFromClaims(claims: IdTokenPayloadDto): Promise<User> {
-    const user = await this.userService.findOrCreateByLtiClaims(claims);
+  public async upsertUserFromClaims(
+    claims: IdTokenPayloadDto,
+    ltiDeployment: LtiDeployment,
+  ): Promise<User> {
+    const user = await this.userService.findOrCreateByLtiClaims(
+      claims,
+      ltiDeployment,
+    );
     this.logger.log(
       `LTI Launch: User processed in DB: ID ${user.id}, Email ${user.email}`,
     );
@@ -140,14 +160,17 @@ export class LtiUtilService {
   public async processCourseAndEnrollUser(
     claims: IdTokenPayloadDto,
     user: User,
+    ltiDeployment: LtiDeployment,
   ): Promise<Course | null> {
     if (!claims.context) {
       return null;
     }
 
     try {
-      const course =
-        await this.courseService.findOrCreateByLtiContextClaims(claims);
+      const course = await this.courseService.findOrCreateByLtiContextClaims(
+        claims,
+        ltiDeployment,
+      );
       this.logger.log(
         `LTI Launch: Course processed in DB: ID ${course.id}, Title ${course.title}`,
       );
