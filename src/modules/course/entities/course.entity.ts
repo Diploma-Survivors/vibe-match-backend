@@ -1,9 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { LtiDeployment } from 'src/modules/lti/entities/lti-deployment.entity';
 import { CourseProblem } from 'src/modules/problems/entities/course-problem.entity';
+import { Tenant } from 'src/modules/user/entities/tenant.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   Unique,
@@ -11,7 +15,7 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Unique(['ltiCourseId', 'ltiPlatformId'])
+@Unique(['ltiCourseId', 'ltiDeploymentId'])
 export class Course {
   @ApiProperty({
     description: 'Course unique identifier',
@@ -24,15 +28,41 @@ export class Course {
     description: 'LTI Course ID from the LTI Platform',
     example: 'some-unique-course-id',
   })
-  @Column({ type: 'varchar' })
-  ltiCourseId: string;
+  @Column({ type: 'varchar', nullable: true })
+  ltiCourseId: string | null;
 
   @ApiProperty({
-    description: 'LTI Platform ID (issuer URL)',
-    example: 'http://localhost:8888',
+    description: 'Tenant ID',
+    example: 1,
   })
-  @Column({ type: 'varchar' })
-  ltiPlatformId: string;
+  @Column({ name: 'tenant_id' })
+  tenantId: number;
+
+  @ApiProperty({
+    description: 'Tenant associated with the course',
+    type: () => Tenant,
+    nullable: true,
+  })
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant;
+
+  @ApiProperty({
+    description: 'LTI Deployment ID associated with the course',
+    example: 1,
+    nullable: true,
+  })
+  @Column({ name: 'lti_deployment_id', nullable: true })
+  ltiDeploymentId: number | null;
+
+  @ApiProperty({
+    description: 'LTI Deployment associated with the course',
+    type: () => LtiDeployment,
+    nullable: true,
+  })
+  @ManyToOne(() => LtiDeployment, { nullable: true })
+  @JoinColumn({ name: 'lti_deployment_id' })
+  ltiDeployment: LtiDeployment | null;
 
   @ApiProperty({
     description: 'Course title',

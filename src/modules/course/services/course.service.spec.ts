@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { IdTokenPayloadDto } from 'src/modules/lti/dto/id-token-payload.dto';
+import { LtiDeployment } from 'src/modules/lti/entities/lti-deployment.entity';
 import { Repository } from 'typeorm';
 import { Course } from '../entities/course.entity';
 import { CourseService } from './course.service';
@@ -49,20 +50,38 @@ describe('CourseService', () => {
       },
     } as IdTokenPayloadDto;
 
+    const ltiDeployment = {
+      id: 1,
+      name: 'Test Deployment',
+      issuerUrl: 'https://lms.example.com',
+      clientId: 'client123',
+      deploymentId: 'deployment123',
+      authenticationUrl: 'https://lms.example.com/auth',
+      jwksUrl: 'https://lms.example.com/jwks',
+      tokenUrl: 'https://lms.example.com/token',
+      isActive: true,
+      tenantId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as LtiDeployment;
+
     it('should create a new course if it does not exist', async () => {
       mockCourseRepository.findOne.mockResolvedValue(null);
       const newCourse = { id: 1, ...claims };
       mockCourseRepository.create.mockReturnValue(newCourse);
       mockCourseRepository.save.mockResolvedValue(newCourse);
 
-      const result = await service.findOrCreateByLtiContextClaims(claims);
+      const result = await service.findOrCreateByLtiContextClaims(
+        claims,
+        ltiDeployment,
+      );
 
       expect(courseRepository.findOne).toHaveBeenCalledWith({
-        where: { ltiCourseId: 'courseId', ltiPlatformId: 'platformId' },
+        where: { ltiCourseId: 'courseId', tenantId: ltiDeployment.tenantId },
       });
       expect(courseRepository.create).toHaveBeenCalledWith({
         ltiCourseId: 'courseId',
-        ltiPlatformId: 'platformId',
+        ltiDeployment,
         title: 'courseTitle',
       });
       expect(courseRepository.save).toHaveBeenCalledWith(newCourse);
@@ -82,10 +101,13 @@ describe('CourseService', () => {
         title: 'courseTitle',
       });
 
-      const result = await service.findOrCreateByLtiContextClaims(claims);
+      const result = await service.findOrCreateByLtiContextClaims(
+        claims,
+        ltiDeployment,
+      );
 
       expect(courseRepository.findOne).toHaveBeenCalledWith({
-        where: { ltiCourseId: 'courseId', ltiPlatformId: 'platformId' },
+        where: { ltiCourseId: 'courseId', tenantId: ltiDeployment.tenantId },
       });
       expect(courseRepository.create).not.toHaveBeenCalled();
       expect(courseRepository.save).toHaveBeenCalledWith({
@@ -104,10 +126,13 @@ describe('CourseService', () => {
       };
       mockCourseRepository.findOne.mockResolvedValue(existingCourse);
 
-      const result = await service.findOrCreateByLtiContextClaims(claims);
+      const result = await service.findOrCreateByLtiContextClaims(
+        claims,
+        ltiDeployment,
+      );
 
       expect(courseRepository.findOne).toHaveBeenCalledWith({
-        where: { ltiCourseId: 'courseId', ltiPlatformId: 'platformId' },
+        where: { ltiCourseId: 'courseId', tenantId: ltiDeployment.tenantId },
       });
       expect(courseRepository.create).not.toHaveBeenCalled();
       expect(courseRepository.save).toHaveBeenCalledWith(existingCourse);
