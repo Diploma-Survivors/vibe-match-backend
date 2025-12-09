@@ -13,6 +13,7 @@ import { LtiDeepLinkingRequestDto } from './dto/lti-deep-linking-request.dto';
 import { LtiLaunchRequestDto } from './dto/lti-launch-request.dto';
 import { LtiLoginInitiationDto } from './dto/lti-login-initiation.dto';
 import { LtiResourceLinkDto } from './dto/lti-resource-link.dto';
+import { LtiDeployment } from './entities/lti-deployment.entity';
 import { LtiLaunchSession } from './entities/lti-launch-session.entity';
 import { LtiUtilService } from './lti-util.service';
 import { LtiService } from './lti.service';
@@ -22,6 +23,7 @@ import { ResourceUrlFactory } from './strategies/resource-url.factory';
 describe('LtiService', () => {
   let service: LtiService;
   let ltiLaunchSessionRepository: Repository<LtiLaunchSession>;
+  let ltiDeploymentRepository: Repository<LtiDeployment>;
   let resourceUrlFactory: ResourceUrlFactory;
   let ltiUtilService: LtiUtilService;
 
@@ -37,6 +39,7 @@ describe('LtiService', () => {
     processCourseAndEnrollUser: jest.fn(),
     issueTokens: jest.fn(),
   };
+  const mockLtiDeploymentRepository = { findOne: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -48,6 +51,10 @@ describe('LtiService', () => {
           provide: getRepositoryToken(LtiLaunchSession),
           useValue: mockLtiLaunchSessionRepository,
         },
+        {
+          provide: getRepositoryToken(LtiDeployment),
+          useValue: mockLtiDeploymentRepository,
+        },
         { provide: ResourceUrlFactory, useValue: mockResourceUrlFactory },
         { provide: DeepLinkingFactory, useValue: mockDeepLinkingFactory },
         { provide: LtiUtilService, useValue: mockLtiUtilService },
@@ -57,6 +64,9 @@ describe('LtiService', () => {
     service = module.get<LtiService>(LtiService);
     ltiLaunchSessionRepository = module.get<Repository<LtiLaunchSession>>(
       getRepositoryToken(LtiLaunchSession),
+    );
+    ltiDeploymentRepository = module.get<Repository<LtiDeployment>>(
+      getRepositoryToken(LtiDeployment),
     );
     resourceUrlFactory = module.get<ResourceUrlFactory>(ResourceUrlFactory);
     ltiUtilService = module.get<LtiUtilService>(LtiUtilService);
@@ -74,9 +84,16 @@ describe('LtiService', () => {
     it('should throw BadRequestException for invalid issuer', async () => {
       const dto = { iss: 'invalid' } as LtiLoginInitiationDto;
       mockConfigService.get.mockReturnValue('valid_issuer');
+      mockLtiDeploymentRepository.findOne.mockResolvedValue(null);
+
       await expect(service.handleLoginInitiation(dto)).rejects.toThrow(
         BadRequestException,
       );
+      expect(ltiDeploymentRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          issuerUrl: dto.iss,
+        },
+      });
     });
   });
 
@@ -103,6 +120,15 @@ describe('LtiService', () => {
           scope: ['scope1'],
         },
       } as unknown as IdTokenPayloadDto;
+      const ltiDeployment = {
+        id: 'deployment_id',
+        tenantId: 'tenant_id',
+        issuerUrl: 'issuer_url',
+        clientId: 'client_id',
+        deploymentId: 'deployment_id',
+        jwksUrl: 'jwks_url',
+        tokenUrl: 'token_url',
+      } as unknown as LtiDeployment;
       const user: User = { id: 1, roles: [RoleEnum.STUDENT] } as User;
       const course: Course = { id: 1 } as Course;
       const ltiSession: LtiLaunchSession = {
@@ -123,6 +149,7 @@ describe('LtiService', () => {
       mockLtiLaunchSessionRepository.create.mockReturnValue(ltiSession);
       mockLtiLaunchSessionRepository.save.mockResolvedValue(ltiSession);
       mockLtiUtilService.issueTokens.mockResolvedValue(tokens);
+      mockLtiDeploymentRepository.findOne.mockResolvedValue(ltiDeployment);
 
       const resourceUrlBuilder = {
         buildRedirectUrl: jest.fn().mockReturnValue(redirectPath),
@@ -137,10 +164,14 @@ describe('LtiService', () => {
         dto.state,
       );
       expect(ltiUtilService.getAndValidateClaims).toHaveBeenCalled();
-      expect(ltiUtilService.upsertUserFromClaims).toHaveBeenCalledWith(claims);
+      expect(ltiUtilService.upsertUserFromClaims).toHaveBeenCalledWith(
+        claims,
+        ltiDeployment,
+      );
       expect(ltiUtilService.processCourseAndEnrollUser).toHaveBeenCalledWith(
         claims,
         user,
+        ltiDeployment,
       );
       expect(ltiLaunchSessionRepository.save).toHaveBeenCalledWith(ltiSession);
       expect(ltiUtilService.issueTokens).toHaveBeenCalled();
