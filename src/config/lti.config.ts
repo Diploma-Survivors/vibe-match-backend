@@ -31,6 +31,11 @@ export const ltiConfig = registerAs('lti', () => ({
       process.env.LTI_FRONTEND_INSTRUCTOR_CONTEST_URL ||
       'http://localhost:3002/contests/{{CONTENT_ID}}',
   },
+  frontendProblemUrl: {
+    instructor:
+      process.env.LTI_FRONTEND_INSTRUCTOR_PROBLEM_MANAGEMENT_URL ||
+      'http://localhost:3002/problems',
+  },
   frontendSelectContentUrl:
     process.env.LTI_FRONTEND_SELECT_CONTENT_URL ||
     'http://localhost:3002/options',

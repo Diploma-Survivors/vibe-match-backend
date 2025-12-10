@@ -29,13 +29,13 @@ import {
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 import {
   CursorEdgeDto,
   PaginationCursorResponseDto,
 } from 'src/common/pagination/dtos/pagination-cursor-response.dto';
 
 // Relative imports
-import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { RoleEnum } from '../user/enums/role.enum';
 import { CreateProblemResponseDto } from './dto/create-problem-response.dto';
 import { CreateProblemDto } from './dto/create-problem.dto';
@@ -48,6 +48,9 @@ import { UpdateProblemDto } from './dto/update-problem.dto';
 import { FileInterceptor } from './interceptors/file.interceptor';
 import { FileRequiredPipe } from './pipes/file-required.pipe';
 import { ProblemsService } from './problems.service';
+
+// Type imports
+import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 
 // Helper function to generate paginated response schema
 const getPaginatedProblemsSchema = () => ({
@@ -106,7 +109,7 @@ const ApiInstructorAuth = () => {
     descriptor: PropertyDescriptor,
   ) => {
     ApiBearerAuth()(target, propertyKey, descriptor);
-    UseGuards(JwtAuthGuard)(target, propertyKey, descriptor);
+    UseGuards(JwtAuthGuard, RolesGuard)(target, propertyKey, descriptor);
     Roles(RoleEnum.INSTRUCTOR)(target, propertyKey, descriptor);
   };
 };
@@ -150,7 +153,7 @@ export class ProblemsController {
   })
   @ApiPaginatedProblemsResponse()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.STUDENT)
   async findTrainableProblems(
     @Query() query: ProblemsCursorQueryDto,
@@ -175,6 +178,20 @@ export class ProblemsController {
       query,
       user,
     );
+  }
+
+  @Get('managable/teacher')
+  @ApiOperation({
+    summary: 'Get list problems for management (Instructor only)',
+    description: 'Get list problems created by the instructor',
+  })
+  @ApiPaginatedProblemsResponse()
+  @ApiInstructorAuth()
+  async findProblemsForManagement(
+    @Query() query: ProblemsCursorQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.problemsService.findProblemsForManagement(query, user);
   }
 
   @Get(':id/detail')

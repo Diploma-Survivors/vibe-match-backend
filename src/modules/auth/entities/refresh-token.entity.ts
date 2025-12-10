@@ -2,10 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 

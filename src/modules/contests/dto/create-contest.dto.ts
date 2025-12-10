@@ -17,6 +17,7 @@ import {
 } from 'class-validator';
 
 // Relative imports
+import { SanitizeMarkdown } from 'src/common/decorators/sanitize-markdown.decorator';
 import { IsAfterNow } from '../decorators/is-after-now.decorator';
 import { IsGreaterThan } from '../decorators/is-greater-than.decorator';
 import { IsLessThan } from '../decorators/is-less-than.decorator';
@@ -61,6 +62,7 @@ export class CreateContestDto {
   })
   @MinLength(10)
   @MaxLength(500)
+  @SanitizeMarkdown()
   description: string;
 
   @ApiProperty({

@@ -61,3 +61,6 @@ public.json
 research.txt
 .cursor
 .vscode
+
+# Temporary uploads
+/src/temp/uploads/testcases/

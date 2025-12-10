@@ -19,6 +19,7 @@ import {
 } from 'class-validator';
 
 // Relative imports
+import { SanitizeMarkdown } from 'src/common/decorators/sanitize-markdown.decorator';
 import { SubmissionStrategyEnum } from '../../submission/enums/submission-strategy.enum';
 import { JsonArrayTransform } from '../decorators/json-transform.decorator';
 import { DifficultyLevel } from '../enums/difficulty-level.enum';
@@ -48,6 +49,7 @@ export class CreateProblemDto {
   @MaxLength(512, {
     message: 'Description must be at most 512 characters long',
   })
+  @SanitizeMarkdown()
   description: string;
 
   @ApiProperty({
@@ -62,6 +64,7 @@ export class CreateProblemDto {
   @MaxLength(512, {
     message: 'Input description must be at most 512 characters long',
   })
+  @SanitizeMarkdown()
   inputDescription: string;
 
   @ApiProperty({
@@ -76,6 +79,7 @@ export class CreateProblemDto {
   @MaxLength(512, {
     message: 'Output description must be at most 512 characters long',
   })
+  @SanitizeMarkdown()
   outputDescription: string;
 
   @ApiProperty({

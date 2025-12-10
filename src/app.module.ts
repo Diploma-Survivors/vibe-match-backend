@@ -9,7 +9,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 // Third-party
 import KeyvRedis from '@keyv/redis';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { addTransactionalDataSource } from 'typeorm-transactional';
+import {
+  addTransactionalDataSource,
+  getDataSourceByName,
+} from 'typeorm-transactional';
 
 // Relative imports
 import { AppController } from './app.controller';
@@ -61,6 +64,11 @@ import { RedisModule } from './shared/redis/redis.module';
       dataSourceFactory: async (options: DataSourceOptions) => {
         if (!options) {
           throw new Error('Invalid options passed');
+        }
+
+        const existingDataSource = getDataSourceByName('default');
+        if (existingDataSource) {
+          return existingDataSource;
         }
 
         const dataSource = await new DataSource(options).initialize();

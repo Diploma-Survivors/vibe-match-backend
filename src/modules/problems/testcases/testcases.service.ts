@@ -1,17 +1,29 @@
-import { Injectable } from '@nestjs/common';
+// Built-in
+import { unlink } from 'node:fs/promises';
+
+// NestJS
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
-import { StoragesService } from 'src/modules/storages/storages.service';
-import { FindOneOptions, FindOptionsWhere, Repository } from 'typeorm';
+
+// Third-party
+import { FindOneOptions, FindOptionsWhere, In, Not, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
 import { v4 as uuidV4 } from 'uuid';
+
+// Relative imports
+import type { JwtPayload } from 'src/modules/auth/interfaces/jwt.interface';
+import { StoragesService } from 'src/modules/storages/storages.service';
 import { TESTCASE_FILE_EXTENSION } from './constants/testcases.constant';
 import { TestcaseSample } from './entities/testcase-sample.entity';
 import { Testcase } from './entities/testcase.entity';
+import { TestcaseTransformService } from './helpers/testcase-transform.service';
+import { TestcaseValidationService } from './helpers/testcase-validation.service';
 
 @Injectable()
 export class TestcasesService {
+  private readonly logger = new Logger(TestcasesService.name);
+
   constructor(
     @InjectRepository(Testcase)
     private readonly testcaseRepository: Repository<Testcase>,
@@ -19,6 +31,8 @@ export class TestcasesService {
     private readonly testcaseSampleRepository: Repository<TestcaseSample>,
     private readonly storagesService: StoragesService,
     private readonly configService: ConfigService,
+    private readonly validationService: TestcaseValidationService,
+    private readonly transformService: TestcaseTransformService,
   ) {}
 
   async uploadAndSaveFileTestcase(
@@ -27,33 +41,86 @@ export class TestcasesService {
     problemId: number,
     keyS3?: string,
   ) {
-    const seed = uuidV4();
-    const key =
-      keyS3 ??
-      `${seed}_${user.userId}_${user.courseId}${TESTCASE_FILE_EXTENSION}`;
+    const filePath = file.path;
     const bucket = this.configService.get<string>(
       'aws.s3.bucketName',
     ) as string;
+    let uploadedS3Key: string | undefined = undefined;
 
-    await this.storagesService.upload({
-      bucket,
-      key,
-      file: file.buffer,
-    });
+    try {
+      const validationResult =
+        await this.validationService.validateTestcaseFile(filePath);
 
-    const url = this.storagesService.getObjectUrl(bucket, key);
+      if (!validationResult.isValid) {
+        const errorMessage =
+          this.validationService.formatValidationErrors(validationResult);
+        throw new BadRequestException({
+          message: 'Testcase validation failed',
+          errors: validationResult.errors,
+          summary: errorMessage,
+        });
+      }
 
-    // File exists, update record
-    if (keyS3) {
-      await this.testcaseRepository.update({ problemId }, { fileUrl: url });
-      return;
+      if (validationResult.warnings && validationResult.warnings.length > 0) {
+        this.logger.warn(
+          `Validation warnings:\n${validationResult.warnings.join('\n')}`,
+        );
+      }
+
+      const seed = uuidV4();
+      const key =
+        keyS3 ??
+        `${seed}_${user.userId}_${user.courseId}${TESTCASE_FILE_EXTENSION}`;
+
+      const transformStream =
+        this.transformService.createTransformStream(filePath);
+
+      await this.storagesService.uploadStream(
+        bucket,
+        key,
+        transformStream,
+        'application/x-ndjson',
+        (progress) => {
+          this.logger.debug(
+            `Upload progress: ${progress.percent}% (${progress.loaded} bytes)`,
+          );
+        },
+      );
+      uploadedS3Key = key;
+
+      // File exists, update record
+      if (keyS3) {
+        await this.testcaseRepository.update(
+          { problemId },
+          { keyS3: key, testcaseCount: validationResult.testcaseCount },
+        );
+      } else {
+        await this.testcaseRepository.save({
+          keyS3: key,
+          problemId,
+          testcaseCount: validationResult.testcaseCount,
+        });
+      }
+
+      await this.cleanupTempFile(filePath);
+
+      return {
+        key,
+        testcaseCount: validationResult.testcaseCount,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      this.logger.error(`Testcase processing failed: ${message}`);
+      await this.cleanupTempFile(filePath);
+      if (uploadedS3Key) {
+        await this.storagesService.delete(bucket, uploadedS3Key);
+      }
+      throw error;
     }
+  }
 
-    const testcase = await this.testcaseRepository.save({
-      fileUrl: url,
-      problemId,
-    });
-    return testcase;
+  private async cleanupTempFile(filePath: string): Promise<void> {
+    await unlink(filePath);
   }
 
   async findTestcaseOne(
@@ -76,5 +143,12 @@ export class TestcasesService {
   async createTestcaseSample(data: Partial<TestcaseSample>) {
     const testcaseSample = this.testcaseSampleRepository.create(data);
     return this.testcaseSampleRepository.save(testcaseSample);
+  }
+
+  async deleteExtraTestcaseSamples(problemId: number, testcaseIds: number[]) {
+    await this.testcaseSampleRepository.delete({
+      problemId,
+      id: Not(In(testcaseIds)),
+    });
   }
 }

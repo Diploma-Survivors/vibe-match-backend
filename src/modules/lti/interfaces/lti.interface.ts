@@ -40,7 +40,7 @@ export interface LtiDeepLinkingSettingsClaim {
 export interface LtiClaims extends jose.JWTPayload {
   iss: string;
   sub: string;
-  aud: string;
+  aud: string | string[];
   exp: number;
   iat: number;
   nonce: string;

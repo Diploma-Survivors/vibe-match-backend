@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Contest } from '../../contests/entities/contest.entity';
 import { User } from '../../user/entities/user.entity';
+import { LtiDeployment } from './lti-deployment.entity';
 
 @Entity('lti_launch_sessions')
 @Index('idx_lti_session_resource_link', ['resourceLinkId'])
@@ -40,11 +41,12 @@ export class LtiLaunchSession {
   @Column({ name: 'ags_scopes', type: 'simple-array', nullable: true })
   agsScopes: string[] | null;
 
-  @Column({ name: 'deployment_id', type: 'varchar' })
-  deploymentId: string;
+  @Column({ name: 'lti_deployment_id', type: 'int' })
+  ltiDeploymentId: number;
 
-  @Column({ name: 'platform_issuer', type: 'varchar' })
-  platformIssuer: string;
+  @ManyToOne(() => LtiDeployment)
+  @JoinColumn({ name: 'lti_deployment_id' })
+  ltiDeployment: LtiDeployment;
 
   @CreateDateColumn({
     name: 'created_at',

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOneOptions, Repository } from 'typeorm';
+import { DeepPartial, FindOneOptions, Repository } from 'typeorm';
 import {
   LTI_ROLES,
   LTI_ROLES_ARRAY,
 } from '../../modules/lti/constants/lti.constants';
 import { IdTokenPayloadDto } from '../lti/dto/id-token-payload.dto';
-import { CreateUserDto } from './dto/create-user.dto';
+import { LtiDeployment } from '../lti/entities/lti-deployment.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { AuthTypeEnum } from './enums/auth-type.enum';
@@ -21,8 +21,8 @@ export class UserService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  create(createUserDto: CreateUserDto) {
-    const user = this.userRepository.create(createUserDto);
+  create(dto: DeepPartial<User>) {
+    const user = this.userRepository.create(dto);
     return this.userRepository.save(user);
   }
 
@@ -44,16 +44,16 @@ export class UserService {
 
   public async findOrCreateByLtiClaims(
     claims: IdTokenPayloadDto,
+    ltiDeployment: LtiDeployment,
   ): Promise<User> {
     const ltiSubjectId = claims.sub;
-    const ltiPlatformId = claims.iss;
     const ltiRoles = claims.roles || [];
     const internalRoles = this.mapLtiRolesToInternalRoles(ltiRoles);
 
     let user = await this.userRepository.findOne({
       where: {
         ltiSubjectId: ltiSubjectId,
-        ltiPlatformId: ltiPlatformId,
+        tenantId: ltiDeployment.tenantId,
       },
     });
 
@@ -64,11 +64,10 @@ export class UserService {
     if (!user) {
       user = this.userRepository.create({
         ltiSubjectId,
-        ltiPlatformId,
+        tenantId: ltiDeployment.tenantId,
         email,
         firstName,
         lastName,
-
         roles: internalRoles,
         authType: AuthTypeEnum.LTI,
       });

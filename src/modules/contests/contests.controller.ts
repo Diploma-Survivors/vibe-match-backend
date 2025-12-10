@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
   UseInterceptors,
@@ -25,6 +26,7 @@ import {
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 import {
   CursorEdgeDto,
   PaginationCursorResponseDto,
@@ -39,6 +41,7 @@ import { CreateContestResponseDto } from './dto/create-contest-response.dto';
 import { CreateContestDto } from './dto/create-contest.dto';
 import { GetContestsResponseDto } from './dto/get-contests-response.dto';
 import { GetDetailContestResponseDto } from './dto/get-detail-contest-response.dto';
+import { UpdateContestDto } from './dto/update-contest.dto';
 
 @Controller('contests')
 @ApiTags('Contests')
@@ -59,7 +62,7 @@ export class ContestsController {
     description: 'Invalid input data',
   })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @UseInterceptors(ClassSerializerInterceptor)
   @Roles(RoleEnum.INSTRUCTOR)
   async createContest(
@@ -71,6 +74,36 @@ export class ContestsController {
       currentUser,
     );
     return new CreateContestResponseDto(contest);
+  }
+
+  @Put(':id')
+  @ApiOperation({
+    summary: 'Update a contest',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Contest updated successfully',
+    type: () => GetDetailContestResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
+  @Roles(RoleEnum.INSTRUCTOR)
+  async updateContest(
+    @Param('id') id: string,
+    @Body() updateContestDto: UpdateContestDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const contest = await this.contestsService.update(
+      +id,
+      updateContestDto,
+      currentUser,
+    );
+    return new GetDetailContestResponseDto(contest);
   }
 
   @Get()
