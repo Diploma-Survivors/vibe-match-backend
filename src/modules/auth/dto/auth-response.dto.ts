@@ -2,12 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class AuthResponseDto {
   @ApiProperty({
-    description: 'Success message',
-    example: 'Authentication successful',
-  })
-  message: string;
-
-  @ApiProperty({
     description: 'JWT access token',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })

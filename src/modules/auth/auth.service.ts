@@ -1,8 +1,17 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { compare } from 'bcrypt';
+
+import { compare, hash } from 'bcrypt';
 import { Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
+
+import { Course } from '../course/entities/course.entity';
+import { UserCourse } from '../user-course/entities/user-course.entity';
 import { Tenant } from '../user/entities/tenant.entity';
 import { AuthTypeEnum } from '../user/enums/auth-type.enum';
 import { RoleEnum } from '../user/enums/role.enum';
@@ -22,8 +31,13 @@ export class AuthService {
     private readonly authRepository: Repository<Auth>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(Course)
+    private readonly courseRepository: Repository<Course>,
+    @InjectRepository(UserCourse)
+    private readonly userCourseRepository: Repository<UserCourse>,
     private readonly userService: UserService,
     private readonly jwtAuthService: JwtAuthService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Transactional()
@@ -39,19 +53,35 @@ export class AuthService {
     const platformTenant = await this.tenantRepository.findOne({
       where: { type: TenantType.PLATFORM },
     });
-
     if (!platformTenant) {
       throw new BadRequestException(
         'Platform tenant not found. Please contact administrator.',
       );
     }
 
+    // Get course for LOCAL auth users (managed by admin)
+    const course = await this.courseRepository.findOne({
+      where: { tenantId: platformTenant.id },
+    });
+    if (!course) {
+      throw new BadRequestException('Course not found');
+    }
+
+    const hashedPassword = await hash(dto.password, 12);
+
     // Create user
-    await this.userService.create({
+    const user = await this.userService.create({
       ...dto,
+      password: hashedPassword,
       roles: [RoleEnum.STUDENT],
       authType: AuthTypeEnum.LOCAL,
       tenantId: platformTenant.id,
+    });
+
+    await this.userCourseRepository.save({
+      user,
+      course,
+      rolesInCourse: [RoleEnum.STUDENT],
     });
   }
 
@@ -70,16 +100,39 @@ export class AuthService {
       throw new BadRequestException('Invalid email or password');
     }
 
+    const tenant = await this.tenantRepository.findOne({
+      where: {
+        type: TenantType.PLATFORM,
+      },
+    });
+    if (!tenant) {
+      throw new NotFoundException(
+        'Platform tenant not found. Please contact administrator.',
+      );
+    }
+    const course = await this.courseRepository.findOne({
+      where: {
+        tenantId: tenant.id,
+      },
+    });
+    if (!course) {
+      throw new NotFoundException(
+        'Platform course not found. Please contact administrator.',
+      );
+    }
+
     // Generate device ID
     const deviceId = await this.jwtAuthService.generateDeviceId();
 
     // Create JWT payload
     const payload: JwtPayload = {
       userId: user.id,
+      courseId: course.id,
       email: user.email!,
       firstName: user.firstName!,
       lastName: user.lastName!,
       roles: user.roles,
+      iss: this.configService.get<string>('appConfig.url'),
     };
 
     // Generate tokens
@@ -90,7 +143,6 @@ export class AuthService {
     );
 
     return {
-      message: 'Sign in successful',
       accessToken,
       refreshToken,
       deviceId,

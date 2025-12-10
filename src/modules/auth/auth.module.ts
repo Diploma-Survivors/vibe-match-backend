@@ -3,7 +3,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { RedisModule } from 'src/shared/redis/redis.module';
+
+import { Course } from '../course/entities/course.entity';
+import { UserCourse } from '../user-course/entities/user-course.entity';
 import { UserCourseModule } from '../user-course/user-course.module';
 import { Tenant } from '../user/entities/tenant.entity';
 import { UserModule } from '../user/user.module';
@@ -18,7 +22,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Auth, Tenant]),
+    TypeOrmModule.forFeature([Auth, Tenant, Course, UserCourse]),
     UserModule,
     UserCourseModule,
     RefreshTokenModule,
