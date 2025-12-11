@@ -28,6 +28,7 @@ import { TimeUtil } from '../../shared/util/time.util';
 import { JwtPayload } from '../auth/interfaces/jwt.interface';
 import { ContestParticipation } from '../contests/entities/contest-participations.entity';
 import { Contest } from '../contests/entities/contest.entity';
+import { DeadlineEnforcement } from '../contests/enums/deadline-enforcement.enum';
 import {
   Judge0BatchResponse,
   Judge0Response,
@@ -152,18 +153,34 @@ export class SubmissionService {
     if (!contest) throw new NotFoundException('Contest not found');
 
     const now = new Date();
-    if (now < contest.startTime)
+
+    // Check contest has started
+    if (now < contest.startTime) {
       throw new BadRequestException('Contest not started yet');
-    if (now > contest.endTime)
-      throw new BadRequestException('Contest already ended');
+    }
 
     // Validate participation
     const contestParticipation = await this.contestParticipationRepo.findOne({
-      where: { id: createSubmissionDto.contestParticipationId },
+      where: {
+        contest: { id: contestId },
+        user: { id: user.userId },
+      },
     });
     if (!contestParticipation) {
-      throw new NotFoundException('User is not registered in the contest');
+      throw new NotFoundException(
+        'You have not started participation in this contest. Please join the contest first.',
+      );
     }
+
+    // Check if participation has been finished
+    if (contestParticipation.finishedAt) {
+      throw new BadRequestException(
+        'You have already finished this contest participation. No further submissions are allowed.',
+      );
+    }
+
+    // Validate deadline based on enforcement strategy
+    this.validateContestDeadline(contest, contestParticipation, now);
 
     // Validate problem in contest
     const problem = await this.findProblemOrFail(createSubmissionDto.problemId);
@@ -192,6 +209,9 @@ export class SubmissionService {
         contestParticipation,
         language,
         fileUrl,
+        ltiLaunchSession: user.ltiSessionId
+          ? ({ id: user.ltiSessionId } as LtiLaunchSession)
+          : null,
       }),
     );
 
@@ -202,6 +222,72 @@ export class SubmissionService {
       true,
       file,
     );
+  }
+
+  /**
+   * Validates contest submission deadline based on enforcement strategy.
+   *
+   * Rules:
+   * - With durationMinutes:
+   *   - STRICT: deadline = contest.endTime
+   *   - FLEXIBLE: deadline = participation.startTime + durationMinutes
+   * - Without durationMinutes:
+   *   - STRICT: deadline = contest.endTime
+   *   - FLEXIBLE: deadline = contest.lateDeadline (late if after contest.endTime)
+   */
+  private validateContestDeadline(
+    contest: Contest,
+    participation: ContestParticipation,
+    now: Date,
+  ): void {
+    const { deadlineEnforcement, durationMinutes, endTime, lateDeadline } =
+      contest;
+
+    if (deadlineEnforcement === DeadlineEnforcement.STRICT) {
+      // STRICT mode: Always enforce contest.endTime
+      if (now > endTime) {
+        throw new BadRequestException('Contest deadline has passed');
+      }
+
+      // Also check participation.endTime if set (for timed contests)
+      if (participation.endTime && now > participation.endTime) {
+        throw new BadRequestException(
+          'Your participation time has ended for this contest',
+        );
+      }
+    } else {
+      // FLEXIBLE mode
+      if (durationMinutes) {
+        // Timed contest: deadline = participation.startTime + durationMinutes
+        const participationDeadline = new Date(participation.startTime);
+        participationDeadline.setMinutes(
+          participationDeadline.getMinutes() + durationMinutes,
+        );
+
+        if (now > participationDeadline) {
+          throw new BadRequestException(
+            'Your participation time has ended for this contest',
+          );
+        }
+      } else {
+        // Untimed contest with late deadline
+        if (!lateDeadline) {
+          // No late deadline set, fall back to contest.endTime
+          if (now > endTime) {
+            throw new BadRequestException('Contest deadline has passed');
+          }
+        } else {
+          // Late deadline is set
+          if (now > lateDeadline) {
+            throw new BadRequestException(
+              'Contest late deadline has passed. Submissions are no longer accepted',
+            );
+          }
+          // Note: Submission is allowed but may be marked as late if after endTime
+          // This is handled in the response/grading logic, not here
+        }
+      }
+    }
   }
 
   async getDetailSubmissionById(
@@ -293,6 +379,11 @@ export class SubmissionService {
     query: SubmissionsCursorQueryDto,
     user: JwtPayload,
   ) {
+    // Check if user is instructor/admin - they can see all submissions
+    const isInstructorOrAdmin =
+      user.roles?.includes(RoleEnum.INSTRUCTOR) ||
+      user.roles?.includes(RoleEnum.ADMIN);
+
     const queryBuilder = this.submissionRepository
       .createQueryBuilder('submission')
       .innerJoinAndSelect('submission.problem', 'problem')
@@ -302,15 +393,69 @@ export class SubmissionService {
       .andWhere(
         'submission.contest_participation_id = :contestParticipationId',
         { contestParticipationId },
-      )
+      );
+
+    // Regular users can only see their own submissions
+    if (!isInstructorOrAdmin) {
+      queryBuilder.andWhere('user.id = :userId', { userId: user.userId });
+    }
+
+    this.applyFilter(queryBuilder, query.filters);
+
+    const countSubmissionsField: CountSubmissionField = {
+      userId: isInstructorOrAdmin ? undefined : user.userId,
+      problemId: Number(problemId),
+      contestParticipationId: Number(contestParticipationId),
+    };
+
+    return this.submissionCursorService.paginateContestSubmissions(
+      queryBuilder,
+      query,
+      countSubmissionsField,
+    );
+  }
+
+  async getByContest(
+    contestId: number,
+    query: SubmissionsCursorQueryDto,
+    user: JwtPayload,
+    problemId?: number,
+  ) {
+    // Find contest participation for this user
+    const contestParticipation = await this.contestParticipationRepo.findOne({
+      where: {
+        contest: { id: contestId },
+        user: { id: user.userId },
+      },
+    });
+
+    if (!contestParticipation) {
+      throw new NotFoundException(
+        'You have not started participation in this contest',
+      );
+    }
+
+    const queryBuilder = this.submissionRepository
+      .createQueryBuilder('submission')
+      .innerJoinAndSelect('submission.problem', 'problem')
+      .innerJoinAndSelect('submission.user', 'user')
+      .innerJoinAndSelect('submission.language', 'language')
+      .where('submission.contest_participation_id = :contestParticipationId', {
+        contestParticipationId: contestParticipation.id,
+      })
       .andWhere('user.id = :userId', { userId: user.userId });
+
+    // Optional filter by specific problem
+    if (problemId) {
+      queryBuilder.andWhere('problem.id = :problemId', { problemId });
+    }
 
     this.applyFilter(queryBuilder, query.filters);
 
     const countSubmissionsField: CountSubmissionField = {
       userId: user.userId,
-      problemId: Number(problemId),
-      contestParticipationId: Number(contestParticipationId),
+      contestParticipationId: contestParticipation.id,
+      ...(problemId && { problemId }),
     };
 
     return this.submissionCursorService.paginateSubmissions(

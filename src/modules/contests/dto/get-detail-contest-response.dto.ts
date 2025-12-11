@@ -7,8 +7,11 @@ import { Exclude, Expose } from 'class-transformer';
 // Relative imports
 import { Course } from 'src/modules/course/entities/course.entity';
 import { DifficultyLevel } from 'src/modules/problems/enums/difficulty-level.enum';
+import { SubmissionStrategyEnum } from 'src/modules/submission/enums/submission-strategy.enum';
 import { User } from 'src/modules/user/entities/user.entity';
 import { DeadlineEnforcement } from '../enums/deadline-enforcement.enum';
+import { ProblemStatus } from '../enums/problem-status.enum';
+import { ParticipationStatusDto } from './participation-status.dto';
 
 export class ContestProblemDetail {
   @ApiProperty({
@@ -22,12 +25,6 @@ export class ContestProblemDetail {
     example: 'Two Sum Problem',
   })
   title: string;
-
-  @ApiProperty({
-    description: 'The score assigned to the problem in the contest',
-    example: 100,
-  })
-  score: number;
 
   @ApiProperty({
     description: 'The difficulty level of the problem',
@@ -47,6 +44,26 @@ export class ContestProblemDetail {
     example: 2000,
   })
   timeLimitMs: number;
+
+  @ApiProperty({
+    description: 'The maximum score for this problem in the contest',
+    example: 100,
+  })
+  maxScore: number;
+
+  @ApiProperty({
+    description:
+      "The user's score for this problem based on the contest's submission strategy",
+    example: 85,
+  })
+  userScore: number;
+
+  @ApiProperty({
+    description: 'The status of the problem for the user',
+    example: ProblemStatus.UNATTEMPTED,
+    enum: ProblemStatus,
+  })
+  status: ProblemStatus;
 }
 
 export class GetDetailContestResponseDto {
@@ -103,6 +120,14 @@ export class GetDetailContestResponseDto {
   })
   deadlineEnforcement: DeadlineEnforcement;
 
+  @ApiProperty({
+    description:
+      'Submission strategy for all problems in this contest (overrides individual problem strategies)',
+    enum: SubmissionStrategyEnum,
+    example: SubmissionStrategyEnum.BEST_SCORE,
+  })
+  submissionStrategy: SubmissionStrategyEnum;
+
   @Exclude()
   courseId: number;
 
@@ -122,6 +147,12 @@ export class GetDetailContestResponseDto {
   })
   @Expose({ name: 'problems' })
   contestProblems: ContestProblemDetail[];
+
+  @ApiProperty({
+    description: 'User participation status in this contest',
+    type: () => ParticipationStatusDto,
+  })
+  participation: ParticipationStatusDto;
 
   @Exclude()
   createdAt: Date;

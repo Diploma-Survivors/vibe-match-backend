@@ -44,7 +44,10 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 // Relative imports
 import * as judge0Interface from '../judge0/judge0.interface';
 import { SubmissionConstants } from './constants/submission.constant';
-import { ApiPaginatedSubmissionsResponse } from './decorators/api-paginated-submissions.decorator';
+import {
+  ApiPaginatedContestSubmissionsResponse,
+  ApiPaginatedSubmissionsResponse,
+} from './decorators/api-paginated-submissions.decorator';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { SubmissionDetailDto } from './dto/detail-submission.dto';
 import { QuerySubmissionsFilterDto } from './dto/query-submission-filter.dto';
@@ -57,7 +60,7 @@ import { SubmissionService } from './submission.service';
 // Type imports
 import type { JwtPayload } from '../auth/interfaces/jwt.interface';
 
-@ApiTags('submissions')
+@ApiTags('Submissions')
 @Controller('submissions')
 @UseInterceptors(ClassSerializerInterceptor)
 export class SubmissionController {
@@ -112,32 +115,6 @@ export class SubmissionController {
     return this.submissionService.submitForGrading(dto, user, file);
   }
 
-  @Post('/contest-participation/:contestId/submit')
-  @ApiResponse({
-    type: () => String,
-    status: HttpStatus.OK,
-    description: 'Code has been submitted successfully.',
-  })
-  @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Unauthorized',
-  })
-  @ApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'You are not allowed to submit to this contest.',
-  })
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async submitToContest(
-    @Param('contestId') contestId: number,
-    @Body() dto: CreateSubmissionDto,
-    @CurrentUser() user: JwtPayload,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
-    return this.submissionService.submitToContest(contestId, dto, user, file);
-  }
-
   @Get('/problem/:problemId')
   @ApiBearerAuth()
   @ApiPaginatedSubmissionsResponse()
@@ -163,7 +140,7 @@ export class SubmissionController {
 
   @Get('/contest-participation/:contestParticipationId/problem/:problemId')
   @ApiBearerAuth()
-  @ApiPaginatedSubmissionsResponse()
+  @ApiPaginatedContestSubmissionsResponse()
   @UseGuards(JwtAuthGuard)
   async getByContestAndProblem(
     @Param('contestParticipationId') contestParticipationId: number,
