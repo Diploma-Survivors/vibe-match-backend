@@ -1,0 +1,73 @@
+{
+  "features": {
+    "code_quality": {
+      "global": {
+        "system": "./features/code_quality/global/system.md",
+        "rubric": "./features/code_quality/global/rubric.md",
+        "examples": "./features/code_quality/global/examples.md"
+      },
+      "dsa": {
+        "system": "./features/code_quality/dsa/system.md",
+        "rubric": "./features/code_quality/dsa/rubric.md",
+        "examples": "./features/code_quality/dsa/examples.md"
+      },
+      "oop": {
+        "system": "./features/code_quality/oop/system.md",
+        "rubric": "./features/code_quality/oop/rubric.md",
+        "examples": "./features/code_quality/oop/examples.md"
+      },
+      "programming_fundamentals": {
+        "system": "./features/code_quality/programming_fundamentals/system.md",
+        "rubric": "./features/code_quality/programming_fundamentals/rubric.md",
+        "examples": "./features/code_quality/programming_fundamentals/examples.md"
+      }
+    },
+    "complexity": {
+      "system": "./features/complexity/system.md",
+      "examples": "./features/complexity/examples.md",
+      "format": "./features/complexity/format.md"
+    },
+    "feedback": {
+      "global": {
+        "system": "./features/feedback/global/system.md",
+        "rubric": "./features/feedback/global/rubric.md",
+        "examples": "./features/feedback/global/examples.md"
+      },
+      "dsa": {
+        "system": "./features/feedback/dsa/system.md",
+        "rubric": "./features/feedback/dsa/rubric.md",
+        "examples": "./features/feedback/dsa/examples.md"
+      },
+      "oop": {
+        "system": "./features/feedback/oop/system.md",
+        "rubric": "./features/feedback/oop/rubric.md",
+        "examples": "./features/feedback/oop/examples.md"
+      },
+      "programming_fundamentals": {
+        "system": "./features/feedback/programming_fundamentals/system.md",
+        "rubric": "./features/feedback/programming_fundamentals/rubric.md",
+        "examples": "./features/feedback/programming_fundamentals/examples.md"
+      }
+    },
+    "teacher_review": {
+      "system": "./features/teacher_review/system.md",
+      "examples": "./features/teacher_review/examples.md",
+      "style_guides": "./features/teacher_review/style_guides.md"
+    }
+  },
+  "shared": {
+    "conventions": {
+      "naming_rules": "./shared/conventions/naming_rules.md",
+      "tone_guidelines": "./shared/conventions/tone_guidelines.md"
+    },
+    "evaluation_rubrics": {
+      "dsa": "./shared/evaluation_rubrics/dsa.md",
+      "fundamentals": "./shared/evaluation_rubrics/fundamentals.md",
+      "oop": "./shared/evaluation_rubrics/oop.md"
+    },
+    "formatting": {
+      "json_output": "./shared/formatting/json_output.md",
+      "markdown_output": "./shared/formatting/markdown_output.md"
+    }
+  }
+}
